@@ -15,16 +15,28 @@ function getArg(name, def) {
   return a ? a.split('=')[1] : def;
 }
 
-async function readSpec(spec) {
-  if (/^https?:\/\//.test(spec)) {
-    const res = await fetch(spec);
-    if (!res.ok) throw new Error(`Impossible de télécharger la spec: ${res.status} ${res.statusText}`);
-    return await res.json();
-  }
-  const src = await fs.readFile(spec, 'utf8');
-  return JSON.parse(src);
-}
+ async function  readSpec(spec) {
+   if (/^https?:\/\//.test(spec)) {
+     const res = await fetch(spec);
+     if (!res.ok) {
+       throw new Error(`Impossible de télécharger la spec : ${res.status} ${res.statusText}`);
+     }
+     return await res.json();
+   }
 
+   try {
+     const src = await fs.readFile(spec, 'utf8');
+     return JSON.parse(src);
+   } catch (err) {
+     if (err.code === 'ENOENT') {
+       throw new Error(`Fichier non trouvé : ${spec}`);
+     }
+     if (err.name === 'SyntaxError') {
+       throw new Error(`JSON invalide dans ${spec} : ${err.message}`);
+     }
+     throw err;
+   }
+ }
 async function main() {
   const specUrl = process.argv[2];
   if (!specUrl) {
