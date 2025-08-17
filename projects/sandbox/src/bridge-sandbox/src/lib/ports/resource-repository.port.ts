@@ -1,6 +1,6 @@
 import {Observable} from 'rxjs';
 
-export type Id = string | number;
+export type Id = string | number | undefined;
 
 export interface Item {
     '@id'?: string;
