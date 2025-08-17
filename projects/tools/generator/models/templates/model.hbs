@@ -1,0 +1,10 @@
+import {Item} from '../lib/ports/resource-repository.port';
+{{#each imports}}
+import { {{this}} } from './{{this}}';
+{{/each}}
+
+export interface {{name}} extends Item {
+{{#each props}}
+  {{{tsKey}}}{{#if optional}}?{{/if}}: {{type}};
+{{/each}}
+}

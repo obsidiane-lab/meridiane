@@ -1,0 +1,76 @@
+<section class="panel" style="margin-bottom: 12px;">
+    <div class="toolbar">
+        <button (click)="routing()">Go Conversations</button>
+
+        <button (click)="load()" [disabled]="loading()">Load list</button>
+        <button (click)="watchAll()">[+] Watch all (SSE)</button>
+        <button (click)="unwatchAll()">[-] Unwatch all (SSE)</button>
+        <span class="badge status {{status()}}">SSE: {{ status() }}</span>
+        <span *ngIf="loading()" class="badge">Loading…</span>
+        <span class="badge">Count: {{ messages().length }}</span>
+    </div>
+</section>
+
+<section class="layout">
+    <!-- LISTE GAUCHE -->
+    <div class="panel list">
+        <div class="row" *ngFor="let c of messages()"
+             [class.active]="c.id === selectedId()"
+             (click)="select(c)">
+            <div>
+                <div><strong>#{{ c.id }}</strong></div>
+                <div style="font-size:12px;color:#6b7280">originalText: {{ c.originalText || '—' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAIL DROITE -->
+    <div class="panel" *ngIf="selected() as mesg; else empty">
+        <header class="toolbar" style="justify-content:space-between;">
+            <div style="display:flex; gap:10px; align-items:center;">
+                <h3 style="margin:0">Message #{{ mesg.id }}</h3>
+                <span class="badge">SSE: {{ status() }}</span>
+            </div>
+            <div class="toolbar">
+                <button (click)="watchOne()" [disabled]="!selectedId()">[+] Watch one now</button>
+                <button (click)="unwatchOne()" [disabled]="!selectedId()">[-] Unwatch one now</button>
+
+                <button (click)="manualGet()" [disabled]="!selectedId()">Manual GET</button>
+            </div>
+        </header>
+
+        <section style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top: 12px;">
+            <div>
+                <h4>Mise à jour (PATCH)</h4>
+                <div style="display:grid; gap:8px;">
+                    <label>
+                        <div style="font-size:12px;color:#6b7280">originalText</div>
+                        <input [(ngModel)]="formOriginalText" placeholder="nouvel originalText"/>
+                    </label>
+                    <button (click)="patchOriginalText()" [disabled]="!selectedId()">Envoyer PATCH</button>
+                </div>
+            </div>
+
+            <div>
+                <h4>Meta</h4>
+                <div class="badge">messages: {{ mesg.messageIris?.length ?? 0 }}</div>
+            </div>
+        </section>
+
+        <section style="margin-top: 16px;">
+            <h4>Snapshot courant</h4>
+            <pre>{{ mesg | json }}</pre>
+        </section>
+
+        <section style="margin-top: 16px;">
+            <h4>Event log</h4>
+            <pre>{{ logs() | json }}</pre>
+        </section>
+    </div>
+
+    <ng-template #empty>
+        <div class="panel">
+            <em>Sélectionne un message dans la liste pour voir le détail.</em>
+        </div>
+    </ng-template>
+</section>
