@@ -56,17 +56,15 @@ projects/
 
 ## 🚀 1) Générer une librairie à partir du template
 
-Exécutez depuis la racine du repo :
+Exécutez depuis la racine du repo:
 
 ```bash
-node projects/tools/generate-lib.js <lib-name> <npm-package-name> [version]
+node projects/tools/generate-lib.js <lib-name> <npm-package-name> [version] <url-registry>
 ```
 
 **Exemples**
 ```bash
-node projects/tools/generate-lib.js backend-bridge @acme/backend-bridge 0.1.0
-# ➜ crée projects/backend-bridge, remplace les placeholders,
-#    met à jour angular.json, et prépare le build ng-packagr.
+node projects/tools/generate-lib.js backend-bridge @acme/backend-bridge 0.1.0 https://gitlab.com/api/v4/projects/12345678910/packages/npm/
 ```
 
 **Placeholders remplacés**
@@ -267,7 +265,6 @@ export class ConversationsLabComponent {
     - `PATCH` → `application/merge-patch+json`
 
 Vous pouvez injecter vos propres interceptors via `extraInterceptors` dans `provideBridge()`.
-
 ---
 
 ## 🛠️ Personnalisation

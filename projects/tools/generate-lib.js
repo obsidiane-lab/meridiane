@@ -32,8 +32,9 @@ async function replacePlaceholdersInDir(srcDir, placeholders) {
  * @param {string} libName - folder and project name
  * @param {string} packageName - NPM package name (e.g. @org/lib)
  * @param {string} version - initial version for the package
+ * @param {string} urlRegistry  - NPM registry url
  */
-async function generate(libName, packageName, version) {
+async function generate(libName, packageName, version, urlRegistry) {
   const tplDir = path.resolve(__dirname, '../../projects/_lib_template');
   const targetDir = path.resolve(__dirname, '../../projects', libName);
 
@@ -44,7 +45,8 @@ async function generate(libName, packageName, version) {
   const placeholders = {
     '__LIB_NAME__': libName,
     '__PACKAGE_NAME__': packageName,
-    '__VERSION__': version
+    '__VERSION__': version,
+    '__URL_REGISTRY__': urlRegistry
   };
   await replacePlaceholdersInDir(targetDir, placeholders);
 
@@ -93,13 +95,13 @@ async function generate(libName, packageName, version) {
 }
 
 // CLI args: node generate-lib.js <lib-name> <package-name> <version>
-const [,, libName, packageName, version = '0.0.1'] = process.argv;
+const [,, libName, packageName, version = '0.0.1', urlRegistry] = process.argv;
 if (!libName || !packageName) {
   console.error('Usage: generate-lib.js <lib-name> <package-name> [version]');
   process.exit(1);
 }
 
-generate(libName, packageName, version).catch(err => {
+generate(libName, packageName, version, urlRegistry).catch(err => {
   console.error(err);
   process.exit(1);
 });
