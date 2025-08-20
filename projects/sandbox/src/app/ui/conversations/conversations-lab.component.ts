@@ -3,8 +3,8 @@ import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import type {Conversation} from '../../entities/conversation';
 import {Router} from "@angular/router";
-import {FacadeFactory} from "../../../bridge-sandbox/src/public-api";
-import {ResourceFacade} from "../../../bridge-sandbox/src/public-api";
+import {ResourceFacade} from '../../../bridge-sandbox/src/lib/facades/resource.facade';
+import {FacadeFactory} from '../../../bridge-sandbox/src/lib/facades/facade.factory';
 
 interface LogEntry {
   t: number;

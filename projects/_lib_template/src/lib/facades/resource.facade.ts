@@ -5,7 +5,7 @@ import {toSignal} from '@angular/core/rxjs-interop';
 import {catchError, finalize, map, shareReplay, filter, throwError} from 'rxjs';
 import {Facade} from './facade.interface';
 
-export class ResourceFacade<T extends { id: Id }> implements Facade<T> {
+export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
     private readonly _items = signal<readonly T[]>([]);
     readonly items = this._items.asReadonly();
 

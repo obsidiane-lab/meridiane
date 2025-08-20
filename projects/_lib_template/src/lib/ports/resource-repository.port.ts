@@ -38,7 +38,7 @@ export interface CreateCommand<T> {
 }
 
 export interface UpdateCommand<T> {
-    id: Id;
+    id?: Id;
     changes: Partial<T>;
 }
 
