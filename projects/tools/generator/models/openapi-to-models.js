@@ -31,7 +31,11 @@ function mergeAllOf(schemas) {
 
 export function buildModelsFromOpenAPI(spec) {
   const schemas = spec?.components?.schemas || {};
-  const origNames = Object.keys(schemas).filter(n => !/jsonld/i.test(n)).sort((a, b) => a.localeCompare(b));
+  const origNames = Object
+    .keys(schemas)
+    .filter(n => !n.includes('.'))
+    .filter(n => !/jsonld/i.test(n))
+    .sort((a, b) => a.localeCompare(b));
 
   const used = new Set();
   const nameMap = new Map(); // original → sanitized
