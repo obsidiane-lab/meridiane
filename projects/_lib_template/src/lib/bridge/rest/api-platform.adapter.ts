@@ -15,26 +15,26 @@ export class ApiPlatformRestRepository<TDomain> implements ResourceRepository<TD
     constructor(
         private readonly http: HttpClient,
         private readonly apiBase: string,
-        private readonly resourcePath: string,                           // ex: '/books'
+        private readonly resourcePath: string
     ) {}
 
-    list(query?: Query): Observable<Collection<TDomain>> {
+    list$(query?: Query): Observable<Collection<TDomain>> {
         return this.http.get<any>(`${this.apiBase}${this.resourcePath}`, { params: toHttpParams(query) });
     }
 
-    get(id: Id): Observable<TDomain> {
+    get$(id: Id): Observable<TDomain> {
         return this.http.get<TDomain>(`${this.apiBase}${this.resourcePath}/${id}`);
     }
 
-    create(cmd: CreateCommand<TDomain>): Observable<TDomain> {
+    create$(cmd: CreateCommand<TDomain>): Observable<TDomain> {
         return this.http.post<TDomain>(`${this.apiBase}${this.resourcePath}`, cmd.payload);
     }
 
-    update(cmd: UpdateCommand<TDomain>): Observable<TDomain> {
+    update$(cmd: UpdateCommand<TDomain>): Observable<TDomain> {
         return this.http.patch<TDomain>(`${this.apiBase}${this.resourcePath}/${cmd.id}`, cmd.changes);
     }
 
-    delete(id: Id): Observable<void> {
+    delete$(id: Id): Observable<void> {
         return this.http.delete<void>(`${this.apiBase}${this.resourcePath}/${id}`);
     }
 }

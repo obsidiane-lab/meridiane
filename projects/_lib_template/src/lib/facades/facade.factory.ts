@@ -28,8 +28,8 @@ export class FacadeFactory {
 
   create<T extends { id?: Id }>(config: FacadeConfig<T>): ResourceFacade<T> {
     const path = config.url;
-    const repo = config.repo ?? new ApiPlatformRestRepository<T>(this.http, this.baseUrl, path);
-    const realtime = config.realtime ?? (this.mercureAny as MercureRealtimeAdapter<T>);
+    const repo = new ApiPlatformRestRepository<T>(this.http, this.baseUrl, path);
+    const realtime = this.mercureAny as MercureRealtimeAdapter<T>;
     return runInInjectionContext(this.env, () => new ResourceFacade<T>(repo, realtime, path));
   }
 }

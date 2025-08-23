@@ -43,13 +43,13 @@ export interface UpdateCommand<T> {
 }
 
 export interface ResourceRepository<T> {
-  list(query?: Query): Observable<Collection<T>>;
+  list$(query?: Query): Observable<Collection<T>>;
 
-  get(id: Id): Observable<T>;
+  get$(id: Id): Observable<T>;
 
-  create(cmd: CreateCommand<T>): Observable<T>;
+  create$(cmd: CreateCommand<T>): Observable<T>;
 
-  update(cmd: UpdateCommand<T>): Observable<T>;
+  update$(cmd: UpdateCommand<T>): Observable<T>;
 
-  delete(id: Id): Observable<void>;
+  delete$(id: Id): Observable<void>;
 }

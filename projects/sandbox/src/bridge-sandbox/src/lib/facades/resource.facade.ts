@@ -28,7 +28,7 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
   ) {
     this.resourcePath = resourcePath;
     this.connectionStatus = toSignal(
-      this.realtime.status(),
+      this.realtime.status$(),
       {initialValue: 'offline' as RealtimeStatus}
     );
   }
@@ -39,7 +39,7 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
 
   list(query?: Query): Observable<Collection<T>> {
     this._loading.set(true);
-    return this.repo.list(query).pipe(
+    return this.repo.list$(query).pipe(
       tap(page => this._items.set(page.member)),
       catchError(err => {
         console.error('Erreur list()', err);
@@ -50,19 +50,19 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
   }
 
   get(id: Id) {
-    return this.repo.get(id);
+    return this.repo.get$(id);
   }
 
   create(cmd: CreateCommand<T>) {
-    return this.repo.create(cmd);
+    return this.repo.create$(cmd);
   }
 
   update(cmd: UpdateCommand<T>) {
-    return this.repo.update(cmd);
+    return this.repo.update$(cmd);
   }
 
   delete(id: Id) {
-    return this.repo.delete(id);
+    return this.repo.delete$(id);
   }
 
   watchAll(): void {
@@ -85,7 +85,7 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
 
   protected subscribeAndSync(iris: string[]): void {
     this.realtime
-      .subscribe(iris, payload => ({iri: payload['@id'] ?? '', data: payload as T | undefined}))
+      .subscribe$(iris, payload => ({iri: payload['@id'] ?? '', data: payload as T | undefined}))
       .pipe(
         map(event => event.data),
         filter((data): data is T => data !== undefined),

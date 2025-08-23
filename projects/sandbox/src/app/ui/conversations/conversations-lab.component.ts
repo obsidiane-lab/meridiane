@@ -58,7 +58,7 @@ export class ConversationsLabComponent {
 
   // Actions toolbar
   load() {
-    this.facade.list({page: 1, itemsPerPage: 20});
+    this.facade.list({page: 1, itemsPerPage: 20}).subscribe();
   }
 
   watchAll() {

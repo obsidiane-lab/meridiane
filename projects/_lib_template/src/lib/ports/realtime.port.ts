@@ -20,10 +20,10 @@ export interface RealtimeEvent<T> {
 }
 
 export interface RealtimePort<TPayload = unknown> {
-    subscribe(iris: string[], parse: (raw: any) => RealtimeEvent<TPayload>): Observable<RealtimeEvent<TPayload>>;
+    subscribe$(iris: string[], parse: (raw: any) => RealtimeEvent<TPayload>): Observable<RealtimeEvent<TPayload>>;
 
     unsubscribe(iris: string[]): void;
 
-    status(): Observable<RealtimeStatus>;
+    status$(): Observable<RealtimeStatus>;
 
 }

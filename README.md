@@ -12,7 +12,7 @@
 - **Scaffold** une librairie Angular à partir d’un **template** (`projects/_lib_template`).
 - Expose un **bridge** pour communiquer avec votre backend :
   - REST (adapter **API Platform / Hydra** prêt à l’emploi) ;
-  - **SSE** via **Mercure** pour le temps réel ;
+  - **SSE** via **Mercure** pour le temps réel — *mono-connexion EventSource* + **comptage de références par topic** (plusieurs façades peuvent s’abonner au même topic sans conflits) ;
   - **interceptors** (`Content-Type`, `X-Request-ID` de corrélation).
 - **Génère des modèles TypeScript** à partir d’une **spec OpenAPI** (via Handlebars).
 - Fournit une **facade** ergonomique (signals Angular) pour lister, lire, créer, mettre à jour, supprimer et **écouter** les entités en temps réel.
@@ -256,6 +256,17 @@ export class ConversationsLabComponent {
 - `watchAll()` / `unwatchAll()` — (SSE) abonne/désabonne toutes les entités chargées
 - `watchOne(id: Id)` / `unwatchOne(id: Id)` — (SSE) sur une entité précise
 
+**Note (SSE & topics)**  
+  Le bridge maintient un **compteur par topic** (`@id`).  
+   Chaque `watch*` **incrémente** ce compteur ; chaque `unwatch*` **décrémente**.  
+  Le **désabonnement effectif** d’un topic n’a lieu **que lorsque le compteur retombe à 0**.  
+  👉 Plusieurs façades peuvent donc observer **la même ressource** sans se gêner :
+```ts
+facadeA.watchOne('/api/conversations/1');
+facadeB.watchOne('/api/conversations/1');
+facadeA.unwatchOne('/api/conversations/1'); // toujours abonné (compteur > 0)
+facadeB.unwatchOne('/api/conversations/1'); // désabonnement effectif (compteur = 0)
+```
 ### Paramétrage des interceptors HTTP
 
 - **`content-type.interceptor`** :
