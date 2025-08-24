@@ -22,7 +22,7 @@
                 <div style="font-size:12px;color:#6b7280">externalId: {{ c.externalId || '—' }}</div>
             </div>
             <div style="display:flex; gap:6px; align-items:center;">
-                <span class="badge">msgs: {{ c.messageIris?.length ?? 0 }}</span>
+                <span class="badge">msgs: {{ c.messages?.length ?? 0 }}</span>
             </div>
         </div>
     </div>
@@ -56,7 +56,7 @@
 
             <div>
                 <h4>Meta</h4>
-                <div class="badge">messages: {{ conv.messageIris?.length ?? 0 }}</div>
+                <div class="badge">messages: {{ conv.messages?.length ?? 0 }}</div>
             </div>
         </section>
 

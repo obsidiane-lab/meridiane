@@ -13,7 +13,7 @@ import {ResourceFacade} from "../../../bridge-sandbox/src/public-api";
 interface LogEntry {
   t: number;
   kind: 'init' | 'select' | 'update' | 'patch' | 'put' | 'manual-get';
-  id?: string | null;
+  id?: number | undefined;
   snapshot?: unknown;
 }
 
@@ -32,7 +32,7 @@ export class MessagesLabComponent {
   readonly status
 
   // Sélection & formulaire
-  readonly selectedId = signal<string | null>(null);
+  readonly selectedId = signal<number | undefined>(undefined);
   formOriginalText = '';
 
   // Logs

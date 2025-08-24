@@ -10,7 +10,7 @@ import {Conversation} from '../../entities/conversation';
 interface LogEntry {
   t: number;
   kind: 'init' | 'select' | 'update' | 'patch' | 'put' | 'manual-get';
-  id?: string | null;
+  id?: number | undefined;
   snapshot?: unknown;
 }
 
@@ -29,7 +29,7 @@ export class ConversationsLabComponent {
   readonly status
 
   // Sélection & formulaire
-  readonly selectedId = signal<string | null>(null);
+  readonly selectedId = signal<number | undefined>(undefined);
   formExternalId = '';
 
   // Logs
@@ -73,7 +73,7 @@ export class ConversationsLabComponent {
     this.formExternalId = c.externalId ?? '';
     this.pushLog({t: Date.now(), kind: 'select', id: c.id, snapshot: c});
 
-    this.facade.watchSubResource$<Message>(`/api/conversations/${c.id}`, 'conversation').subscribe(() => {
+    this.facade.watchSubResource$<Message>([`/api/conversations/1`], 'conversation').subscribe(message => {
       this.facade.get$(c.id).subscribe()
     })
   }
