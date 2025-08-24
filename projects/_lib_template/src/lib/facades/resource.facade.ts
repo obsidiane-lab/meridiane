@@ -39,10 +39,7 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
   list$(query?: Query): Observable<Collection<T>> {
     return this.repo.list$(query).pipe(
       tap(page => {
-        console.log('tap before', page);
         this._items.set(page.member)
-        console.log('tap after', this._items());
-
       })
     )
   }
