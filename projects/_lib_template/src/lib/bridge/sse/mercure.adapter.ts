@@ -8,16 +8,9 @@ import {Item} from "../../ports/resource-repository.port";
 import {isPlatformBrowser} from '@angular/common';
 import {MercureUrlBuilder} from './mercure-url.builder';
 import {RefCountTopicRegistry} from './ref-count-topic.registry';
+import {CredentialsPolicy} from '../credentials.policy';
 
-class CredentialsPolicy {
-  constructor(private readonly init: unknown) {
-  }
 
-  withCredentials(): boolean {
-    const c = this.init as any;
-    return c?.withCredentials === true || c?.credentials === 'include';
-  }
-}
 
 @Injectable({providedIn: 'root'})
 export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {

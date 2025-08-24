@@ -1,40 +1,59 @@
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { toHttpParams } from './query-builder';
+import {HttpClient} from '@angular/common/http';
+import {Observable} from 'rxjs';
+import {toHttpParams} from './query-builder';
 import {
-    Collection,
-    CreateCommand,
-    Id,
-    Query,
-    ResourceRepository,
-    UpdateCommand
+  Collection,
+  CreateCommand,
+  Id,
+  Query,
+  ResourceRepository,
+  UpdateCommand
 } from '../../ports/resource-repository.port';
+import {Inject} from '@angular/core';
+import {MERCURE_CONFIG} from '../../tokens';
+import {CredentialsPolicy} from '../credentials.policy';
 
 
 export class ApiPlatformRestRepository<TDomain> implements ResourceRepository<TDomain> {
-    constructor(
-        private readonly http: HttpClient,
-        private readonly apiBase: string,
-        private readonly resourcePath: string
-    ) {}
+  private readonly credentialsPolicy: CredentialsPolicy;
 
-    list$(query?: Query): Observable<Collection<TDomain>> {
-        return this.http.get<any>(`${this.apiBase}${this.resourcePath}`, { params: toHttpParams(query) });
-    }
+  constructor(
+    private readonly http: HttpClient,
+    private readonly apiBase: string,
+    private readonly resourcePath: string,
+    @Inject(MERCURE_CONFIG) readonly init: string,
+  ) {
+    this.credentialsPolicy = new CredentialsPolicy(init);
+  }
 
-    get$(id: Id): Observable<TDomain> {
-        return this.http.get<TDomain>(`${this.apiBase}${this.resourcePath}/${id}`);
-    }
+  list$(query?: Query): Observable<Collection<TDomain>> {
+    return this.http.get<any>(`${this.apiBase}${this.resourcePath}`, {
+      params: toHttpParams(query),
+      withCredentials: this.credentialsPolicy.withCredentials()
+    });
+  }
 
-    create$(cmd: CreateCommand<TDomain>): Observable<TDomain> {
-        return this.http.post<TDomain>(`${this.apiBase}${this.resourcePath}`, cmd.payload);
-    }
+  get$(id: Id): Observable<TDomain> {
+    return this.http.get<TDomain>(`${this.apiBase}${this.resourcePath}/${id}`, {
+      withCredentials: this.credentialsPolicy.withCredentials()
+    });
+  }
 
-    update$(cmd: UpdateCommand<TDomain>): Observable<TDomain> {
-        return this.http.patch<TDomain>(`${this.apiBase}${this.resourcePath}/${cmd.id}`, cmd.changes);
-    }
+  create$(cmd: CreateCommand<TDomain>): Observable<TDomain> {
+    return this.http.post<TDomain>(`${this.apiBase}${this.resourcePath}`, cmd.payload, {
+      withCredentials: this.credentialsPolicy.withCredentials()
+    });
+  }
 
-    delete$(id: Id): Observable<void> {
-        return this.http.delete<void>(`${this.apiBase}${this.resourcePath}/${id}`);
-    }
+  update$(cmd: UpdateCommand<TDomain>): Observable<TDomain> {
+    return this.http.patch<TDomain>(`${this.apiBase}${this.resourcePath}/${cmd.id}`, cmd.changes, {
+      withCredentials: this.credentialsPolicy.withCredentials()
+    });
+  }
+
+  delete$(id: Id): Observable<void> {
+    return this.http.delete<void>(`${this.apiBase}${this.resourcePath}/${id}`, {
+      withCredentials: this.credentialsPolicy.withCredentials()
+    });
+  }
 }
