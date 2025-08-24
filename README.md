@@ -163,7 +163,6 @@ import {ResourceFacade} from "@acme/bridge";
 
 @Component({
   selector: 'app-conversations',
-  standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './conversations.component.html',
   styleUrls: ['./conversations.component.css'],
@@ -173,7 +172,6 @@ export class ConversationsLabComponent {
 
   // Signals façade
   readonly conversations
-  readonly loading
   readonly status
 
   // Sélection & formulaire
@@ -188,16 +186,18 @@ export class ConversationsLabComponent {
   });
 
   constructor(protected facadeFactory: FacadeFactory) {
-
     this.facade = facadeFactory.create<Conversation>({url: `/api/conversations`})
-
     this.conversations = this.facade.items;
-    this.loading = this.facade.loading;
     this.status = this.facade.connectionStatus;
   }
 
-  loadList() {
-    this.facade.list({page: 1, itemsPerPage: 20});
+  select(c: Conversation) {
+    this.selectedId.set(c.id);
+    this.formExternalId = c.externalId ?? '';
+  }
+  
+  load() {
+    this.facade.list$({page: 1, itemsPerPage: 20}).subscribe();
   }
 
   watchAll() {
@@ -207,7 +207,7 @@ export class ConversationsLabComponent {
   unwatchAll() {
     this.facade.unwatchAll();
   }
-
+  
   watchOne() {
     const id = this.selectedId();
     if (id) this.facade.watchOne(id);
@@ -221,7 +221,7 @@ export class ConversationsLabComponent {
   manualGet() {
     const id = this.selectedId();
     if (!id) return;
-    this.facade.get(id).subscribe(res => {
+    this.facade.get$(id).subscribe(res => {
       console.log("get entity", res)
     });
   }
@@ -230,15 +230,9 @@ export class ConversationsLabComponent {
     const id = this.selectedId();
     if (!id) return;
     const ext = this.formExternalId?.trim();
-    this.facade.update({id, changes: {externalId: ext}}).subscribe(res => {
+    this.facade.update$({id, changes: {externalId: ext}}).subscribe(res => {
       console.log("patched", res)
     });
-  }
-
-
-  select(c: Conversation) {
-    this.selectedId.set(c.id);
-    this.formExternalId = c.externalId ?? '';
   }
 }
 
@@ -267,7 +261,66 @@ facadeB.watchOne('/api/conversations/1');
 facadeA.unwatchOne('/api/conversations/1'); // toujours abonné (compteur > 0)
 facadeB.unwatchOne('/api/conversations/1'); // désabonnement effectif (compteur = 0)
 ```
-### Paramétrage des interceptors HTTP
+
+
+### 🔔 Temps réel (SSE/Mercure) — écouter des **sous-ressources** par **relation**
+
+Vous pouvez vous abonner à un **topic parent** (ex. une *Conversation*) et ne recevoir que les événements dont une **relation** (ex. `conversation`) pointe vers ce topic.
+Aucune 2ᵉ connexion SSE n’est ouverte : le filtrage est fait côté client.
+
+#### RealtimePort — `subscribe$` (filtre par relation)
+
+```ts
+// Reçoit les Message dont message.conversation == '/api/conversations/1'
+this.conversationFacade
+  .watchSubResource$<Message>({ url: '/api/conversations/1', field: 'conversation' })
+  .subscribe(msg => {
+    console.log('nouveau Message:', msg);
+  });
+```
+
+**Variantes**
+
+```ts
+// Plusieurs conversations ouvertes
+this.conversationFacade.watchSubResource$<Message>({
+  url: ['/api/conversations/1', '/api/conversations/2'],
+  field: 'conversation'
+}).subscribe();
+
+// Relation imbriquée ou tableau
+// field: 'conversation.@id'        // si la relation est un objet { '@id': ... } // TODO
+// field: 'conversations'           // si la relation est un tableau d'IRIs/objets
+```
+
+### Côté API Platform
+
+Publiez la sous-ressource **sur le topic parent** **et** sur son propre topic, et exposez la relation dans le payload :
+
+```php
+mercure: {
+  topics: [
+    '@=iri(object)',                      // /api/conversations/{id}/messages/{mid}
+    '@=iri(object.getConversation())'     // /api/conversations/{id}
+  ]
+}
+```
+
+Le payload Mercure doit contenir la relation :
+
+```json
+{
+  "@type": "Message",
+  "@id": "/api/conversations/1/messages/72",
+  "conversation": "/api/conversations/1",
+  "originalText": "Bien l",
+  "createdAt": "2025-08-24T10:01:13+00:00",
+  "senderId": "user-123"
+}
+```
+
+
+## Paramétrage des interceptors HTTP
 
 - **`content-type.interceptor`** :
   - `Accept: application/ld+json`

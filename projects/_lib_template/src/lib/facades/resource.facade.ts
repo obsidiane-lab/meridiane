@@ -105,9 +105,9 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
     url: string | string[],
     field: string
   ): Observable<R> {
-    const topics = Array.isArray(url) ? url : [url];
+    const iris = Array.isArray(url) ? url : [url];
     return this.realtime
-      .subscribe$<R>(topics, {field: field})
+      .subscribe$<R>(iris, {field: field})
       .pipe(
         map(e => e.data),
         filter((d): d is R => d !== undefined),
