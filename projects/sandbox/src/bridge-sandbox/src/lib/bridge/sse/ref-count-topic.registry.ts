@@ -1,5 +1,5 @@
 export class RefCountTopicRegistry {
-  private readonly topics = new Set<string>();
+  private readonly iris = new Set<string>();
   private readonly refCounts = new Map<string, number>();
 
 
@@ -7,7 +7,7 @@ export class RefCountTopicRegistry {
     for (const iri of iris) {
       const next = (this.refCounts.get(iri) ?? 0) + 1;
       this.refCounts.set(iri, next);
-      this.topics.add(iri);
+      this.iris.add(iri);
     }
   }
 
@@ -17,7 +17,7 @@ export class RefCountTopicRegistry {
       const next = (this.refCounts.get(iri) ?? 0) - 1;
       if (next <= 0) {
         this.refCounts.delete(iri);
-        this.topics.delete(iri);
+        this.iris.delete(iri);
       } else {
         this.refCounts.set(iri, next);
       }
@@ -26,18 +26,18 @@ export class RefCountTopicRegistry {
 
 
   hasAny(): boolean {
-    return this.topics.size > 0;
+    return this.iris.size > 0;
   }
 
 
   snapshot(): ReadonlySet<string> {
-    return new Set(this.topics);
+    return new Set(this.iris);
   }
 
 
 
   computeKey(hubUrl: string, credentialsOn: boolean): string {
-    const topicsSorted = Array.from(this.topics).sort().join('|');
+    const topicsSorted = Array.from(this.iris).sort().join('|');
     return `${hubUrl}::${credentialsOn ? '1' : '0'}::${topicsSorted}`;
   }
 }

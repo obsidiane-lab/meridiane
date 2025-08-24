@@ -1,8 +1,8 @@
 import {DOCUMENT, Inject, Injectable, OnDestroy, PLATFORM_ID} from '@angular/core';
-import {BehaviorSubject, Subject, Observable, defer, of, fromEvent} from 'rxjs';
-import {auditTime, concatMap, filter, finalize, first, map, share, takeUntil} from 'rxjs/operators';
+import {BehaviorSubject, defer, fromEvent, Observable, of, Subject} from 'rxjs';
+import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
 import {API_BASE_URL, MERCURE_CONFIG, MERCURE_HUB_URL} from '../../tokens';
-import {RealtimePort, RealtimeEvent, RealtimeStatus} from '../../ports/realtime.port';
+import {RealtimeEvent, RealtimePort, RealtimeStatus} from '../../ports/realtime.port';
 import {EventSourceWrapper} from './eventsource-wrapper';
 import {Item} from "../../ports/resource-repository.port";
 import {isPlatformBrowser} from '@angular/common';
@@ -20,7 +20,7 @@ class CredentialsPolicy {
 }
 
 @Injectable({providedIn: 'root'})
-export class MercureRealtimeAdapter<T> implements RealtimePort<T>, OnDestroy {
+export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   private lastEventId?: string;
   private es?: EventSourceWrapper;
   private currentKey?: string;
@@ -72,8 +72,8 @@ export class MercureRealtimeAdapter<T> implements RealtimePort<T>, OnDestroy {
   }
 
 
-  subscribe$(iris: string[]): Observable<RealtimeEvent<T>> {
-    if (!iris || iris.length === 0) {
+  subscribe$<T>(iris: string[], _filter?: { field?: string }): Observable<RealtimeEvent<T>> {
+    if (iris.length === 0) {
       return new Observable<RealtimeEvent<T>>((sub) => sub.complete());
     }
 
@@ -81,10 +81,20 @@ export class MercureRealtimeAdapter<T> implements RealtimePort<T>, OnDestroy {
     this.scheduleRebuild();
 
     const filterSet = new Set(iris);
+    const fieldPath = _filter?.field;
 
     return this.incoming$.pipe(
       map((evt) => this.safeParse(evt.data)),
-      filter((payload: Item) => !!payload && !!payload['@id'] && filterSet.has(payload['@id'] as string)),
+
+      filter((raw: any) => {
+        if (fieldPath) {
+          const relIri = this.extractRelationIris(raw, fieldPath);
+          return filterSet.has(relIri)
+        }
+        const id = raw?.['@id'];
+        return typeof id === 'string' && filterSet.has(id);
+      }),
+
       map((payload) => ({iri: payload['@id'] as string, data: payload as T})),
       finalize(() => {
         this.topicsRegistry.removeAll(iris);
@@ -161,7 +171,7 @@ export class MercureRealtimeAdapter<T> implements RealtimePort<T>, OnDestroy {
 
         this._status$.next('connecting');
         this.es.open();
-        this.currentKey = key; // Mémorise la config effective
+        this.currentKey = key;
       } catch (err) {
         console.error('[Mercure] rebuild failed:', err);
         this.currentKey = undefined;
@@ -194,4 +204,9 @@ export class MercureRealtimeAdapter<T> implements RealtimePort<T>, OnDestroy {
   private safeParse(raw: string): Item {
     return JSON.parse(raw) as Item;
   }
+
+  private extractRelationIris(raw: any, path: string): string {
+    return raw?.[path];
+  }
+
 }

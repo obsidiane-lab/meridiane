@@ -10,7 +10,7 @@ import {ResourceFacade} from "./resource.facade";
 export type FacadeConfig<T> = {
   url: string;
   repo?: ResourceRepository<T>;
-  realtime?: RealtimePort<T>;
+  realtime?: RealtimePort;
 };
 
 
@@ -22,14 +22,14 @@ export class FacadeFactory {
   constructor(
     private readonly http: HttpClient,
     @Inject(API_BASE_URL) private readonly baseUrl: string,
-    private readonly mercureAny: MercureRealtimeAdapter<any>
+    private readonly mercureAny: MercureRealtimeAdapter
   ) {
   }
 
   create<T extends { id?: Id }>(config: FacadeConfig<T>): ResourceFacade<T> {
     const path = config.url;
     const repo = new ApiPlatformRestRepository<T>(this.http, this.baseUrl, path);
-    const realtime = this.mercureAny as MercureRealtimeAdapter<T>;
+    const realtime = this.mercureAny as MercureRealtimeAdapter;
     return runInInjectionContext(this.env, () => new ResourceFacade<T>(repo, realtime, path));
   }
 }

@@ -29,7 +29,6 @@ export class MessagesLabComponent {
   readonly facade: ResourceFacade<Message>;
   // Signals façade
   readonly messages
-  readonly loading
   readonly status
 
   // Sélection & formulaire
@@ -52,7 +51,6 @@ export class MessagesLabComponent {
     this.facade = facadeFactory.create<Message>({url: `/api/conversations/1/messages`})
 
     this.messages = this.facade.items;
-    this.loading = this.facade.loading;
     this.status = this.facade.connectionStatus;
 
     this.pushLog({t: Date.now(), kind: 'init'});
@@ -65,7 +63,7 @@ export class MessagesLabComponent {
   }
 
   load() {
-    this.facade.list({page: 1, itemsPerPage: 20});
+    this.facade.list$({page: 1, itemsPerPage: 20});
   }
 
   watchAll() {
@@ -95,7 +93,7 @@ export class MessagesLabComponent {
   manualGet() {
     const id = this.selectedId();
     if (!id) return;
-    this.facade.get(id).subscribe(res => {
+    this.facade.get$(id).subscribe(res => {
       this.pushLog({t: Date.now(), kind: 'manual-get', id, snapshot: res});
     });
   }
@@ -104,7 +102,7 @@ export class MessagesLabComponent {
     const id = this.selectedId();
     if (!id) return;
     const ext = this.formOriginalText?.trim();
-    this.facade.update({
+    this.facade.update$({
         id, changes:
           {originalText: ext}
       }

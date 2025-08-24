@@ -2,12 +2,12 @@
     <div class="toolbar">
         <button (click)="routing()">Go Messages</button>
 
-        <button (click)="load()" [disabled]="loading()">Load list</button>
+        <button (click)="load()">Load list</button>
         <button (click)="watchAll()">[+] Watch all (SSE)</button>
         <button (click)="unwatchAll()">[-] Unwatch all (SSE)</button>
         <span class="badge status {{status()}}">SSE: {{ status() }}</span>
-        <span *ngIf="loading()" class="badge">Loading…</span>
         <span class="badge">Count: {{ conversations().length }}</span>
+
     </div>
 </section>
 

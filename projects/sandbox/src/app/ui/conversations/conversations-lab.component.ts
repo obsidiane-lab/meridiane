@@ -1,10 +1,11 @@
 import {Component, computed, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
-import type {Conversation} from '../../entities/conversation';
 import {Router} from "@angular/router";
 import {ResourceFacade} from '../../../bridge-sandbox/src/lib/facades/resource.facade';
 import {FacadeFactory} from '../../../bridge-sandbox/src/lib/facades/facade.factory';
+import {Message} from '../../entities/message';
+import {Conversation} from '../../entities/conversation';
 
 interface LogEntry {
   t: number;
@@ -25,7 +26,6 @@ export class ConversationsLabComponent {
 
   // Signals façade
   readonly conversations
-  readonly loading
   readonly status
 
   // Sélection & formulaire
@@ -48,7 +48,6 @@ export class ConversationsLabComponent {
     this.facade = facadeFactory.create<Conversation>({url: `/api/conversations`})
 
     this.conversations = this.facade.items;
-    this.loading = this.facade.loading;
     this.status = this.facade.connectionStatus;
   }
 
@@ -58,7 +57,7 @@ export class ConversationsLabComponent {
 
   // Actions toolbar
   load() {
-    this.facade.list({page: 1, itemsPerPage: 20}).subscribe();
+    this.facade.list$({page: 1, itemsPerPage: 20}).subscribe();
   }
 
   watchAll() {
@@ -73,6 +72,10 @@ export class ConversationsLabComponent {
     this.selectedId.set(c.id);
     this.formExternalId = c.externalId ?? '';
     this.pushLog({t: Date.now(), kind: 'select', id: c.id, snapshot: c});
+
+    this.facade.watchSubResource$<Message>(`/api/conversations/${c.id}`, 'conversation').subscribe(() => {
+      this.facade.get$(c.id).subscribe()
+    })
   }
 
   watchOne() {
@@ -88,7 +91,7 @@ export class ConversationsLabComponent {
   manualGet() {
     const id = this.selectedId();
     if (!id) return;
-    this.facade.get(id).subscribe(res => {
+    this.facade.get$(id).subscribe(res => {
       this.pushLog({t: Date.now(), kind: 'manual-get', id, snapshot: res});
     });
   }
@@ -97,7 +100,7 @@ export class ConversationsLabComponent {
     const id = this.selectedId();
     if (!id) return;
     const ext = this.formExternalId?.trim();
-    this.facade.update({id, changes: {externalId: ext}}).subscribe(res => {
+    this.facade.update$({id, changes: {externalId: ext}}).subscribe(res => {
       this.pushLog({t: Date.now(), kind: 'patch', id, snapshot: res});
     });
   }
