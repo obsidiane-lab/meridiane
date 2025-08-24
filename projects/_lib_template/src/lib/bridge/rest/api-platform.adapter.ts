@@ -9,8 +9,6 @@ import {
   ResourceRepository,
   UpdateCommand
 } from '../../ports/resource-repository.port';
-import {Inject} from '@angular/core';
-import {MERCURE_CONFIG} from '../../tokens';
 import {CredentialsPolicy} from '../credentials.policy';
 
 
@@ -21,9 +19,9 @@ export class ApiPlatformRestRepository<TDomain> implements ResourceRepository<TD
     private readonly http: HttpClient,
     private readonly apiBase: string,
     private readonly resourcePath: string,
-    @Inject(MERCURE_CONFIG) readonly init: string,
+    private readonly init: string,
   ) {
-    this.credentialsPolicy = new CredentialsPolicy(init);
+    this.credentialsPolicy = new CredentialsPolicy(this.init);
   }
 
   list$(query?: Query): Observable<Collection<TDomain>> {
