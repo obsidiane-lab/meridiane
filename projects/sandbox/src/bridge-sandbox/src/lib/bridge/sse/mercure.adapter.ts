@@ -11,7 +11,6 @@ import {RefCountTopicRegistry} from './ref-count-topic.registry';
 import {CredentialsPolicy} from '../credentials.policy';
 
 
-
 @Injectable({providedIn: 'root'})
 export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   private lastEventId?: string;

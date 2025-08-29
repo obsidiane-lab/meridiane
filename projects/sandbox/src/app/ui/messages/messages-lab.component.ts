@@ -1,4 +1,4 @@
-import {Component, computed, signal} from '@angular/core';
+import {Component, computed, Signal, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {Router} from "@angular/router";
@@ -6,14 +6,14 @@ import {Router} from "@angular/router";
 import {Conversation} from '../../entities/conversation';
 import {Message} from '../../entities/message';
 
-import {FacadeFactory} from "../../../bridge-sandbox/src/public-api";
+import {FacadeFactory, Iri, Item} from "../../../bridge-sandbox/src/public-api";
 import {ResourceFacade} from "../../../bridge-sandbox/src/public-api";
 
 
 interface LogEntry {
   t: number;
   kind: 'init' | 'select' | 'update' | 'patch' | 'put' | 'manual-get';
-  id?: number | undefined;
+  iri?: Iri | undefined;
   snapshot?: unknown;
 }
 
@@ -28,11 +28,11 @@ export class MessagesLabComponent {
 
   readonly facade: ResourceFacade<Message>;
   // Signals façade
-  readonly messages
+  readonly messages : Signal<readonly  Message[]>;
   readonly status
 
   // Sélection & formulaire
-  readonly selectedId = signal<number | undefined>(undefined);
+  readonly selectedId = signal<Iri>(undefined);
   formOriginalText = '';
 
   // Logs
@@ -41,9 +41,9 @@ export class MessagesLabComponent {
 
   // Conversation sélectionnée
   readonly selected = computed<Conversation | null>(() => {
-    const id = this.selectedId();
-    if (!id) return null;
-    return this.messages().find(c => c.id === id) ?? null;
+    const iri = this.selectedId();
+    if (!iri) return null;
+    return this.messages().find(c => c['@id'] === iri) ?? null;
   });
 
   constructor(private router: Router, protected facadeFactory: FacadeFactory) {
@@ -75,9 +75,9 @@ export class MessagesLabComponent {
   }
 
   select(c: Conversation) {
-    this.selectedId.set(c.id);
+    this.selectedId.set(c["@id"]);
     this.formOriginalText = c.externalId ?? '';
-    this.pushLog({t: Date.now(), kind: 'select', id: c.id, snapshot: c});
+    this.pushLog({t: Date.now(), kind: 'select', iri: c["@id"], snapshot: c});
   }
 
   watchOne() {
@@ -91,23 +91,23 @@ export class MessagesLabComponent {
   }
 
   manualGet() {
-    const id = this.selectedId();
-    if (!id) return;
-    this.facade.get$(id).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'manual-get', id, snapshot: res});
+    const iri = this.selectedId();
+    if (!iri) return;
+    this.facade.get$(iri).subscribe(res => {
+      this.pushLog({t: Date.now(), kind: 'manual-get', iri, snapshot: res});
     });
   }
 
   patchOriginalText() {
-    const id = this.selectedId();
-    if (!id) return;
+    const iri = this.selectedId();
+    if (!iri) return;
     const ext = this.formOriginalText?.trim();
     this.facade.update$({
-        id, changes:
-          {originalText: ext}
+        iri,
+        changes: {originalText: ext}
       }
     ).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'patch', id, snapshot: res});
+      this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
     });
   }
 

@@ -1,7 +1,7 @@
 import {Injectable, Inject, runInInjectionContext, inject, EnvironmentInjector} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {RealtimePort} from '../ports/realtime.port';
-import {ResourceRepository, Id} from '../ports/resource-repository.port';
+import {Item, ResourceRepository} from '../ports/resource-repository.port';
 import {API_BASE_URL, MERCURE_CONFIG} from "../tokens";
 import {MercureRealtimeAdapter} from "../bridge/sse/mercure.adapter";
 import {ApiPlatformRestRepository} from "../bridge/rest/api-platform.adapter";
@@ -27,7 +27,7 @@ export class FacadeFactory {
   ) {
   }
 
-  create<T extends { id?: Id }>(config: FacadeConfig<T>): ResourceFacade<T> {
+  create<T extends Item>(config: FacadeConfig<T>): ResourceFacade<T> {
     const path = config.url;
     const repo = new ApiPlatformRestRepository<T>(this.http, this.baseUrl, path , this.init);
     const realtime = this.mercureAny as MercureRealtimeAdapter;

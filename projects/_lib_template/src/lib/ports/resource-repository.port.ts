@@ -1,15 +1,15 @@
 import {Observable} from 'rxjs';
 
-export type Id = string | number | undefined;
+export type Iri = string | undefined;
 
 export interface Item {
-  '@id'?: string;
+  '@id'?: Iri;
   '@context'?: string,
   '@type'?: string
 }
 
 export interface View {
-  "@id": string;
+  "@id": Iri;
   "hydra:first": string;
   "hydra:last": string;
   "hydra:next": string;
@@ -17,7 +17,7 @@ export interface View {
 }
 
 
-export interface Collection<T> extends Item {
+export interface Collection<T> {
   member: T[];
   search?: object;
   totalItems?: number;
@@ -38,18 +38,18 @@ export interface CreateCommand<T> {
 }
 
 export interface UpdateCommand<T> {
-  id?: Id;
+  iri?: Iri;
   changes: Partial<T>;
 }
 
 export interface ResourceRepository<T> {
   list$(query?: Query): Observable<Collection<T>>;
 
-  get$(id: Id): Observable<T>;
+  get$(iri: Iri): Observable<T>;
 
   create$(cmd: CreateCommand<T>): Observable<T>;
 
   update$(cmd: UpdateCommand<T>): Observable<T>;
 
-  delete$(id: Id): Observable<void>;
+  delete$(iri: Iri): Observable<void>;
 }

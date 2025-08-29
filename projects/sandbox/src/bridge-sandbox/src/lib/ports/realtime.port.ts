@@ -1,4 +1,5 @@
 import {Observable} from 'rxjs';
+import {Iri} from './resource-repository.port';
 
 export type RealtimeStatus = 'connecting' | 'connected' | 'closed';
 
@@ -25,9 +26,9 @@ export type SubscribeFilter = {
 
 
 export interface RealtimePort {
-  subscribe$<T>(iris: string[], filter?: SubscribeFilter): Observable<RealtimeEvent<T>>;
+  subscribe$<T>(iris: Iri[], filter?: SubscribeFilter): Observable<RealtimeEvent<T>>;
 
-  unsubscribe(iris: string[]): void;
+  unsubscribe(iris: Iri[]): void;
 
   status$(): Observable<RealtimeStatus>;
 }

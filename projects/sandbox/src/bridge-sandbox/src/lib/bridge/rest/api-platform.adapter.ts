@@ -4,7 +4,7 @@ import {toHttpParams} from './query-builder';
 import {
   Collection,
   CreateCommand,
-  Id,
+  Iri, Item,
   Query,
   ResourceRepository,
   UpdateCommand
@@ -12,45 +12,45 @@ import {
 import {CredentialsPolicy} from '../credentials.policy';
 
 
-export class ApiPlatformRestRepository<TDomain> implements ResourceRepository<TDomain> {
+export class ApiPlatformRestRepository<T extends Item> implements ResourceRepository<T> {
   private readonly credentialsPolicy: CredentialsPolicy;
 
   constructor(
     private readonly http: HttpClient,
     private readonly apiBase: string,
-    private readonly resourcePath: string,
+    private readonly resourcePath: Iri,
     private readonly init: string,
   ) {
     this.credentialsPolicy = new CredentialsPolicy(init);
   }
 
-  list$(query?: Query): Observable<Collection<TDomain>> {
+  list$(query?: Query): Observable<Collection<T>> {
     return this.http.get<any>(`${this.apiBase}${this.resourcePath}`, {
       params: toHttpParams(query),
       withCredentials: this.credentialsPolicy.withCredentials()
     });
   }
 
-  get$(id: Id): Observable<TDomain> {
-    return this.http.get<TDomain>(`${this.apiBase}${this.resourcePath}/${id}`, {
+  get$(iri: Iri): Observable<T> {
+    return this.http.get<T>(`${this.apiBase}${iri}`, {
       withCredentials: this.credentialsPolicy.withCredentials()
     });
   }
 
-  create$(cmd: CreateCommand<TDomain>): Observable<TDomain> {
-    return this.http.post<TDomain>(`${this.apiBase}${this.resourcePath}`, cmd.payload, {
+  create$(cmd: CreateCommand<T>): Observable<T> {
+    return this.http.post<T>(`${this.apiBase}${this.resourcePath}`, cmd.payload, {
       withCredentials: this.credentialsPolicy.withCredentials()
     });
   }
 
-  update$(cmd: UpdateCommand<TDomain>): Observable<TDomain> {
-    return this.http.patch<TDomain>(`${this.apiBase}${this.resourcePath}/${cmd.id}`, cmd.changes, {
+  update$(cmd: UpdateCommand<T>): Observable<T> {
+    return this.http.patch<T>(`${this.apiBase}${cmd.iri}`, cmd.changes, {
       withCredentials: this.credentialsPolicy.withCredentials()
     });
   }
 
-  delete$(id: Id): Observable<void> {
-    return this.http.delete<void>(`${this.apiBase}${this.resourcePath}/${id}`, {
+  delete$(iri: Iri): Observable<void> {
+    return this.http.delete<void>(`${this.apiBase}${this.resourcePath}${iri}`, {
       withCredentials: this.credentialsPolicy.withCredentials()
     });
   }

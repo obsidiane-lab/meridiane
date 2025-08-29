@@ -4,16 +4,15 @@ import {
   Query,
   CreateCommand,
   UpdateCommand,
-  Id,
-  Collection
+  Collection, Iri, Item
 } from '../ports/resource-repository.port';
 import {RealtimePort, RealtimeStatus} from '../ports/realtime.port';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {map, shareReplay, filter, tap, Observable} from 'rxjs';
 import {Facade} from './facade.interface';
 
-export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
-  private readonly _items = signal<readonly T[]>([]);
+export class ResourceFacade<T extends Item> implements Facade<T> {
+  private readonly _items = signal<readonly Item[]>([]);
   readonly items = this._items.asReadonly();
 
   readonly connectionStatus: Signal<RealtimeStatus>;
@@ -44,8 +43,8 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
     )
   }
 
-  get$(id: Id): Observable<T> {
-    return this.repo.get$(id).pipe(
+  get$(iri: Iri): Observable<T> {
+    return this.repo.get$(iri).pipe(
       tap(entity => {
         if (entity) this.applyUpdate(entity);
       }),
@@ -71,10 +70,10 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
     );
   }
 
-  delete$(id: Id) {
-    return this.repo.delete$(id).pipe(
+  delete$(iri: Iri) {
+    return this.repo.delete$(iri).pipe(
       tap(() => this._items.set(
-        this.items().filter(i => i.id !== id))
+        this.items().filter(i => i['@id'] !== iri))
       ),
       shareReplay({bufferSize: 1, refCount: true})
     );
@@ -86,23 +85,23 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
     this.subscribeAndSync(iris);
   }
 
-  watchOne(id: Id): void {
-    this.subscribeAndSync([this.buildIri(id)]);
+  watchOne(iri: Iri): void {
+    this.subscribeAndSync([iri]);
   }
 
   unwatchAll(): void {
     this.realtime.unsubscribe(this.getAllIris());
   }
 
-  unwatchOne(id: Id): void {
-    this.realtime.unsubscribe([this.buildIri(id)]);
+  unwatchOne(iri: Iri): void {
+    this.realtime.unsubscribe([iri]);
   }
 
   watchSubResource$<R>(
-    url: string | string[],
+    iri: Iri | Iri[],
     field: string
   ): Observable<R> {
-    const iris = Array.isArray(url) ? url : [url];
+    const iris = Array.isArray(iri) ? iri : [iri];
     return this.realtime
       .subscribe$<R>(iris, {field: field})
       .pipe(
@@ -112,7 +111,7 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
       );
   }
 
-  protected subscribeAndSync(iris: string[]): void {
+  protected subscribeAndSync(iris: Iri[]): void {
     this.realtime
       .subscribe$<T>(iris)
       .pipe(
@@ -127,7 +126,7 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
 
   protected applyUpdate(updated: T): void {
     const current = this.items();
-    const idx = current.findIndex(item => item.id === updated.id);
+    const idx = current.findIndex(item => item["@id"] === updated["@id"]);
     const next = [...current];
 
     if (idx >= 0) {
@@ -138,11 +137,7 @@ export class ResourceFacade<T extends { id?: Id }> implements Facade<T> {
     this._items.set(next);
   }
 
-  protected buildIri(id: Id): string {
-    return `${this.resourcePath}/${id}`;
-  }
-
-  protected getAllIris(): string[] {
-    return this.items().map(item => this.buildIri(item.id));
+  protected getAllIris(): Iri[] {
+    return this.items().map(item => item["@id"]);
   }
 }

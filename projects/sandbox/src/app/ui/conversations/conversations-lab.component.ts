@@ -1,4 +1,4 @@
-import {Component, computed, signal} from '@angular/core';
+import {Component, computed, Signal, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {Router} from "@angular/router";
@@ -6,11 +6,12 @@ import {ResourceFacade} from '../../../bridge-sandbox/src/lib/facades/resource.f
 import {FacadeFactory} from '../../../bridge-sandbox/src/lib/facades/facade.factory';
 import {Message} from '../../entities/message';
 import {Conversation} from '../../entities/conversation';
+import {Iri} from '../../../bridge-sandbox/src/lib/ports/resource-repository.port';
 
 interface LogEntry {
   t: number;
   kind: 'init' | 'select' | 'update' | 'patch' | 'put' | 'manual-get';
-  id?: number | undefined;
+  iri?: Iri | undefined;
   snapshot?: unknown;
 }
 
@@ -25,11 +26,11 @@ export class ConversationsLabComponent {
   readonly facade: ResourceFacade<Conversation>;
 
   // Signals façade
-  readonly conversations
+  readonly conversations: Signal<readonly Conversation[]>
   readonly status
 
   // Sélection & formulaire
-  readonly selectedId = signal<number | undefined>(undefined);
+  readonly selectedId = signal<Iri | undefined>(undefined);
   formExternalId = '';
 
   // Logs
@@ -38,9 +39,9 @@ export class ConversationsLabComponent {
 
   // Conversation sélectionnée
   readonly selected = computed<Conversation | null>(() => {
-    const id = this.selectedId();
-    if (!id) return null;
-    return this.conversations().find(c => c.id === id) ?? null;
+    const iri = this.selectedId();
+    if (!iri) return null;
+    return this.conversations().find(c => c['@id'] === iri) ?? null;
   });
 
   constructor(private router: Router, protected facadeFactory: FacadeFactory) {
@@ -69,18 +70,17 @@ export class ConversationsLabComponent {
   }
 
   select(c: Conversation) {
-    this.selectedId.set(c.id);
+    this.selectedId.set(c['@id']);
     this.formExternalId = c.externalId ?? '';
-    this.pushLog({t: Date.now(), kind: 'select', id: c.id, snapshot: c});
-
-    this.facade.watchSubResource$<Message>([`/api/conversations/1`], 'conversation').subscribe(message => {
-      this.facade.get$(c.id).subscribe()
+    this.pushLog({t: Date.now(), kind: 'select', iri: c['@id'], snapshot: c});
+    this.facade.watchSubResource$<Message>([c["@id"]!], 'conversation').subscribe(message => {
+      this.facade.get$(c['@id']).subscribe()
     })
   }
 
   watchOne() {
-    const id = this.selectedId();
-    if (id) this.facade.watchOne(id);
+    const iri = this.selectedId();
+    if (iri) this.facade.watchOne(iri);
   }
 
   unwatchOne() {
@@ -89,19 +89,19 @@ export class ConversationsLabComponent {
   }
 
   manualGet() {
-    const id = this.selectedId();
-    if (!id) return;
-    this.facade.get$(id).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'manual-get', id, snapshot: res});
+    const iri = this.selectedId();
+    if (!iri) return;
+    this.facade.get$(iri).subscribe(res => {
+      this.pushLog({t: Date.now(), kind: 'manual-get', iri, snapshot: res});
     });
   }
 
   patchExternalId() {
-    const id = this.selectedId();
-    if (!id) return;
+    const iri = this.selectedId();
+    if (!iri) return;
     const ext = this.formExternalId?.trim();
-    this.facade.update$({id, changes: {externalId: ext}}).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'patch', id, snapshot: res});
+    this.facade.update$({iri, changes: {externalId: ext}}).subscribe(res => {
+      this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
     });
   }
 
