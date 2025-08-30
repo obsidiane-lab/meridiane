@@ -87,10 +87,7 @@ export function buildModelsFromOpenAPI(spec) {
       return schema.enum.map((v) => (typeof v === 'string' ? `'${v.replace(/'/g, "\'")}'` : v)).join(' | ');
     }
 
-    if (schema.type === 'string') {
-      if (schema.format === 'date-time' || schema.format === 'date') return 'Date';
-      return 'string';
-    }
+    if (schema.type === 'string') return 'string';
     if (schema.type === 'integer' || schema.type === 'number') return 'number';
     if (schema.type === 'boolean') return 'boolean';
 
