@@ -1,4 +1,4 @@
-import {Component, computed, Signal, signal} from '@angular/core';
+import {Component, computed, Signal, signal, WritableSignal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {Router} from "@angular/router";
@@ -6,9 +6,10 @@ import {Router} from "@angular/router";
 import {Conversation} from '../../entities/conversation';
 import {Message} from '../../entities/message';
 
-import {FacadeFactory, Iri, Item} from "../../../bridge-sandbox/src/public-api";
+import {FacadeFactory, Iri} from "../../../bridge-sandbox/src/public-api";
 import {ResourceFacade} from "../../../bridge-sandbox/src/public-api";
-
+import {tap} from 'rxjs';
+import {upsertInSignal} from '../../../bridge-sandbox/src/lib/utils/utils';
 
 interface LogEntry {
   t: number;
@@ -28,7 +29,7 @@ export class MessagesLabComponent {
 
   readonly facade: ResourceFacade<Message>;
   // Signals façade
-  readonly messages : Signal<readonly  Message[]>;
+  readonly messages!: WritableSignal<readonly Message[]>;
   readonly status
 
   // Sélection & formulaire
@@ -47,15 +48,9 @@ export class MessagesLabComponent {
   });
 
   constructor(private router: Router, protected facadeFactory: FacadeFactory) {
-
     this.facade = facadeFactory.create<Message>({url: `/api/conversations/1/messages`})
-
-    this.messages = this.facade.items;
     this.status = this.facade.connectionStatus;
-
     this.pushLog({t: Date.now(), kind: 'init'});
-
-
   }
 
   routing() {
@@ -63,15 +58,21 @@ export class MessagesLabComponent {
   }
 
   load() {
-    this.facade.list$({page: 1, itemsPerPage: 20});
+    this.facade.list$({page: 1, itemsPerPage: 20})
+      .pipe(
+        tap(list => {
+          this.messages.set(list.member)
+        })
+      )
+      .subscribe();
   }
 
   watchAll() {
-    this.facade.watchAll();
+    this.facade.watch$(this.messages().map(conversation => conversation['@id']));
   }
 
   unwatchAll() {
-    this.facade.unwatchAll();
+    this.facade.unwatch(this.messages().map(conversation => conversation['@id']));
   }
 
   select(c: Conversation) {
@@ -82,12 +83,14 @@ export class MessagesLabComponent {
 
   watchOne() {
     const id = this.selectedId();
-    if (id) this.facade.watchOne(id);
+    if (id) this.facade.watch$(id).subscribe(result => {
+      upsertInSignal(this.messages, result)
+    });
   }
 
   unwatchOne() {
     const id = this.selectedId();
-    if (id) this.facade.unwatchOne(id);
+    if (id) this.facade.unwatch(id);
   }
 
   manualGet() {

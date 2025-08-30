@@ -1,4 +1,4 @@
-import {Component, computed, Signal, signal} from '@angular/core';
+import {Component, computed, signal, WritableSignal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {Router} from "@angular/router";
@@ -7,6 +7,7 @@ import {FacadeFactory} from '../../../bridge-sandbox/src/lib/facades/facade.fact
 import {Message} from '../../entities/message';
 import {Conversation} from '../../entities/conversation';
 import {Iri} from '../../../bridge-sandbox/src/lib/ports/resource-repository.port';
+import {upsertInSignal} from '../../../bridge-sandbox/src/lib/utils/utils';
 
 interface LogEntry {
   t: number;
@@ -26,7 +27,7 @@ export class ConversationsLabComponent {
   readonly facade: ResourceFacade<Conversation>;
 
   // Signals façade
-  readonly conversations: Signal<readonly Conversation[]>
+  readonly conversations: WritableSignal<readonly Conversation[]> = signal<readonly Conversation[]>([])
   readonly status
 
   // Sélection & formulaire
@@ -48,7 +49,6 @@ export class ConversationsLabComponent {
 
     this.facade = facadeFactory.create<Conversation>({url: `/api/conversations`})
 
-    this.conversations = this.facade.items;
     this.status = this.facade.connectionStatus;
   }
 
@@ -58,15 +58,22 @@ export class ConversationsLabComponent {
 
   // Actions toolbar
   load() {
-    this.facade.list$({page: 1, itemsPerPage: 20}).subscribe();
+    this.facade.list$({page: 1, itemsPerPage: 20})
+      .subscribe(list => {
+        console.log('list', list);
+        this.conversations.set(list.member)
+      });
   }
 
   watchAll() {
-    this.facade.watchAll();
+    this.facade.watch$(this.conversations().map(conversation => conversation['@id'])).subscribe(result => {
+        upsertInSignal(this.conversations, result)
+      }
+    );
   }
 
   unwatchAll() {
-    this.facade.unwatchAll();
+    this.facade.unwatch(this.conversations().map(conversation => conversation['@id']));
   }
 
   select(c: Conversation) {
@@ -80,12 +87,14 @@ export class ConversationsLabComponent {
 
   watchOne() {
     const iri = this.selectedId();
-    if (iri) this.facade.watchOne(iri);
+    if (iri) {
+      this.facade.watch$(iri);
+    }
   }
 
   unwatchOne() {
     const id = this.selectedId();
-    if (id) this.facade.unwatchOne(id);
+    if (id) this.facade.unwatch(id);
   }
 
   manualGet() {

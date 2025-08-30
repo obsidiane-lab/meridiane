@@ -3,8 +3,6 @@ import {Observable} from "rxjs";
 
 export interface Facade<T extends Item> {
 
-  dispose(): void;
-
   list$(query?: Query): Observable<Collection<T>>;
 
   get$(iri: Iri): Observable<T>;
@@ -15,11 +13,7 @@ export interface Facade<T extends Item> {
 
   delete$(iri: Iri): Observable<void>;
 
-  watchAll(): void;
+  watch$(iri: Iri|Iri[]): Observable<T>;
 
-  unwatchAll(): void;
-
-  watchOne(iri: Iri): void;
-
-  unwatchOne(iri: Iri): void;
+  unwatch(iri: Iri|Iri[]): void;
 }

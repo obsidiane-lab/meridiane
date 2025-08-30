@@ -19,7 +19,7 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
     private readonly http: HttpClient,
     private readonly apiBase: string,
     private readonly resourcePath: Iri,
-    private readonly init: string,
+    readonly init: string,
   ) {
     this.credentialsPolicy = new CredentialsPolicy(init);
   }

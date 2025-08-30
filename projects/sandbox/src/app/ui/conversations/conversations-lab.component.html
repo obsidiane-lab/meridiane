@@ -1,79 +1,82 @@
 <section class="panel" style="margin-bottom: 12px;">
-    <div class="toolbar">
-        <button (click)="routing()">Go Messages</button>
+  <div class="toolbar">
+    <button (click)="routing()">Go Messages</button>
 
-        <button (click)="load()">Load list</button>
-        <button (click)="watchAll()">[+] Watch all (SSE)</button>
-        <button (click)="unwatchAll()">[-] Unwatch all (SSE)</button>
-        <span class="badge status {{status()}}">SSE: {{ status() }}</span>
-        <span class="badge">Count: {{ conversations().length }}</span>
+    <button (click)="load()">Load list</button>
+    <button (click)="watchAll()">[+] Watch all (SSE)</button>
+    <button (click)="unwatchAll()">[-] Unwatch all (SSE)</button>
+    <span class="badge status {{status()}}">SSE: {{ status() }}</span>
+    <span class="badge">Count: {{ conversations().length }}</span>
 
-    </div>
+  </div>
 </section>
 
 <section class="layout">
-    <!-- LISTE GAUCHE -->
-    <div class="panel list">
-        <div class="row" *ngFor="let c of conversations()"
-             [class.active]="c['@id'] === selectedId()"
-             (click)="select(c)">
-            <div>
-                <div><strong>#{{ c['@id'] }}</strong></div>
-                <div style="font-size:12px;color:#6b7280">externalId: {{ c.externalId || '—' }}</div>
-            </div>
-            <div style="display:flex; gap:6px; align-items:center;">
-                <span class="badge">msgs: {{ c.messages?.length ?? 0 }}</span>
-            </div>
+  <!-- LISTE GAUCHE -->
+  <div class="panel list">
+    @for (c of conversations(); track c['@id']) {
+      <div class="row"
+           [class.active]="c['@id'] === selectedId()"
+           (click)="select(c)">
+        <div>
+          <div><strong>#{{ c['@id'] }}</strong></div>
+          <div style="font-size:12px;color:#6b7280">externalId: {{ c.externalId || '—' }}</div>
         </div>
-    </div>
-
-    <!-- DETAIL DROITE -->
-    <div class="panel" *ngIf="selected() as conv; else empty">
-        <header class="toolbar" style="justify-content:space-between;">
-            <div style="display:flex; gap:10px; align-items:center;">
-                <h3 style="margin:0">Conversation #{{ conv.id }}</h3>
-                <span class="badge">SSE: {{ status() }}</span>
-            </div>
-            <div class="toolbar">
-                <button (click)="watchOne()" [disabled]="!selectedId()">[+] Watch one now</button>
-                <button (click)="unwatchOne()" [disabled]="!selectedId()">[-] Unwatch one now</button>
-
-                <button (click)="manualGet()" [disabled]="!selectedId()">Manual GET</button>
-            </div>
-        </header>
-
-        <section style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top: 12px;">
-            <div>
-                <h4>Mise à jour (PATCH)</h4>
-                <div style="display:grid; gap:8px;">
-                    <label>
-                        <div style="font-size:12px;color:#6b7280">externalId</div>
-                        <input [(ngModel)]="formExternalId" placeholder="nouvel externalId"/>
-                    </label>
-                    <button (click)="patchExternalId()" [disabled]="!selectedId()">Envoyer PATCH</button>
-                </div>
-            </div>
-
-            <div>
-                <h4>Meta</h4>
-                <div class="badge">messages: {{ conv.messages?.length ?? 0 }}</div>
-            </div>
-        </section>
-
-        <section style="margin-top: 16px;">
-            <h4>Snapshot courant</h4>
-            <pre>{{ conv | json }}</pre>
-        </section>
-
-        <section style="margin-top: 16px;">
-            <h4>Event log</h4>
-            <pre>{{ logs() | json }}</pre>
-        </section>
-    </div>
-
-    <ng-template #empty>
-        <div class="panel">
-            <em>Sélectionne une conversation dans la liste pour voir le détail.</em>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="badge">msgs: {{ c.messages?.length ?? 0 }}</span>
         </div>
-    </ng-template>
+      </div>
+    }
+
+  </div>
+
+  <!-- DETAIL DROITE -->
+  <div class="panel" *ngIf="selected() as conv; else empty">
+    <header class="toolbar" style="justify-content:space-between;">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <h3 style="margin:0">Conversation #{{ conv.id }}</h3>
+        <span class="badge">SSE: {{ status() }}</span>
+      </div>
+      <div class="toolbar">
+        <button (click)="watchOne()" [disabled]="!selectedId()">[+] Watch one now</button>
+        <button (click)="unwatchOne()" [disabled]="!selectedId()">[-] Unwatch one now</button>
+
+        <button (click)="manualGet()" [disabled]="!selectedId()">Manual GET</button>
+      </div>
+    </header>
+
+    <section style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top: 12px;">
+      <div>
+        <h4>Mise à jour (PATCH)</h4>
+        <div style="display:grid; gap:8px;">
+          <label>
+            <div style="font-size:12px;color:#6b7280">externalId</div>
+            <input [(ngModel)]="formExternalId" placeholder="nouvel externalId"/>
+          </label>
+          <button (click)="patchExternalId()" [disabled]="!selectedId()">Envoyer PATCH</button>
+        </div>
+      </div>
+
+      <div>
+        <h4>Meta</h4>
+        <div class="badge">messages: {{ conv.messages?.length ?? 0 }}</div>
+      </div>
+    </section>
+
+    <section style="margin-top: 16px;">
+      <h4>Snapshot courant</h4>
+      <pre>{{ conv | json }}</pre>
+    </section>
+
+    <section style="margin-top: 16px;">
+      <h4>Event log</h4>
+      <pre>{{ logs() | json }}</pre>
+    </section>
+  </div>
+
+  <ng-template #empty>
+    <div class="panel">
+      <em>Sélectionne une conversation dans la liste pour voir le détail.</em>
+    </div>
+  </ng-template>
 </section>

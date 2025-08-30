@@ -8,30 +8,34 @@ export interface Item {
   '@type'?: string
 }
 
-export interface View {
-  "@id": Iri;
-  "hydra:first": string;
-  "hydra:last": string;
-  "hydra:next": string;
-  "hydra:previous": string;
+export interface View extends Item{
+  first?: Iri;
+  last?: Iri;
+  next?: Iri;
+  previous?: Iri;
 }
-
-
-export interface Collection<T> {
+export interface IriTemplateMapping extends Item {
+  variable: string;
+  property?: string;
+  required?: boolean;
+}
+export interface IriTemplate extends Item {
+  template: string;
+  variableRepresentation?: string;
+  mapping: IriTemplateMapping[];
+}
+export interface Collection<T> extends Item {
   member: T[];
-  search?: object;
   totalItems?: number;
-  page: number;
-  view: View;
+  search?: IriTemplate;
+  view?: View;
 }
 
 export interface Query {
-  page?: number;
   itemsPerPage?: number;
-  order?: Record<string, 'asc' | 'desc'>;
+  page?: number;
   filters?: Record<string, string | number | boolean | Array<string | number | boolean>>;
 }
-
 
 export interface CreateCommand<T> {
   payload: T;
