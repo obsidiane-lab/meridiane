@@ -15,9 +15,20 @@ function schemaNameFromRef($ref) {
 }
 
 function mergeAllOf(schemas) {
+  // Essaye d'aplatir un allOf en un unique object.
+  // Supporte le pattern courant API Platform:
+  //   allOf: [ { $ref: HydraItemBaseSchema }, { type: 'object', properties: ... } ]
+  // On ignore les $ref vers HydraItemBaseSchema/HydraCollectionBaseSchema.
   const out = {type: 'object', properties: {}, required: []};
   for (const s of schemas) {
-    if (s.$ref) return null;
+    if (s.$ref) {
+      const ref = schemaNameFromRef(s.$ref);
+      if (/^Hydra(?:Item|Collection)BaseSchema$/.test(ref)) {
+        // Ignorer les schémas Hydra de base
+        continue;
+      }
+      return null;
+    }
     if (s.type === 'object') {
       Object.assign(out.properties, s.properties || {});
       if (Array.isArray(s.required)) out.required.push(...s.required);
@@ -29,17 +40,53 @@ function mergeAllOf(schemas) {
   return out;
 }
 
+function friendlyName(original) {
+  // Convertit un nom de schéma OpenAPI en un nom lisible sans artefacts jsonld/jsonapi
+  // et en intégrant les groupes (ex: Identity.jsonld-user.read -> Identity user read)
+  const m = original.match(/^(.*?)(?:\.(?:jsonld|jsonapi))?-(.+)$/i);
+  if (m) {
+    const base = m[1];
+    const baseSimple = base.split('.').pop();
+    const groupTokens = m[2].split('.');
+    if (groupTokens.length && groupTokens[0].toLowerCase() === String(baseSimple).toLowerCase()) {
+      groupTokens.shift();
+    }
+    const group = groupTokens.join(' ');
+    return group ? `${base} ${group}` : base;
+  }
+  // Supprime un éventuel suffixe simple .jsonld/.jsonapi
+  return original.replace(/\.(jsonld|jsonapi)$/ig, '');
+}
+
 export function buildModelsFromOpenAPI(spec) {
   const schemas = spec?.components?.schemas || {};
+  // Récupère les schémas de premier niveau à générer.
+  // On exclut:
+  //  - les schémas avec un point (noms dérivés, variantes, etc.)
+  //  - les schémas jsonld
+  //  - les schémas Hydra de base (remplacent Item/Collection côté API Platform 4.2)
+  //    que l’on ne souhaite pas générer pour garder notre `Item`/`Collection` maison
   const origNames = Object
     .keys(schemas)
-    .filter(n => !n.includes('.'))
-    .filter(n => !/jsonld/i.test(n))
+    .filter(n => !/^Hydra(?:Item|Collection)BaseSchema$/.test(n))
+    .filter(n => {
+      const hasGroup = n.includes('-');
+      const hasDot = n.includes('.');
+      const isJsonFlavor = /jsonld|jsonapi/i.test(n);
+      if (hasGroup) {
+        // Garde les schémas groupés (ex: *.jsonld-user.read, Identity-user.update, ...)
+        return true;
+      }
+      // Sinon, garder uniquement les schémas "racine" (pas jsonld/jsonapi ni nom en pointillés)
+      if (hasDot) return false;
+      if (isJsonFlavor) return false;
+      return true;
+    })
     .sort((a, b) => a.localeCompare(b));
 
   const used = new Set();
   const nameMap = new Map(); // original → sanitized
-  for (const n of origNames) nameMap.set(n, sanitizeTypeName(n, used));
+  for (const n of origNames) nameMap.set(n, sanitizeTypeName(friendlyName(n), used));
 
   // Résolveur de type avec collecte de deps
   function tsTypeOf(schema, deps) {
