@@ -53,3 +53,11 @@ export function sanitizeTypeName(original, used) {
 export function isValidTsIdentifier(k) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) && !RESERVED.has(k);
 }
+
+/**
+ * Ajoute des quotes sur une clé si nécessaire (clé non valide en TS)
+ * @param {string} k
+ */
+export function quoteKeyIfNeeded(k) {
+  return isValidTsIdentifier(k) ? k : `'${k.replace(/'/g, "\\'")}'`;
+}

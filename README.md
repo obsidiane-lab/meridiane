@@ -39,8 +39,11 @@ projects/
     generate-models.js          # Génère des modèles depuis OpenAPI
     generator/models/
       templates/                # Handlebars (model.hbs, index.hbs)
-      openapi-to-models.js      # Transforme OpenAPI -> DTOs TS
-      utils.js, handlebars.js   # Helpers
+      openapi-to-models.js      # Orchestrateur OpenAPI -> modèles TS
+      type-resolver.js          # Résolution des types (enum, unions, null, arrays, objets)
+      schema-utils.js           # Merge allOf, filtrage , helpers Hydra
+      naming.js                 # Friendly name des schémas (groupes jsonld/jsonapi)
+      utils.js, handlebars.js   # Helpers (fs, identifiants TS, render)
 ```
 
 ---
@@ -78,11 +81,12 @@ node projects/tools/generate-lib.js backend-bridge @acme/backend-bridge 0.1.0 ht
 Commande :
 
 ```bash
-node projects/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--no-index]
+node projects/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
 ```
 
 - `--out` : dossier de sortie **relatif au CWD** (défaut : `models`).
 - `--item-import` : chemin d’import de l’interface `Item` utilisé par les modèles (défaut : `../lib/ports/resource-repository.port`).
+- `--required-mode` : contrôle les `?` des propriétés. `all-optional` (défaut) marque toutes les propriétés optionnelles; `spec` respecte le tableau `required` de la spec.
 - `--no-index` : n’écrit pas `index.ts` d’export.
 
 **Exemples (à lancer depuis le dossier de la lib générée)**
@@ -97,6 +101,11 @@ node projects/tools/generate-models.js ./openapi.json --out=projects/backend-bri
 
 > Les interfaces générées étendent `Item` et importent les types nécessaires.  
 > Un `index.ts` est créé (sauf `--no-index`) pour centraliser les exports.
+
+Règles de nommage
+- Variantes `.jsonld`/`.jsonapi` sont dé-dupliquées (préférence `jsonld`).
+- Si un schéma groupé a un nom de base unique et non en conflit avec une racine, on conserve le nom de base (ex. `RegisterIdentityInput.jsonld-user.register` → `RegisterIdentityInput`).
+- Sinon, on garde un nom enrichi lisible (ex. `Identity.jsonld-user.read` → `IdentityUserRead`).
 
 ---
 

@@ -50,7 +50,7 @@ async function readSpec(specPathOrUrl) {
 async function main() {
   const specPathOrUrl = process.argv[2];
   if (!specPathOrUrl) {
-    console.error('Usage: generate-models.js <OpenAPI spec (url|fichier)> [--item-import=../lib/ports/resource-repository.port] [--out=models] [--no-index]');
+    console.error('Usage: generate-models.js <OpenAPI spec (url|fichier)> [--item-import=../lib/ports/resource-repository.port] [--out=models] [--required-mode=all-optional|spec] [--no-index]');
     process.exit(1);
   }
 
@@ -58,13 +58,17 @@ async function main() {
   const outDir = path.resolve(workDir, getArg('out', 'models'));
   const writeIndex = !('' + process.argv.join(' ')).includes('--no-index');
   const itemImportPath = getArg('item-import', '../lib/ports/resource-repository.port');
+  const requiredMode = (() => {
+    const v = getArg('required-mode', 'spec');
+    return (v === 'spec' || v === 'all-optional') ? v : 'all-optional';
+  })();
 
   console.log(`📥 Spec OpenAPI: ${specPathOrUrl}`);
   const spec = await readSpec(specPathOrUrl);
 
 
   console.log('🔧 Construction des interfaces…');
-  const {models} = buildModelsFromOpenAPI(spec);
+  const {models} = buildModelsFromOpenAPI(spec, { requiredMode });
 
   const templatesDir = path.join(__dirname, 'generator', 'models', 'templates');
   await ensureCleanDir(outDir);
