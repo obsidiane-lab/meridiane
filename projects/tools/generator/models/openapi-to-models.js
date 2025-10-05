@@ -4,18 +4,6 @@ import { friendlyName } from './naming.js';
 import { tsTypeOf, withNullable } from './type-resolver.js';
 
 /**
- * @typedef {{
- *   name: string,
- *   props: Array<{ name: string, tsKey: string, type: string, optional: boolean }>,
- *   imports: string[]
- * }} ModelDefinition
- */
-
-/**
- * @typedef {{ requiredMode?: 'spec' | 'all-optional' }} BuildOptions
- */
-
-/**
  * Construit une map originalName -> sanitizedName, en assurant l’unicité
  * @param {string[]} schemaNames
  */
@@ -65,7 +53,7 @@ function buildNameMap(schemaNames) {
 export function buildModelsFromOpenAPI(spec, options) {
   const opts = { requiredMode: 'all-optional', ...(options || {}) };
   const schemas = spec?.components?.schemas || {};
-  const schemaNames = filterSchemaNames(schemas);
+  const schemaNames = filterSchemaNames(schemas, opts);
   const nameMap = buildNameMap(schemaNames);
   const allSanitizedNames = new Set([...nameMap.values()]);
 
@@ -76,7 +64,7 @@ export function buildModelsFromOpenAPI(spec, options) {
     const raw = schemas[originalName];
     let effective = raw;
     if (raw?.allOf) {
-      const merged = mergeAllOf(raw.allOf);
+      const merged = mergeAllOf(raw.allOf, opts);
       if (merged) effective = merged;
     }
 

@@ -2,7 +2,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import process from 'node:process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 
 import {renderTemplateToFile} from './generator/models/handlebars.js';
 import {buildModelsFromOpenAPI} from './generator/models/openapi-to-models.js';
@@ -47,6 +47,21 @@ async function readSpec(specPathOrUrl) {
     throw err;
   }
 }
+/**
+ * Charge un fichier de config local `models.config.js` (CWD) s'il existe.
+ * Le module peut exporter par défaut ou via export nommé.
+ */
+async function loadUserConfig() {
+  const cfgPath = path.resolve(process.cwd(), 'models.config.js');
+  try {
+    const st = await fs.stat(cfgPath);
+    if (!st.isFile()) return {};
+    const mod = await import(pathToFileURL(cfgPath).href);
+    return (mod?.default && typeof mod.default === 'object') ? mod.default : (mod || {});
+  } catch {
+    return {};
+  }
+}
 async function main() {
   const specPathOrUrl = process.argv[2];
   if (!specPathOrUrl) {
@@ -55,20 +70,23 @@ async function main() {
   }
 
   const workDir = process.cwd();
-  const outDir = path.resolve(workDir, getArg('out', 'models'));
+  const userCfg = await loadUserConfig();
+  const outDir = path.resolve(workDir, getArg('out', userCfg.outDir || 'models'));
   const writeIndex = !('' + process.argv.join(' ')).includes('--no-index');
-  const itemImportPath = getArg('item-import', '../lib/ports/resource-repository.port');
+  const itemImportPath = getArg('item-import', userCfg.itemImportPath || '../lib/ports/resource-repository.port');
   const requiredMode = (() => {
-    const v = getArg('required-mode', 'spec');
+    const v = getArg('required-mode', userCfg.requiredMode || 'all-optional');
     return (v === 'spec' || v === 'all-optional') ? v : 'all-optional';
   })();
+  const preferFlavor = userCfg.preferFlavor; // 'jsonld' | 'jsonapi' | 'none'
+  const hydraBaseRegex = userCfg.hydraBaseRegex; // RegExp|string
 
   console.log(`📥 Spec OpenAPI: ${specPathOrUrl}`);
   const spec = await readSpec(specPathOrUrl);
 
 
   console.log('🔧 Construction des interfaces…');
-  const {models} = buildModelsFromOpenAPI(spec, { requiredMode });
+  const {models} = buildModelsFromOpenAPI(spec, { requiredMode, preferFlavor, hydraBaseRegex });
 
   const templatesDir = path.join(__dirname, 'generator', 'models', 'templates');
   await ensureCleanDir(outDir);

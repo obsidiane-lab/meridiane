@@ -1,5 +1,16 @@
 /** Hydra base schemas to ignore in merges and filtering */
-export const HYDRA_BASE_RE = /^Hydra(?:Item|Collection)BaseSchema$/;
+const DEFAULT_HYDRA_BASE_RE = /^Hydra(?:Item|Collection)BaseSchema$/;
+
+/**
+ * Récupère la RegExp Hydra à partir d'une config optionnelle.
+ * @param {{ hydraBaseRegex?: RegExp|string }} [cfg]
+ */
+function hydraRe(cfg) {
+  const r = cfg?.hydraBaseRegex;
+  if (!r) return DEFAULT_HYDRA_BASE_RE;
+  if (r instanceof RegExp) return r;
+  try { return new RegExp(r); } catch { return DEFAULT_HYDRA_BASE_RE; }
+}
 
 /**
  * Détermine si une valeur est un objet simple (non tableau)
@@ -26,12 +37,12 @@ export function schemaNameFromRef($ref) {
  * @param {any[]} schemas
  * @returns {any|null}
  */
-export function mergeAllOf(schemas) {
+export function mergeAllOf(schemas, cfg) {
   const out = {type: 'object', properties: {}, required: []};
   for (const s of schemas) {
     if (s.$ref) {
       const ref = schemaNameFromRef(s.$ref);
-      if (HYDRA_BASE_RE.test(ref)) {
+      if (hydraRe(cfg).test(ref)) {
         continue;
       }
       return null;
@@ -56,14 +67,18 @@ export function mergeAllOf(schemas) {
  * @param {Record<string, any>} schemas
  * @returns {string[]}
  */
-export function filterSchemaNames(schemas) {
-  const rank = (name) => /\.jsonld\b/i.test(name) ? 3 : /\.jsonapi\b/i.test(name) ? 1 : 2;
+export function filterSchemaNames(schemas, cfg) {
+  const prefer = (cfg?.preferFlavor === 'jsonapi') ? ['jsonapi','none','jsonld']
+               : (cfg?.preferFlavor === 'none') ? ['none','jsonld','jsonapi']
+               : ['jsonld','none','jsonapi']; // default jsonld
+  const flavorOf = (name) => /\.jsonld\b/i.test(name) ? 'jsonld' : /\.jsonapi\b/i.test(name) ? 'jsonapi' : 'none';
+  const rank = (name) => 3 - prefer.indexOf(flavorOf(name));
 
   const roots = [];
   const grouped = new Map();
 
   for (const n of Object.keys(schemas)) {
-    if (HYDRA_BASE_RE.test(n)) continue;
+    if (hydraRe(cfg).test(n)) continue;
 
     const hasGroup = n.includes('-');
     const hasDot = n.includes('.');
@@ -89,4 +104,3 @@ export function filterSchemaNames(schemas) {
 
   return [...roots, ...[...grouped.values()]].sort((a, b) => a.localeCompare(b));
 }
-

@@ -107,6 +107,16 @@ Règles de nommage
 - Si un schéma groupé a un nom de base unique et non en conflit avec une racine, on conserve le nom de base (ex. `RegisterIdentityInput.jsonld-user.register` → `RegisterIdentityInput`).
 - Sinon, on garde un nom enrichi lisible (ex. `Identity.jsonld-user.read` → `IdentityUserRead`).
 
+Configuration via fichier `models.config.js`
+- Placez un fichier `models.config.js` à la racine du repo (voir `models.config.example.js`).
+- Propriétés supportées:
+  - `outDir` (string) — dossier de sortie par défaut.
+  - `itemImportPath` (string) — import `Item` dans les templates.
+  - `requiredMode` ('all-optional' | 'spec') — optionnalité des propriétés.
+  - `preferFlavor` ('jsonld' | 'jsonapi' | 'none') — préférence de variante.
+  - `hydraBaseRegex` (RegExp|string) — regex des schémas Hydra à ignorer.
+- Priorité: paramètres CLI > `models.config.js` > valeurs par défaut.
+
 ---
 
 ## 🏗️ 3) Builder (et publier) la librairie
