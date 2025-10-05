@@ -78,10 +78,11 @@ node projects/tools/generate-lib.js backend-bridge @acme/backend-bridge 0.1.0 ht
 Commande :
 
 ```bash
-node projects/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--no-index]
+node projects/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--no-index]
 ```
 
 - `--out` : dossier de sortie **relatif au CWD** (défaut : `models`).
+- `--item-import` : chemin d’import de l’interface `Item` utilisé par les modèles (défaut : `../lib/ports/resource-repository.port`).
 - `--no-index` : n’écrit pas `index.ts` d’export.
 
 **Exemples (à lancer depuis le dossier de la lib générée)**
