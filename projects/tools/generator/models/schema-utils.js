@@ -76,6 +76,7 @@ export function filterSchemaNames(schemas, cfg) {
 
   const roots = [];
   const grouped = new Map();
+  const variantsNoGroup = new Map(); // base -> best variant (no '-')
 
   for (const n of Object.keys(schemas)) {
     if (hydraRe(cfg).test(n)) continue;
@@ -85,7 +86,24 @@ export function filterSchemaNames(schemas, cfg) {
     const isJsonFlavor = /\.jsonld\b|\.jsonapi\b/i.test(n);
 
     if (!hasGroup) {
-      if (!hasDot && !isJsonFlavor) roots.push(n);
+      // Cas 1: racine simple (pas de point, pas de variante jsonld/jsonapi)
+      if (!hasDot && !isJsonFlavor) {
+        roots.push(n);
+        continue;
+      }
+      // Cas 2: variante jsonld/jsonapi sans groupe (ex: Workflow.WorkflowInput.jsonld ou Foo.jsonld)
+      if (isJsonFlavor) {
+        const base = n.replace(/\.(jsonld|jsonapi)\b/i, '');
+        // Si une base "pure" existe dans la spec, on préfère l’ignorer pour éviter les doublons
+        if (Object.prototype.hasOwnProperty.call(schemas, base)) {
+          continue;
+        }
+        const curr = variantsNoGroup.get(base);
+        if (!curr || rank(n) > rank(curr)) variantsNoGroup.set(base, n);
+        continue;
+      }
+      // Cas 3: nom avec point mais sans suffixe jsonld/jsonapi et sans group — on le considère tel quel
+      variantsNoGroup.set(n, n);
       continue;
     }
 
@@ -101,6 +119,7 @@ export function filterSchemaNames(schemas, cfg) {
     const curr = grouped.get(key);
     if (!curr || rank(n) > rank(curr)) grouped.set(key, n);
   }
-
-  return [...roots, ...[...grouped.values()]].sort((a, b) => a.localeCompare(b));
+  // Ajoute les variantes sans groupe sélectionnées
+  const noGroupSelected = [...variantsNoGroup.values()];
+  return [...roots, ...[...grouped.values()], ...noGroupSelected].sort((a, b) => a.localeCompare(b));
 }

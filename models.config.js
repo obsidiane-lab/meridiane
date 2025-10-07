@@ -10,7 +10,7 @@ export default {
   // Optionnalité des propriétés
   // - 'all-optional': toutes les propriétés sont marquées optionnelles (par défaut)
   // - 'spec': respecte les champs 'required' de la spec OpenAPI
-  requiredMode: 'all-optional',
+  requiredMode: 'spec',
 
   // Préférence entre les variantes de schémas
   // - 'jsonld' (défaut) | 'jsonapi' | 'none'
