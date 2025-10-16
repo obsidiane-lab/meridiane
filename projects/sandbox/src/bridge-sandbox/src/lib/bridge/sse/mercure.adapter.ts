@@ -81,10 +81,13 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
       filter((raw: any) => {
         if (fieldPath) {
           const relIri = this.extractRelationIris(raw, fieldPath);
-          return filterSet.has(relIri)
+          return Array.from(filterSet).some((iri) => relIri === iri || relIri?.startsWith(`${iri}/`));
         }
         const id = raw?.['@id'];
-        return typeof id === 'string' && filterSet.has(id);
+        return typeof id === 'string' && Array.from(filterSet).some((iri) => {
+          const normalized = iri.endsWith('/') ? iri.slice(0, -1) : iri;
+          return id === normalized || id.startsWith(`${normalized}/`);
+        });
       }),
 
       map((payload) => ({iri: payload['@id'] as string, data: payload as T})),
