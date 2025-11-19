@@ -3,32 +3,6 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "meridiane": {
-      "projectType": "library",
-      "root": "projects/meridiane",
-      "sourceRoot": "projects/meridiane/src",
-      "prefix": "lib",
-      "architect": {
-        "build": {
-          "builder": "@angular/build:ng-packagr",
-          "configurations": {
-            "production": {
-              "tsConfig": "projects/meridiane/tsconfig.lib.prod.json"
-            },
-            "development": {
-              "tsConfig": "projects/meridiane/tsconfig.lib.json"
-            }
-          },
-          "defaultConfiguration": "production"
-        },
-        "test": {
-          "builder": "@angular/build:karma",
-          "options": {
-            "tsConfig": "projects/meridiane/tsconfig.spec.json"
-          }
-        }
-      }
-    },
     "sandbox": {
       "projectType": "application",
       "schematics": {},
