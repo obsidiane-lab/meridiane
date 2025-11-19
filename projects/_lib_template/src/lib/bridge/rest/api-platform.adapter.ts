@@ -50,7 +50,7 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
   }
 
   delete$(iri: Iri): Observable<void> {
-    return this.http.delete<void>(`${this.apiBase}${this.resourcePath}${iri}`, {
+    return this.http.delete<void>(`${this.apiBase}${iri}`, {
       withCredentials: this.credentialsPolicy.withCredentials()
     });
   }

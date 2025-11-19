@@ -94,10 +94,10 @@ async function generate(libName, packageName, version, urlRegistry) {
     ` with package '${packageName}@${version}'`);
 }
 
-// CLI args: node generate-lib.js <lib-name> <package-name> <version>
+// CLI args: node generate-lib.js <lib-name> <package-name> [version] <url-registry>
 const [,, libName, packageName, version = '0.0.1', urlRegistry] = process.argv;
 if (!libName || !packageName) {
-  console.error('Usage: generate-lib.js <lib-name> <package-name> [version]');
+  console.error('Usage: generate-lib.js <lib-name> <package-name> [version] <url-registry>');
   process.exit(1);
 }
 

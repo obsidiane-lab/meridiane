@@ -178,8 +178,7 @@ import {Component, computed, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import type {Conversation} from '../../entities/conversation';
-import {FacadeFactory} from "@acme/bridge";
-import {ResourceFacade} from "@acme/bridge";
+import {FacadeFactory, ResourceFacade} from "@acme/backend-bridge";
 
 @Component({
   selector: 'app-conversations',
@@ -191,8 +190,8 @@ export class ConversationsLabComponent {
   readonly facade: ResourceFacade<Conversation>;
 
   // Signals façade
-  readonly conversations
-  readonly status
+  readonly conversations = signal<readonly Conversation[]>([]);
+  readonly status = this.facade.connectionStatus;
 
   // Sélection & formulaire
   readonly selectedId = signal<string | null>(null);
@@ -200,42 +199,57 @@ export class ConversationsLabComponent {
 
   // Conversation sélectionnée
   readonly selected = computed<Conversation | null>(() => {
-    const id = this.selectedId();
-    if (!id) return null;
-    return this.conversations().find(c => c.id === id) ?? null;
+    const iri = this.selectedId();
+    if (!iri) return null;
+    return this.conversations().find(c => c['@id'] === iri) ?? null;
   });
 
   constructor(protected facadeFactory: FacadeFactory) {
     this.facade = facadeFactory.create<Conversation>({url: `/api/conversations`})
-    this.conversations = this.facade.items;
-    this.status = this.facade.connectionStatus;
   }
 
   select(c: Conversation) {
-    this.selectedId.set(c.id);
+    this.selectedId.set(c['@id']!);
     this.formExternalId = c.externalId ?? '';
   }
   
   load() {
-    this.facade.list$({page: 1, itemsPerPage: 20}).subscribe();
+    this.facade.list$({page: 1, itemsPerPage: 20}).subscribe(list => {
+      this.conversations.set(list.member);
+    });
   }
 
   watchAll() {
-    this.facade.watchAll();
+    this.facade.watch$(this.conversations().map(c => c['@id']!)).subscribe(updated => {
+      // mettre à jour le signal à partir des événements SSE
+      const arr = this.conversations();
+      const idx = arr.findIndex(c => c['@id'] === updated['@id']);
+      this.conversations.set(
+        idx === -1 ? [updated, ...arr] : [...arr.slice(0, idx), updated, ...arr.slice(idx + 1)],
+      );
+    });
   }
 
   unwatchAll() {
-    this.facade.unwatchAll();
+    this.facade.unwatch(this.conversations().map(c => c['@id']!));
   }
   
   watchOne() {
-    const id = this.selectedId();
-    if (id) this.facade.watchOne(id);
+    const iri = this.selectedId();
+    if (iri) {
+      this.facade.watch$(iri).subscribe(updated => {
+        const arr = this.conversations();
+        const idx = arr.findIndex(c => c['@id'] === updated['@id']);
+        this.conversations.set(
+          idx === -1 ? [updated, ...arr] : [...arr.slice(0, idx), updated, ...arr.slice(idx + 1)],
+        );
+      });
+    }
   }
 
   unwatchOne() {
-    const id = this.selectedId();
-    if (id) this.facade.unwatchOne(id);
+    const iri = this.selectedId();
+    if (iri) this.facade.unwatch(iri);
   }
 
   manualGet() {
@@ -247,10 +261,10 @@ export class ConversationsLabComponent {
   }
 
   patchExternalId() {
-    const id = this.selectedId();
-    if (!id) return;
+    const iri = this.selectedId();
+    if (!iri) return;
     const ext = this.formExternalId?.trim();
-    this.facade.update$({id, changes: {externalId: ext}}).subscribe(res => {
+    this.facade.update$({iri, changes: {externalId: ext}}).subscribe(res => {
       console.log("patched", res)
     });
   }
@@ -258,17 +272,16 @@ export class ConversationsLabComponent {
 
 ```
 
-**FacadeFactory factory fourni un object `ResourceFacade<T>`**
+**FacadeFactory fournit un objet `ResourceFacade<T>`**
 
-- `items: Signal<readonly T[]>` — liste courante
-- `loading: Signal<boolean>` — état de chargement
-- `list(query?: Query)` — charge une page (`page`, `itemsPerPage`, `order`, `filters`)
-- `get(id: Id)` — récupère un item
-- `create(cmd: { payload: T })`
-- `update(cmd: { id: Id; changes: Partial<T> })`
-- `delete(id: Id)`
-- `watchAll()` / `unwatchAll()` — (SSE) abonne/désabonne toutes les entités chargées
-- `watchOne(id: Id)` / `unwatchOne(id: Id)` — (SSE) sur une entité précise
+- `connectionStatus: Signal<RealtimeStatus>` — état de la connexion SSE (`connecting` | `connected` | `closed`)
+- `list$(query?: Query)` — charge une page (`page`, `itemsPerPage`, `filters`)
+- `get$(iri: Iri)` — récupère un item
+- `create$(cmd: { payload: T })`
+- `update$(cmd: { iri?: Iri; changes: Partial<T> })`
+- `delete$(iri: Iri)`
+- `watch$(iri: Iri | Iri[])` — (SSE) abonne un ou plusieurs topics et émet les entités reçues
+- `unwatch(iri: Iri | Iri[])` — (SSE) décrémente le compteur sur les topics
 
 **Note (SSE & topics)**  
   Le bridge maintient un **compteur par topic** (`@id`).  
