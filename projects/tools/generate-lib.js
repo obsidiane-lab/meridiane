@@ -36,7 +36,8 @@ async function replacePlaceholdersInDir(srcDir, placeholders) {
  */
 async function generate(libName, packageName, version, urlRegistry) {
   const tplDir = path.resolve(__dirname, '../../projects/_lib_template');
-  const targetDir = path.resolve(__dirname, '../../projects', libName);
+  const workspaceRoot = process.cwd();
+  const targetDir = path.resolve(workspaceRoot, 'projects', libName);
 
   // 1) Copy the template directory
   await fs.copy(tplDir, targetDir);
@@ -60,7 +61,7 @@ async function generate(libName, packageName, version, urlRegistry) {
   }
 
   // 4) Update angular.json
-  const angularJsonPath = path.resolve(__dirname, '../../angular.json');
+  const angularJsonPath = path.resolve(workspaceRoot, 'angular.json');
   const ng = await fs.readJson(angularJsonPath);
 
   ng.projects[libName] = {

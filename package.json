@@ -1,6 +1,6 @@
 {
   "name": "meridiane",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "ng": "ng",
@@ -8,6 +8,11 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
+  },
+  "bin": {
+    "meridiane": "cli.js",
+    "meridiane-generate-lib": "projects/tools/generate-lib.js",
+    "meridiane-generate-models": "projects/tools/generate-models.js"
   },
   "prettier": {
     "overrides": [
@@ -19,7 +24,6 @@
       }
     ]
   },
-  "private": true,
   "dependencies": {
     "@angular/common": "^20.1.7",
     "@angular/compiler": "^20.1.7",

@@ -1,9 +1,9 @@
 # Meridiane — Générateur de librairie Angular & *bridge* backend (avec modèles dynamiques)
 
 > **TL;DR**  
-> Ce repo fournit :
+> Ce paquet npm fournit :
 > 1) un **template de librairie Angular** prêt à l’emploi (bridge REST + SSE) ;
-> 2) deux **scripts CLI** pour **générer une librairie** et **générer des modèles TypeScript** depuis une **spec OpenAPI**.
+> 2) un **CLI** pour **générer une librairie** et **générer des modèles TypeScript** depuis une **spec OpenAPI**.
 
 ---
 
@@ -16,6 +16,28 @@
   - **interceptors** (`Content-Type`, `X-Request-ID` de corrélation).
 - **Génère des modèles TypeScript** à partir d’une **spec OpenAPI** (via Handlebars).
 - Fournit une **facade** ergonomique (signals Angular) pour lister, lire, créer, mettre à jour, supprimer et **écouter** les entités en temps réel.
+
+---
+
+## ⚡️ Utilisation rapide (en tant qu’utilisateur)
+
+Dans un workspace Angular existant (dossier qui contient `angular.json`) :
+
+```bash
+# 1) Installer le CLI
+npm install -D meridiane
+
+# 2) Générer une librairie bridge
+npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0 https://gitlab.com/api/v4/projects/12345678910/packages/npm/
+
+# 3) Générer les modèles depuis la spec OpenAPI
+npx meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
+
+# 4) Builder la librairie
+ng build backend-bridge
+```
+
+La lib générée peut ensuite être publiée sur votre registry privée (`dist/backend-bridge`) et consommée dans vos apps Angular via `npm i @acme/backend-bridge`.
 
 ---
 
@@ -59,15 +81,23 @@ projects/
 
 ## 🚀 1) Générer une librairie à partir du template
 
-Exécutez depuis la racine du repo:
+### Via le paquet npm (recommandé)
+
+Depuis la racine de votre workspace Angular :
+
+```bash
+npx meridiane lib <lib-name> <npm-package-name> [version] <url-registry>
+```
+
+**Exemple**
+```bash
+npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0 https://gitlab.com/api/v4/projects/12345678910/packages/npm/
+```
+
+### Depuis ce repo (développement / contribution)
 
 ```bash
 node projects/tools/generate-lib.js <lib-name> <npm-package-name> [version] <url-registry>
-```
-
-**Exemples**
-```bash
-node projects/tools/generate-lib.js backend-bridge @acme/backend-bridge 0.1.0 https://gitlab.com/api/v4/projects/12345678910/packages/npm/
 ```
 
 **Placeholders remplacés**
@@ -78,7 +108,15 @@ node projects/tools/generate-lib.js backend-bridge @acme/backend-bridge 0.1.0 ht
 
 ## 🧬 2) Générer les modèles TypeScript depuis OpenAPI
 
-Commande :
+### Via le paquet npm
+
+Depuis le dossier de la librairie générée :
+
+```bash
+npx meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
+```
+
+### Depuis ce repo (développement / contribution)
 
 ```bash
 node projects/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
@@ -93,10 +131,10 @@ node projects/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out
 
 ```bash
 # 1) Depuis une URL (API Platform expose souvent /docs.json)
-node projects/tools/generate-models.js http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
+meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
 
 # 2) Depuis un fichier local déjà en JSON
-node projects/tools/generate-models.js ./openapi.json --out=projects/backend-bridge/src/models
+meridiane models ./openapi.json --out=projects/backend-bridge/src/models
 ```
 
 > Les interfaces générées étendent `Item` et importent les types nécessaires.  
