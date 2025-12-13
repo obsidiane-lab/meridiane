@@ -1,6 +1,13 @@
+import {HttpHeaders, HttpParams} from '@angular/common/http';
 import {Observable} from 'rxjs';
 
 export type Iri = string | undefined;
+
+type BaseHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
+export type HttpMethod = BaseHttpMethod | Lowercase<BaseHttpMethod>;
+
+export type QueryParamValue = string | number | boolean | Array<string | number | boolean>;
+export type AnyQuery = Query | Record<string, QueryParamValue> | HttpParams;
 
 export interface Item {
   '@id'?: Iri;
@@ -34,7 +41,7 @@ export interface Collection<T> extends Item {
 export interface Query {
   itemsPerPage?: number;
   page?: number;
-  filters?: Record<string, string | number | boolean | Array<string | number | boolean>>;
+  filters?: Record<string, QueryParamValue>;
 }
 
 export interface CreateCommand<T> {
@@ -56,4 +63,17 @@ export interface ResourceRepository<T> {
   update$(cmd: UpdateCommand<T>): Observable<T>;
 
   delete$(iri: Iri): Observable<void>;
+
+  request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R>;
+}
+
+export interface HttpRequestConfig<TBody = unknown> {
+  method: HttpMethod;
+  url?: Iri;
+  query?: AnyQuery;
+  body?: TBody;
+  headers?: HttpHeaders | Record<string, string>;
+  responseType?: 'json' | 'text' | 'blob';
+  withCredentials?: boolean;
+  options?: Record<string, unknown>;
 }

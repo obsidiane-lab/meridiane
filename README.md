@@ -318,6 +318,16 @@ export class ConversationsLabComponent {
 - `create$(cmd: { payload: T })`
 - `update$(cmd: { iri?: Iri; changes: Partial<T> })`
 - `delete$(iri: Iri)`
+- `request$<R>(config: { method; url?; query?; body?; headers?; responseType?; options?; withCredentials? })` — requête HTTP générique (chemin relatif à `apiBaseUrl` ou URL absolue) avec passage des options supplémentaires à `HttpClient`
+- Helpers `post$`, `put$`, `patch$` → versions typées qui fixent la méthode et délèguent à `request$` (les `get$(iri)` / `delete$(iri)` existants restent inchangés pour les ressources)
+
+Exemple helper :
+```ts
+facade.post$<MaRessource>({
+  url: '/api/ma-ressource',
+  body: { foo: 'bar' },
+});
+```
 - `watch$(iri: Iri | Iri[])` — (SSE) abonne un ou plusieurs topics et émet les entités reçues
 - `unwatch(iri: Iri | Iri[])` — (SSE) décrémente le compteur sur les topics
 

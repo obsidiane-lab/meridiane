@@ -4,12 +4,12 @@ import {
   Query,
   CreateCommand,
   UpdateCommand,
-  Collection, Iri, Item
+  Collection, Iri, Item, HttpRequestConfig
 } from '../ports/resource-repository.port';
 import {RealtimePort, RealtimeStatus} from '../ports/realtime.port';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {map, shareReplay, filter, Observable} from 'rxjs';
-import {Facade} from './facade.interface';
+import {Facade, RestRequest} from './facade.interface';
 
 export class ResourceFacade<T extends Item> implements Facade<T> {
 
@@ -49,10 +49,28 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
     );
   }
 
-  delete$(iri: Iri) {
+  delete$(iri: Iri): Observable<void> {
     return this.repo.delete$(iri).pipe(
       shareReplay({bufferSize: 1, refCount: true})
     );
+  }
+
+  request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
+    return this.repo.request$<R, B>(req).pipe(
+      shareReplay({bufferSize: 1, refCount: true})
+    );
+  }
+
+  post$<R = unknown, B = unknown>(req: RestRequest<B> = {}): Observable<R> {
+    return this.request$<R, B>({...req, method: 'POST'});
+  }
+
+  put$<R = unknown, B = unknown>(req: RestRequest<B> = {}): Observable<R> {
+    return this.request$<R, B>({...req, method: 'PUT'});
+  }
+
+  patch$<R = unknown, B = unknown>(req: RestRequest<B> = {}): Observable<R> {
+    return this.request$<R, B>({...req, method: 'PATCH'});
   }
 
   watch$(iri: Iri | Iri[]): Observable<T> {
