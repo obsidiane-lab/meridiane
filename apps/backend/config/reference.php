@@ -470,7 +470,7 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *     },
  *     disallow_search_engine_index?: bool, // Enabled by default when debug is enabled. // Default: true
  *     http_client?: bool|array{ // HTTP Client configuration
- *         enabled?: bool, // Default: false
+ *         enabled?: bool, // Default: true
  *         max_host_connections?: int, // The maximum number of connections to a single host.
  *         default_options?: array{
  *             headers?: array<string, mixed>,
@@ -775,6 +775,9 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *             property?: scalar|null, // Default: null
  *             manager_name?: scalar|null, // Default: null
  *         },
+ *         lexik_jwt?: array{
+ *             class?: scalar|null, // Default: "Lexik\\Bundle\\JWTAuthenticationBundle\\Security\\User\\JWTUser"
+ *         },
  *     }>,
  *     firewalls: array<string, array{ // Default: []
  *         pattern?: scalar|null,
@@ -832,6 +835,10 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *         remote_user?: array{
  *             provider?: scalar|null,
  *             user?: scalar|null, // Default: "REMOTE_USER"
+ *         },
+ *         jwt?: array{
+ *             provider?: scalar|null, // Default: null
+ *             authenticator?: scalar|null, // Default: "lexik_jwt_authentication.security.jwt_authenticator"
  *         },
  *         login_link?: array{
  *             check_route: scalar|null, // Route that will validate the login link - e.g. "app_login_link_verify".
@@ -1385,7 +1392,7 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *         },
  *     },
  *     mercure?: bool|array{
- *         enabled?: bool, // Default: false
+ *         enabled?: bool, // Default: true
  *         hub_url?: scalar|null, // The URL sent in the Link HTTP header. If not set, will default to the URL for MercureBundle's default hub. // Default: null
  *         include_type?: bool, // Always include @type in updates (including delete ones). // Default: false
  *     },
@@ -1523,6 +1530,112 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *         ...<mixed>
  *     },
  * }
+ * @psalm-type LexikJwtAuthenticationConfig = array{
+ *     public_key?: scalar|null, // The key used to sign tokens (useless for HMAC). If not set, the key will be automatically computed from the secret key. // Default: null
+ *     additional_public_keys?: list<scalar|null>,
+ *     secret_key?: scalar|null, // The key used to sign tokens. It can be a raw secret (for HMAC), a raw RSA/ECDSA key or the path to a file itself being plaintext or PEM. // Default: null
+ *     pass_phrase?: scalar|null, // The key passphrase (useless for HMAC) // Default: ""
+ *     token_ttl?: scalar|null, // Default: 3600
+ *     allow_no_expiration?: bool, // Allow tokens without "exp" claim (i.e. indefinitely valid, no lifetime) to be considered valid. Caution: usage of this should be rare. // Default: false
+ *     clock_skew?: scalar|null, // Default: 0
+ *     encoder?: array{
+ *         service?: scalar|null, // Default: "lexik_jwt_authentication.encoder.lcobucci"
+ *         signature_algorithm?: scalar|null, // Default: "RS256"
+ *     },
+ *     user_id_claim?: scalar|null, // Default: "username"
+ *     token_extractors?: array{
+ *         authorization_header?: bool|array{
+ *             enabled?: bool, // Default: true
+ *             prefix?: scalar|null, // Default: "Bearer"
+ *             name?: scalar|null, // Default: "Authorization"
+ *         },
+ *         cookie?: bool|array{
+ *             enabled?: bool, // Default: false
+ *             name?: scalar|null, // Default: "BEARER"
+ *         },
+ *         query_parameter?: bool|array{
+ *             enabled?: bool, // Default: false
+ *             name?: scalar|null, // Default: "bearer"
+ *         },
+ *         split_cookie?: bool|array{
+ *             enabled?: bool, // Default: false
+ *             cookies?: list<scalar|null>,
+ *         },
+ *     },
+ *     remove_token_from_body_when_cookies_used?: scalar|null, // Default: true
+ *     set_cookies?: array<string, array{ // Default: []
+ *         lifetime?: scalar|null, // The cookie lifetime. If null, the "token_ttl" option value will be used // Default: null
+ *         samesite?: "none"|"lax"|"strict", // Default: "lax"
+ *         path?: scalar|null, // Default: "/"
+ *         domain?: scalar|null, // Default: null
+ *         secure?: scalar|null, // Default: true
+ *         httpOnly?: scalar|null, // Default: true
+ *         partitioned?: scalar|null, // Default: false
+ *         split?: list<scalar|null>,
+ *     }>,
+ *     api_platform?: bool|array{ // API Platform compatibility: add check_path in OpenAPI documentation.
+ *         enabled?: bool, // Default: false
+ *         check_path?: scalar|null, // The login check path to add in OpenAPI. // Default: null
+ *         username_path?: scalar|null, // The path to the username in the JSON body. // Default: null
+ *         password_path?: scalar|null, // The path to the password in the JSON body. // Default: null
+ *     },
+ *     access_token_issuance?: bool|array{
+ *         enabled?: bool, // Default: false
+ *         signature?: array{
+ *             algorithm: scalar|null, // The algorithm use to sign the access tokens.
+ *             key: scalar|null, // The signature key. It shall be JWK encoded.
+ *         },
+ *         encryption?: bool|array{
+ *             enabled?: bool, // Default: false
+ *             key_encryption_algorithm: scalar|null, // The key encryption algorithm is used to encrypt the token.
+ *             content_encryption_algorithm: scalar|null, // The key encryption algorithm is used to encrypt the token.
+ *             key: scalar|null, // The encryption key. It shall be JWK encoded.
+ *         },
+ *     },
+ *     access_token_verification?: bool|array{
+ *         enabled?: bool, // Default: false
+ *         signature?: array{
+ *             header_checkers?: list<scalar|null>,
+ *             claim_checkers?: list<scalar|null>,
+ *             mandatory_claims?: list<scalar|null>,
+ *             allowed_algorithms?: list<scalar|null>,
+ *             keyset: scalar|null, // The signature keyset. It shall be JWKSet encoded.
+ *         },
+ *         encryption?: bool|array{
+ *             enabled?: bool, // Default: false
+ *             continue_on_decryption_failure?: bool, // If enable, non-encrypted tokens or tokens that failed during decryption or verification processes are accepted. // Default: false
+ *             header_checkers?: list<scalar|null>,
+ *             allowed_key_encryption_algorithms?: list<scalar|null>,
+ *             allowed_content_encryption_algorithms?: list<scalar|null>,
+ *             keyset: scalar|null, // The encryption keyset. It shall be JWKSet encoded.
+ *         },
+ *     },
+ *     blocklist_token?: bool|array{
+ *         enabled?: bool, // Default: false
+ *         cache?: scalar|null, // Storage to track blocked tokens // Default: "cache.app"
+ *     },
+ * }
+ * @psalm-type MercureConfig = array{
+ *     hubs?: array<string, array{ // Default: []
+ *         url?: scalar|null, // URL of the hub's publish endpoint
+ *         public_url?: scalar|null, // URL of the hub's public endpoint // Default: null
+ *         jwt?: string|array{ // JSON Web Token configuration.
+ *             value?: scalar|null, // JSON Web Token to use to publish to this hub.
+ *             provider?: scalar|null, // The ID of a service to call to provide the JSON Web Token.
+ *             factory?: scalar|null, // The ID of a service to call to create the JSON Web Token.
+ *             publish?: list<scalar|null>,
+ *             subscribe?: list<scalar|null>,
+ *             secret?: scalar|null, // The JWT Secret to use.
+ *             passphrase?: scalar|null, // The JWT secret passphrase. // Default: ""
+ *             algorithm?: scalar|null, // The algorithm to use to sign the JWT // Default: "hmac.sha256"
+ *         },
+ *         jwt_provider?: scalar|null, // Deprecated: The child node "jwt_provider" at path "mercure.hubs..jwt_provider" is deprecated, use "jwt.provider" instead. // The ID of a service to call to generate the JSON Web Token.
+ *         bus?: scalar|null, // Name of the Messenger bus where the handler for this hub must be registered. Default to the default bus if Messenger is enabled.
+ *     }>,
+ *     default_hub?: scalar|null,
+ *     default_cookie_lifetime?: int, // Default lifetime of the cookie containing the JWT, in seconds. Defaults to the value of "framework.session.cookie_lifetime". // Default: null
+ *     enable_profiler?: bool, // Deprecated: The child node "enable_profiler" at path "mercure.enable_profiler" is deprecated. // Enable Symfony Web Profiler integration.
+ * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
@@ -1534,6 +1647,8 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *     doctrine_migrations?: DoctrineMigrationsConfig,
  *     nelmio_cors?: NelmioCorsConfig,
  *     api_platform?: ApiPlatformConfig,
+ *     lexik_jwt_authentication?: LexikJwtAuthenticationConfig,
+ *     mercure?: MercureConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
@@ -1545,6 +1660,8 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         nelmio_cors?: NelmioCorsConfig,
  *         api_platform?: ApiPlatformConfig,
+ *         lexik_jwt_authentication?: LexikJwtAuthenticationConfig,
+ *         mercure?: MercureConfig,
  *     },
  *     "when@prod"?: array{
  *         imports?: ImportsConfig,
@@ -1557,6 +1674,8 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         nelmio_cors?: NelmioCorsConfig,
  *         api_platform?: ApiPlatformConfig,
+ *         lexik_jwt_authentication?: LexikJwtAuthenticationConfig,
+ *         mercure?: MercureConfig,
  *     },
  *     "when@test"?: array{
  *         imports?: ImportsConfig,
@@ -1569,6 +1688,8 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         nelmio_cors?: NelmioCorsConfig,
  *         api_platform?: ApiPlatformConfig,
+ *         lexik_jwt_authentication?: LexikJwtAuthenticationConfig,
+ *         mercure?: MercureConfig,
  *     },
  *     ...<string, ExtensionType|array{ // extra keys must follow the when@%env% pattern or match an extension alias
  *         imports?: ImportsConfig,

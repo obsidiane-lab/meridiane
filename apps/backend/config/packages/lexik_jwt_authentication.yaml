@@ -1,0 +1,14 @@
+lexik_jwt_authentication:
+    # Utilise la même clé HS256 que le service obsidiane/auth
+    secret_key: '%env(JWT_SECRET)%'
+    encoder:
+        signature_algorithm: HS256
+
+    token_extractors:
+        authorization_header:
+            enabled: true
+            prefix: Bearer
+            name: Authorization
+        cookie:
+            enabled: true
+            name: "__Secure-at"
