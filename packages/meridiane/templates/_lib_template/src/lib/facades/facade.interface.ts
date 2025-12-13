@@ -1,29 +1,27 @@
 import {
   Collection,
-  CreateCommand,
   HttpRequestConfig,
   Iri,
+  IriRequired,
   Item,
-  Query,
-  UpdateCommand
+  HttpCallOptions,
+  AnyQuery,
 } from "../ports/resource-repository.port";
 import {Observable} from "rxjs";
 
 export interface Facade<T extends Item> {
 
-  list$(query?: Query): Observable<Collection<T>>;
+  getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>>;
 
-  get$(iri: Iri): Observable<T>;
+  get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T>;
 
-  create$(cmd: CreateCommand<T>): Observable<T>;
+  post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T>;
 
-  update$(cmd: UpdateCommand<T>): Observable<T>;
+  patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T>;
 
-  delete$(iri: Iri): Observable<void>;
+  put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T>;
 
-  post$<R = unknown, B = unknown>(req: RestRequest<B>): Observable<R>;
-  put$<R = unknown, B = unknown>(req: RestRequest<B>): Observable<R>;
-  patch$<R = unknown, B = unknown>(req: RestRequest<B>): Observable<R>;
+  delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void>;
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R>;
 
@@ -31,5 +29,3 @@ export interface Facade<T extends Item> {
 
   unwatch(iri: Iri|Iri[]): void;
 }
-
-export type RestRequest<B> = Omit<HttpRequestConfig<B>, 'method'>;

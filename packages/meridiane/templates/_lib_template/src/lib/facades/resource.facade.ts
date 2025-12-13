@@ -1,15 +1,18 @@
 import {Signal} from '@angular/core';
 import {
   ResourceRepository,
-  Query,
-  CreateCommand,
-  UpdateCommand,
-  Collection, Iri, Item, HttpRequestConfig
+  AnyQuery,
+  HttpCallOptions,
+  Iri,
+  IriRequired,
+  Collection,
+  Item,
+  HttpRequestConfig
 } from '../ports/resource-repository.port';
 import {RealtimePort, RealtimeStatus} from '../ports/realtime.port';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {map, shareReplay, filter, Observable} from 'rxjs';
-import {Facade, RestRequest} from './facade.interface';
+import {Facade} from './facade.interface';
 
 export class ResourceFacade<T extends Item> implements Facade<T> {
 
@@ -27,30 +30,36 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
     );
   }
 
-  list$(query?: Query): Observable<Collection<T>> {
-    return this.repo.list$(query)
+  getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>> {
+    return this.repo.getCollection$(query, opts);
   }
 
-  get$(iri: Iri): Observable<T> {
-    return this.repo.get$(iri).pipe(
+  get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T> {
+    return this.repo.get$(iri, opts).pipe(
       shareReplay({bufferSize: 1, refCount: true})
     );
   }
 
-  create$(cmd: CreateCommand<T>) {
-    return this.repo.create$(cmd).pipe(
+  patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+    return this.repo.patch$(iri, changes, opts).pipe(
       shareReplay({bufferSize: 1, refCount: true})
     );
   }
 
-  update$(cmd: UpdateCommand<T>) {
-    return this.repo.update$(cmd).pipe(
+  post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+    return this.repo.post$(payload, opts).pipe(
       shareReplay({bufferSize: 1, refCount: true})
     );
   }
 
-  delete$(iri: Iri): Observable<void> {
-    return this.repo.delete$(iri).pipe(
+  put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+    return this.repo.put$(iri, payload, opts).pipe(
+      shareReplay({bufferSize: 1, refCount: true})
+    );
+  }
+
+  delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void> {
+    return this.repo.delete$(iri, opts).pipe(
       shareReplay({bufferSize: 1, refCount: true})
     );
   }
@@ -59,18 +68,6 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
     return this.repo.request$<R, B>(req).pipe(
       shareReplay({bufferSize: 1, refCount: true})
     );
-  }
-
-  post$<R = unknown, B = unknown>(req: RestRequest<B> = {}): Observable<R> {
-    return this.request$<R, B>({...req, method: 'POST'});
-  }
-
-  put$<R = unknown, B = unknown>(req: RestRequest<B> = {}): Observable<R> {
-    return this.request$<R, B>({...req, method: 'PUT'});
-  }
-
-  patch$<R = unknown, B = unknown>(req: RestRequest<B> = {}): Observable<R> {
-    return this.request$<R, B>({...req, method: 'PATCH'});
   }
 
   watch$(iri: Iri | Iri[]): Observable<T> {

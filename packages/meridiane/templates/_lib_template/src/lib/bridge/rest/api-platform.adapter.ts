@@ -3,12 +3,13 @@ import {Observable} from 'rxjs';
 import {toHttpParams} from './query-builder';
 import {
   Collection,
-  CreateCommand,
+  HttpCallOptions,
   HttpRequestConfig,
-  Iri, Item,
-  Query,
+  Iri,
+  IriRequired,
+  Item,
+  AnyQuery,
   ResourceRepository,
-  UpdateCommand
 } from '../../ports/resource-repository.port';
 import {CredentialsPolicy} from '../credentials.policy';
 
@@ -25,34 +26,47 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
     this.credentialsPolicy = new CredentialsPolicy(init);
   }
 
-  list$(query?: Query): Observable<Collection<T>> {
-    return this.http.get<any>(`${this.apiBase}${this.resourcePath}`, {
-      params: toHttpParams(query),
-      withCredentials: this.credentialsPolicy.withCredentials()
+  getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>> {
+    const params = toHttpParams(query);
+    return this.http.get<Collection<T>>(this.resolveUrl(this.resourcePath), {
+      params,
+      headers: opts?.headers,
+      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
     });
   }
 
-  get$(iri: Iri): Observable<T> {
-    return this.http.get<T>(`${this.apiBase}${iri}`, {
-      withCredentials: this.credentialsPolicy.withCredentials()
+  get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T> {
+    return this.http.get<T>(this.resolveUrl(iri), {
+      headers: opts?.headers,
+      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
     });
   }
 
-  create$(cmd: CreateCommand<T>): Observable<T> {
-    return this.http.post<T>(`${this.apiBase}${this.resourcePath}`, cmd.payload, {
-      withCredentials: this.credentialsPolicy.withCredentials()
+  post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+    return this.http.post<T>(this.resolveUrl(this.resourcePath), payload, {
+      headers: opts?.headers,
+      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
     });
   }
 
-  update$(cmd: UpdateCommand<T>): Observable<T> {
-    return this.http.patch<T>(`${this.apiBase}${cmd.iri}`, cmd.changes, {
-      withCredentials: this.credentialsPolicy.withCredentials()
+  patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+    return this.http.patch<T>(this.resolveUrl(iri), changes, {
+      headers: opts?.headers,
+      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
     });
   }
 
-  delete$(iri: Iri): Observable<void> {
-    return this.http.delete<void>(`${this.apiBase}${iri}`, {
-      withCredentials: this.credentialsPolicy.withCredentials()
+  put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+    return this.http.put<T>(this.resolveUrl(iri), payload, {
+      headers: opts?.headers,
+      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
+    });
+  }
+
+  delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void> {
+    return this.http.delete<void>(this.resolveUrl(iri), {
+      headers: opts?.headers,
+      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
     });
   }
 
@@ -78,7 +92,7 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
     mergedOptions.withCredentials = credentials;
 
     if (headers) mergedOptions.headers = headers;
-    if (query) mergedOptions.params = toHttpParams(query as any);
+    if (query) mergedOptions.params = toHttpParams(query);
     if (body !== undefined) mergedOptions.body = body;
 
     mergedOptions.observe = 'body';

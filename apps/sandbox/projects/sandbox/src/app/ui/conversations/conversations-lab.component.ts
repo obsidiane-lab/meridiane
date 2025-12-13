@@ -56,7 +56,7 @@ export class ConversationsLabComponent {
 
   // Actions toolbar
   load() {
-    this.facade.list$({page: 1, itemsPerPage: 20})
+    this.facade.getCollection$({page: 1, itemsPerPage: 20})
       .subscribe(list => {
         console.log('list', list);
         this.conversations.set(list.member)
@@ -79,7 +79,8 @@ export class ConversationsLabComponent {
     this.formExternalId = c.externalId ?? '';
     this.pushLog({t: Date.now(), kind: 'select', iri: c['@id'], snapshot: c});
     this.facade.watchSubResource$<Message>([c["@id"]!], 'conversation').subscribe(message => {
-      this.facade.get$(c['@id']).subscribe()
+      const iri = c['@id'];
+      if (iri) this.facade.get$(iri).subscribe();
     })
   }
 
@@ -107,7 +108,7 @@ export class ConversationsLabComponent {
     const iri = this.selectedId();
     if (!iri) return;
     const ext = this.formExternalId?.trim();
-    this.facade.update$({iri, changes: {externalId: ext}}).subscribe(res => {
+    this.facade.patch$(iri, {externalId: ext}).subscribe(res => {
       this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
     });
   }

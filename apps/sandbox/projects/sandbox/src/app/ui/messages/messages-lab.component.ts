@@ -57,7 +57,7 @@ export class MessagesLabComponent {
   }
 
   load() {
-    this.facade.list$({page: 1, itemsPerPage: 20})
+    this.facade.getCollection$({page: 1, itemsPerPage: 20})
       .pipe(
         tap(list => {
           this.messages.set(list.member)
@@ -104,11 +104,7 @@ export class MessagesLabComponent {
     const iri = this.selectedId();
     if (!iri) return;
     const ext = this.formOriginalText?.trim();
-    this.facade.update$({
-        iri,
-        changes: {originalText: ext}
-      }
-    ).subscribe(res => {
+    this.facade.patch$(iri, {originalText: ext}).subscribe(res => {
       this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
     });
   }

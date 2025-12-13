@@ -2,6 +2,7 @@ import {HttpHeaders, HttpParams} from '@angular/common/http';
 import {Observable} from 'rxjs';
 
 export type Iri = string | undefined;
+export type IriRequired = string;
 
 type BaseHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
 export type HttpMethod = BaseHttpMethod | Lowercase<BaseHttpMethod>;
@@ -44,25 +45,23 @@ export interface Query {
   filters?: Record<string, QueryParamValue>;
 }
 
-export interface CreateCommand<T> {
-  payload: T;
-}
-
-export interface UpdateCommand<T> {
-  iri?: Iri;
-  changes: Partial<T>;
+export interface HttpCallOptions {
+  headers?: HttpHeaders | Record<string, string>;
+  withCredentials?: boolean;
 }
 
 export interface ResourceRepository<T> {
-  list$(query?: Query): Observable<Collection<T>>;
+  getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>>;
 
-  get$(iri: Iri): Observable<T>;
+  get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T>;
 
-  create$(cmd: CreateCommand<T>): Observable<T>;
+  post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T>;
 
-  update$(cmd: UpdateCommand<T>): Observable<T>;
+  patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T>;
 
-  delete$(iri: Iri): Observable<void>;
+  put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T>;
+
+  delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void>;
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R>;
 }

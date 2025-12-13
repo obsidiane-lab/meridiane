@@ -27,14 +27,23 @@ Compat :
 `FacadeFactory` crée une façade typée par ressource.
 Le bridge centralise ainsi la création des repositories REST et l’accès au realtime.
 
+## `BridgeFacade`
+
+`BridgeFacade` est le helper “cas spécifiques” : endpoints custom, routes non Hydra, etc.
+Il est fourni en tant que service Angular (`providedIn: 'root'`) et expose une API libre où chaque appel reçoit explicitement une `url`.
+
+Il expose aussi les helpers SSE/Mercure : `watch$` / `unwatch`.
+
 ## `ResourceFacade<T>`
 
 Une `ResourceFacade<T>` expose une API orientée usage :
 
-- `list$(query?)`, `get$(iri)`
-- `create$({ payload })`, `update$({ iri, changes })`, `delete$(iri)`
+- `getCollection$(query?, opts?)`, `get$(iri, opts?)`
+- `post$(payload, opts?)`, `patch$(iri, changes, opts?)`, `put$(iri, payload, opts?)`, `delete$(iri, opts?)`
 - `request$({ method, url?, query?, body?, headers?, responseType?, withCredentials?, options? })`
 - `watch$(iri|iri[])` / `unwatch(iri|iri[])` pour Mercure/SSE
+
+Note : `iri` doit être une string (ex: `item['@id']!`). Le type `Iri` peut être `undefined` car un `Item` n’a pas forcément d’IRI tant qu’il n’est pas persisté.
 
 Le typage s’appuie sur `Item` (IRI `@id`) et une structure de collection compatible Hydra.
 
