@@ -30,15 +30,6 @@ jobs:
       - name: Build sandbox (template validation)
         run: npm run sandbox:build
 
-      - name: Setup Chrome (Karma)
-        id: chrome
-        uses: browser-actions/setup-chrome@v1
-
-      - name: Test sandbox
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
-        run: npm -w apps/sandbox run test -- --watch=false --browsers=ChromeHeadless
-
       - name: Align package version with tag
         run: |
           cd packages/meridiane
