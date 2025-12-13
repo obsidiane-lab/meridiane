@@ -9,7 +9,7 @@
 
 ## ✨ Ce que fait le projet
 
-- **Scaffold** une librairie Angular à partir d’un **template** (`projects/_lib_template`).
+- **Scaffold** une librairie Angular à partir d’un **template** (embarqué dans `@obsidiane/meridiane`).
 - Expose un **bridge** pour communiquer avec votre backend :
   - REST (adapter **API Platform / Hydra** prêt à l’emploi) ;
   - **SSE** via **Mercure** pour le temps réel — *mono-connexion EventSource* + **comptage de références par topic** (plusieurs façades peuvent s’abonner au même topic sans conflits) ;
@@ -25,47 +25,34 @@ Dans un workspace Angular existant (dossier qui contient `angular.json`) :
 
 ```bash
 # 1) Installer le CLI
-npm install -D meridiane
+npm install -D @obsidiane/meridiane
 
 # 2) Générer une librairie bridge
-npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0 https://gitlab.com/api/v4/projects/12345678910/packages/npm/
+npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0
 
 # 3) Générer les modèles depuis la spec OpenAPI
 npx meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
 
 # 4) Builder la librairie
-ng build backend-bridge
+npx ng build backend-bridge
 ```
 
-La lib générée peut ensuite être publiée sur votre registry privée (`dist/backend-bridge`) et consommée dans vos apps Angular via `npm i @acme/backend-bridge`.
+La lib générée peut ensuite être publiée (`dist/backend-bridge`) et consommée dans vos apps Angular via `npm i @acme/backend-bridge`.
 
 ---
 
 ## 🧭 Structure (vue d’ensemble)
 
 ```
-projects/
-  _lib_template/                # Template de librairie
-    src/
-      lib/
-        bridge/                 # REST + SSE (Mercure)
-        facades/                # Facade + Factory (signals)
-        interceptors/           # Content-Type + Correlation
-        ports/                  # Contrats (Repository, Realtime)
-        tokens.ts               # Injection tokens (API_BASE_URL, …)
-      public-api.ts             # Ce que la lib exporte
-    ng-package.json             # ng-packagr
-    package.json                # placeholders
-  tools/                        # Outils CLI
-    generate-lib.js             # Génère une lib depuis le template
-    generate-models.js          # Génère des modèles depuis OpenAPI
-    generator/models/
-      templates/                # Handlebars (model.hbs, index.hbs)
-      openapi-to-models.js      # Orchestrateur OpenAPI -> modèles TS
-      type-resolver.js          # Résolution des types (enum, unions, null, arrays, objets)
-      schema-utils.js           # Merge allOf, filtrage , helpers Hydra
-      naming.js                 # Friendly name des schémas (groupes jsonld/jsonapi)
-      utils.js, handlebars.js   # Helpers (fs, identifiants TS, render)
+packages/
+  meridiane/                    # Paquet publié (@obsidiane/meridiane)
+    cli.js                      # Entrypoint CLI
+    tools/                      # Générateurs (lib + models)
+    templates/_lib_template/     # Template de librairie Angular (bridge)
+apps/
+  sandbox/                      # App Angular de dev (non publiée)
+    projects/sandbox/           # L'app
+    projects/bridge-sandbox/    # Lib générée (ignorée, régénérée à la demande)
 ```
 
 ---
@@ -86,18 +73,20 @@ projects/
 Depuis la racine de votre workspace Angular :
 
 ```bash
-npx meridiane lib <lib-name> <npm-package-name> [version] <url-registry>
+npx meridiane lib <lib-name> <npm-package-name> [version] [url-registry]
 ```
 
 **Exemple**
 ```bash
-npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0 https://gitlab.com/api/v4/projects/12345678910/packages/npm/
+npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0
 ```
+
+> Recommandé : configurez le registry via `.npmrc` / variables CI et gardez `url-registry` optionnel.
 
 ### Depuis ce repo (développement / contribution)
 
 ```bash
-node projects/tools/generate-lib.js <lib-name> <npm-package-name> [version] <url-registry>
+node packages/meridiane/tools/generate-lib.js <lib-name> <npm-package-name> [version] [url-registry]
 ```
 
 **Placeholders remplacés**
@@ -119,7 +108,7 @@ npx meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-im
 ### Depuis ce repo (développement / contribution)
 
 ```bash
-node projects/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
+node packages/meridiane/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
 ```
 
 - `--out` : dossier de sortie **relatif au CWD** (défaut : `models`).
@@ -146,7 +135,8 @@ Règles de nommage
 - Sinon, on garde un nom enrichi lisible (ex. `Identity.jsonld-user.read` → `IdentityUserRead`).
 
 Configuration via fichier `models.config.js`
-- Placez un fichier `models.config.js` à la racine du repo (voir `models.config.example.js`).
+- Placez un fichier `models.config.js` dans le répertoire où vous lancez la commande (CWD).
+- Exemple : `cp node_modules/@obsidiane/meridiane/models.config.example.js ./models.config.js` (après installation).
 - Propriétés supportées:
   - `outDir` (string) — dossier de sortie par défaut.
   - `itemImportPath` (string) — import `Item` dans les templates.
@@ -161,7 +151,7 @@ Configuration via fichier `models.config.js`
 
 ```bash
 # Build de la lib (ng-packagr)
-ng build backend-bridge
+npx ng build backend-bridge
 
 # Le package est dans dist/<lib-name>
 # Publication NPM (optionnel)
@@ -414,7 +404,49 @@ Vous pouvez injecter vos propres interceptors via `extraInterceptors` dans `prov
 
 ## 🛠️ Personnalisation
 
-- **Modèles** : adaptez les templates Handlebars (`projects/tools/generator/models/templates/`) selon votre style/linters.
+- **Modèles** : adaptez les templates Handlebars (`packages/meridiane/tools/generator/models/templates/`) selon votre style/linters.
+
+---
+
+## 🧑‍💻 Développement de Meridiane (ce repo)
+
+Prérequis : Node.js ≥ 18, npm.
+
+```bash
+# Installer toutes les dépendances (workspaces)
+npm install
+
+# (Re)générer la lib de sandbox + build (lib + app)
+npm run sandbox:build
+
+# (Re)générer la lib de sandbox + lancer l'app
+npm run sandbox:dev
+```
+
+Notes
+- `apps/sandbox/projects/bridge-sandbox` est généré et ignoré par git.
+- Le sandbox consomme la lib via `@obsidiane/bridge-sandbox` (paths TS) afin de tester l’API publique.
+
+---
+
+## 🚢 Publication (production) de `@obsidiane/meridiane` (npm public)
+
+```bash
+# Vérifier le contenu publié (sans toucher au cache global npm)
+npm -w packages/meridiane run pack:check
+
+# Publier sur npm (scopé -> public)
+cd packages/meridiane
+npm publish
+```
+
+En CI (projets consommateurs), pinnez une version :
+
+```bash
+npx -y @obsidiane/meridiane@0.1.0 lib <lib-name> <npm-package-name> [version]
+npx -y @obsidiane/meridiane@0.1.0 models <SPEC> --out=projects/<lib-name>/src/models
+npx ng build <lib-name>
+```
 - **Auth** : passez un provider `auth` et/ou des `extraInterceptors` dans `provideBridge()` (Bearer, CSRF, etc.).
 - **SSE** : fournissez `mercureHubUrl` et `mercure` (headers/cookies).
 
