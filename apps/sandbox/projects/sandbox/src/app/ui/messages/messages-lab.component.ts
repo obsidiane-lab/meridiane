@@ -1,9 +1,8 @@
-import {Component, computed, Signal, signal, WritableSignal} from '@angular/core';
+import {Component, computed, signal, WritableSignal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {Router} from "@angular/router";
 
-import {Conversation} from '../../entities/conversation';
 import {Message} from '../../entities/message';
 
 import {FacadeFactory, Iri, ResourceFacade} from "@obsidiane/bridge-sandbox";
@@ -28,22 +27,22 @@ export class MessagesLabComponent {
 
   readonly facade: ResourceFacade<Message>;
   // Signals façade
-  readonly messages!: WritableSignal<readonly Message[]>;
+  readonly messages: WritableSignal<readonly Message[]> = signal<readonly Message[]>([]);
   readonly status
 
   // Sélection & formulaire
-  readonly selectedId = signal<Iri>(undefined);
+  readonly selectedId = signal<Iri | undefined>(undefined);
   formOriginalText = '';
 
   // Logs
   private readonly _logs = signal<LogEntry[]>([]);
   readonly logs = this._logs.asReadonly();
 
-  // Conversation sélectionnée
-  readonly selected = computed<Conversation | null>(() => {
+  // Message sélectionné
+  readonly selected = computed<Message | null>(() => {
     const iri = this.selectedId();
     if (!iri) return null;
-    return this.messages().find(c => c['@id'] === iri) ?? null;
+    return this.messages().find(m => m['@id'] === iri) ?? null;
   });
 
   constructor(private router: Router, protected facadeFactory: FacadeFactory) {
@@ -67,17 +66,19 @@ export class MessagesLabComponent {
   }
 
   watchAll() {
-    this.facade.watch$(this.messages().map(conversation => conversation['@id']));
+    this.facade.watch$(this.messages().map(message => message['@id'])).subscribe(result => {
+      upsertInSignal(this.messages, result)
+    });
   }
 
   unwatchAll() {
-    this.facade.unwatch(this.messages().map(conversation => conversation['@id']));
+    this.facade.unwatch(this.messages().map(message => message['@id']));
   }
 
-  select(c: Conversation) {
-    this.selectedId.set(c["@id"]);
-    this.formOriginalText = c.externalId ?? '';
-    this.pushLog({t: Date.now(), kind: 'select', iri: c["@id"], snapshot: c});
+  select(m: Message) {
+    this.selectedId.set(m["@id"]);
+    this.formOriginalText = m.originalText ?? '';
+    this.pushLog({t: Date.now(), kind: 'select', iri: m["@id"], snapshot: m});
   }
 
   watchOne() {

@@ -1,5 +1,5 @@
 import {DOCUMENT, Inject, Injectable, OnDestroy, Optional, PLATFORM_ID} from '@angular/core';
-import {BehaviorSubject, defer, fromEvent, Observable, of, Subject} from 'rxjs';
+import {BehaviorSubject, defer, EMPTY, fromEvent, Observable, of, Subject} from 'rxjs';
 import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
 import {API_BASE_URL, BRIDGE_LOGGER, BridgeLogger, MERCURE_CONFIG, MERCURE_HUB_URL} from '../../tokens';
 import {RealtimeEvent, RealtimePort, RealtimeStatus} from '../../ports/realtime.port';
@@ -66,42 +66,42 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
 
   subscribe$<T>(iris: string[], _filter?: { field?: string }): Observable<RealtimeEvent<T>> {
-    if (iris.length === 0) {
-      return new Observable<RealtimeEvent<T>>((sub) => sub.complete());
-    }
+    return defer(() => {
+      if (iris.length === 0) return EMPTY;
 
-    if (!this.hubUrl) {
-      this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
-      return new Observable<RealtimeEvent<T>>((sub) => sub.complete());
-    }
+      if (!this.hubUrl) {
+        this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
+        return EMPTY;
+      }
 
-    this.topicsRegistry.addAll(iris);
-    this.scheduleRebuild();
+      this.topicsRegistry.addAll(iris);
+      this.scheduleRebuild();
 
-    const filterSet = new Set(iris);
-    const fieldPath = _filter?.field;
+      const filterSet = new Set(iris);
+      const fieldPath = _filter?.field;
 
-    return this.incoming$.pipe(
-      map((evt) => this.safeParse(evt.data)),
+      return this.incoming$.pipe(
+        map((evt) => this.safeParse(evt.data)),
 
-      filter((raw: any) => {
-        if (fieldPath) {
-          const relIri = this.extractRelationIris(raw, fieldPath);
-          return Array.from(filterSet).some((iri) => relIri === iri || relIri?.startsWith(`${iri}/`));
-        }
-        const id = raw?.['@id'];
-        return typeof id === 'string' && Array.from(filterSet).some((iri) => {
-          const normalized = iri.endsWith('/') ? iri.slice(0, -1) : iri;
-          return id === normalized || id.startsWith(`${normalized}/`);
-        });
-      }),
-      map((payload) => ({iri: payload['@id'] as string, data: payload as T})),
-      finalize(() => {
-        this.topicsRegistry.removeAll(iris);
-        this.scheduleRebuild();
-      }),
-      share()
-    );
+        filter((raw: any) => {
+          if (fieldPath) {
+            const relIri = this.extractRelationIris(raw, fieldPath);
+            return Array.from(filterSet).some((iri) => relIri === iri || relIri?.startsWith(`${iri}/`));
+          }
+          const id = raw?.['@id'];
+          return typeof id === 'string' && Array.from(filterSet).some((iri) => {
+            const normalized = iri.endsWith('/') ? iri.slice(0, -1) : iri;
+            return id === normalized || id.startsWith(`${normalized}/`);
+          });
+        }),
+        map((payload) => ({iri: payload['@id'] as string, data: payload as T})),
+        finalize(() => {
+          this.topicsRegistry.removeAll(iris);
+          this.scheduleRebuild();
+        }),
+        share()
+      );
+    });
   }
 
   unsubscribe(iris: string[]): void {
