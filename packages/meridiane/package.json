@@ -1,0 +1,37 @@
+{
+  "name": "@obsidiane/meridiane",
+  "version": "0.1.0",
+  "description": "Générateur de librairie Angular et modèles TypeScript (OpenAPI) pour un bridge Symfony/API Platform + Mercure.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/obsidiane-lab/meridiane"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "pack:check": "npm_config_cache=./.npm-cache npm pack --dry-run"
+  },
+  "bin": {
+    "meridiane": "cli.js",
+    "meridiane-generate-lib": "tools/generate-lib.js",
+    "meridiane-generate-models": "tools/generate-models.js"
+  },
+  "files": [
+    "cli.js",
+    "tools/**",
+    "templates/**",
+    "models.config.example.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.1",
+    "handlebars": "^4.7.8",
+    "openapi-typescript-codegen": "^0.29.0",
+    "tslib": "^2.3.0"
+  }
+}
