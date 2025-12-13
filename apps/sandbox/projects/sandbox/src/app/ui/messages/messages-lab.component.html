@@ -1,75 +1,103 @@
 <section class="panel" style="margin-bottom: 12px;">
-    <div class="toolbar">
-        <button (click)="routing()">Go Conversations</button>
-
-        <button (click)="load()" >Load list</button>
-        <button (click)="watchAll()">[+] Watch all (SSE)</button>
-        <button (click)="unwatchAll()">[-] Unwatch all (SSE)</button>
-        <span class="badge status {{status()}}">SSE: {{ status() }}</span>
-        <span class="badge">Count: {{ messages().length }}</span>
+    <div class="toolbar" style="justify-content: space-between; gap: 12px;">
+        <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+            <h1 style="margin:0; font-size: 18px;">Messages</h1>
+            <span class="badge">Conversation: #{{ conversationId }}</span>
+            <span class="badge"
+                  [class.badge--good]="status() === 'connected'"
+                  [class.badge--warn]="status() === 'connecting'"
+                  [class.badge--bad]="status() === 'closed'">
+                SSE: {{ status() }}
+            </span>
+            @if (loading()) { <span class="badge">Loading…</span> }
+        </div>
+        <div class="toolbar">
+            <form [formGroup]="searchForm">
+                <input class="input" formControlName="q" placeholder="Search (id, text, IRI)" style="min-width: 260px;"/>
+            </form>
+            <button class="btn" type="button" (click)="routing()">Back</button>
+            <button class="btn" type="button" (click)="load()">Reload</button>
+            <button class="btn" type="button" (click)="watchAll()">SSE on</button>
+            <button class="btn" type="button" (click)="unwatchAll()">SSE off</button>
+        </div>
     </div>
+    @if (error()) {
+        <div class="badge badge--bad" style="margin-top: 10px;">{{ error() }}</div>
+    }
+</section>
+
+<section class="panel" style="margin-bottom: 12px;">
+    <form class="toolbar" style="gap: 10px; flex-wrap: wrap;" [formGroup]="createForm" (ngSubmit)="create()">
+        <strong>Create (conversation #{{ conversationId }})</strong>
+        <input formControlName="originalText" placeholder="originalText" style="min-width: 320px;"/>
+        <button class="btn btn--primary" type="submit" [disabled]="loading()">Create</button>
+    </form>
 </section>
 
 <section class="layout">
     <!-- LISTE GAUCHE -->
     <div class="panel list">
-        <div class="row" *ngFor="let c of messages()"
-             [class.active]="c['@id'] === selectedId()"
-             (click)="select(c)">
-            <div>
-                <div><strong>#{{ c['@id'] }}</strong></div>
-                <div style="font-size:12px;color:#6b7280">originalText: {{ c.originalText || '—' }}</div>
+        @if (filtered().length === 0) {
+            <div class="muted" style="padding: 8px;">No messages.</div>
+        }
+        @for (m of filtered(); track m['@id']) {
+            <div class="row"
+                 [class.active]="m['@id'] === selectedId()"
+                 (click)="select(m)">
+                <div>
+                    <div><strong>#{{ m['@id'] }}</strong></div>
+                    <div style="font-size:12px;color:#6b7280">originalText: {{ m.originalText || '—' }}</div>
+                </div>
             </div>
-        </div>
+        }
     </div>
 
     <!-- DETAIL DROITE -->
-    <div class="panel" *ngIf="selected() as mesg; else empty">
+    @if (selected(); as mesg) {
         <header class="toolbar" style="justify-content:space-between;">
             <div style="display:flex; gap:10px; align-items:center;">
                 <h3 style="margin:0">Message #{{ mesg.id }}</h3>
-                <span class="badge">SSE: {{ status() }}</span>
+                <span class="badge">IRI: <code>{{ mesg['@id'] }}</code></span>
             </div>
             <div class="toolbar">
-                <button (click)="watchOne()" [disabled]="!selectedId()">[+] Watch one now</button>
-                <button (click)="unwatchOne()" [disabled]="!selectedId()">[-] Unwatch one now</button>
+                <button class="btn" type="button" (click)="watchOne()" [disabled]="!selectedId()">Watch</button>
+                <button class="btn" type="button" (click)="unwatchOne()" [disabled]="!selectedId()">Unwatch</button>
 
-                <button (click)="manualGet()" [disabled]="!selectedId()">Manual GET</button>
+                <button class="btn" type="button" (click)="manualGet()" [disabled]="!selectedId()">GET</button>
             </div>
         </header>
 
         <section style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top: 12px;">
             <div>
                 <h4>Mise à jour (PATCH)</h4>
-                <div style="display:grid; gap:8px;">
+                <form style="display:grid; gap:8px;" [formGroup]="editForm" (ngSubmit)="patchOriginalText()">
                     <label>
                         <div style="font-size:12px;color:#6b7280">originalText</div>
-                        <input [(ngModel)]="formOriginalText" placeholder="nouvel originalText"/>
+                        <input formControlName="originalText" placeholder="nouvel originalText"/>
                     </label>
-                    <button (click)="patchOriginalText()" [disabled]="!selectedId()">Envoyer PATCH</button>
-                </div>
+                    <button class="btn btn--primary" type="submit" [disabled]="!selectedId() || loading()">Save</button>
+                </form>
             </div>
 
             <div>
                 <h4>Meta</h4>
-                <div class="badge">messages: {{ mesg.messages?.length ?? 0 }}</div>
+                <div class="badge">conversation: {{ mesg.conversation || '—' }}</div>
             </div>
         </section>
 
         <section style="margin-top: 16px;">
             <h4>Snapshot courant</h4>
-            <pre>{{ mesg | json }}</pre>
+            <app-json-viewer [value]="mesg" title="Message JSON"></app-json-viewer>
         </section>
 
         <section style="margin-top: 16px;">
             <h4>Event log</h4>
-            <pre>{{ logs() | json }}</pre>
+            <app-json-viewer [value]="logs()" title="Logs"></app-json-viewer>
         </section>
-    </div>
-
-    <ng-template #empty>
+    } @else {
         <div class="panel">
-            <em>Sélectionne un message dans la liste pour voir le détail.</em>
+            <h3 style="margin-top: 0;">Select a message</h3>
+            <p class="muted">Create a message, reload the subresource list, then patch and test SSE watch/unwatch.</p>
         </div>
-    </ng-template>
+    }
 </section>

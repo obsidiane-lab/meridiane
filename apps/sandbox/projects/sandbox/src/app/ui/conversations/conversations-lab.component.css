@@ -9,13 +9,6 @@
     align-items: start;
 }
 
-.panel {
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 12px;
-    background: #fff;
-}
-
 .toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -45,48 +38,89 @@
     background: #eef2ff;
 }
 
-.badge {
-    font-size: 12px;
-    padding: 2px 6px;
-    border-radius: 9999px;
-    background: #f3f4f6;
+
+.chat {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 60vh;
 }
 
-.status.connected {
-    background: #dcfce7;
+.chat__header {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
 }
 
-.status.reconnecting {
-    background: #fef3c7;
-}
-
-.status.offline {
-    background: #fee2e2;
-}
-
-button {
-    padding: 6px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    background: #fff;
-    cursor: pointer;
-}
-
-button:hover {
-    background: #f9fafb;
-}
-
-input, textarea {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-}
-
-pre {
-    background: #0b1020;
-    color: #e5e7eb;
-    padding: 10px;
-    border-radius: 6px;
+.chat__messages {
+    flex: 1;
     overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    min-height: 280px;
+}
+
+.msg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: min(720px, 78%);
+}
+
+.msg--mine {
+    margin-left: auto;
+    align-items: flex-end;
+}
+
+.msg__meta {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.msg__author {
+    font-weight: 700;
+    color: #374151;
+}
+
+.msg__bubble {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px 12px;
+    white-space: pre-wrap;
+    line-height: 1.35;
+}
+
+.msg--mine .msg__bubble {
+    background: #111827;
+    color: #ffffff;
+    border-color: #111827;
+}
+
+.chat__composer {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: end;
+}
+
+.chat__composer textarea {
+    resize: vertical;
+    min-height: 44px;
+}
+
+.chat__composerActions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.devtools > summary {
+    cursor: pointer;
+    font-weight: 700;
 }

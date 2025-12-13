@@ -1,0 +1,76 @@
+<section class="page">
+  <header class="page__header">
+    <h1>Meridiane Sandbox</h1>
+    <p class="muted">
+      Ce sandbox reproduit une archi “réelle” : backend Symfony/API Platform + frontend Angular consommateur d’un bridge Meridiane.
+    </p>
+  </header>
+
+  <div class="grid grid--2">
+    <section class="card">
+      <h2>Checklist</h2>
+      <ol class="list">
+        <li>Démarrer le backend Docker (port 8000)</li>
+        <li>Reset DB (optionnel) puis charger fixtures</li>
+        <li>Se connecter et tester HTTP/SSE</li>
+      </ol>
+
+      <div class="actions">
+        <a class="btn btn--primary" routerLink="/login">Login</a>
+        <a class="btn" routerLink="/conversations">Conversations</a>
+        <a class="btn" routerLink="/http">HTTP Lab</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Endpoints</h2>
+      <div class="kv">
+        <div class="kv__k">Backend</div>
+        <div class="kv__v"><code>{{ backendBaseUrl }}</code></div>
+      </div>
+      <div class="kv">
+        <div class="kv__k">API docs</div>
+        <div class="kv__v"><a [href]="backendBaseUrl + '/api/docs'" target="_blank">{{ backendBaseUrl }}/api/docs</a></div>
+      </div>
+      <div class="kv">
+        <div class="kv__k">Mercure hub</div>
+        <div class="kv__v"><code>{{ mercureHubUrl }}</code></div>
+      </div>
+      <div class="kv">
+        <div class="kv__k">Login</div>
+        <div class="kv__v"><code>{{ backendBaseUrl }}/api/auth/login</code></div>
+      </div>
+      <div class="kv">
+        <div class="kv__k">Me</div>
+        <div class="kv__v"><code>{{ backendBaseUrl }}/api/auth/me</code></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Identifiants (fixtures)</h2>
+      <div class="kv">
+        <div class="kv__k">Dev</div>
+        <div class="kv__v"><code>dev&#64;meridiane.local</code> / <code>dev</code></div>
+      </div>
+      <div class="kv">
+        <div class="kv__k">Admin</div>
+        <div class="kv__v"><code>admin&#64;meridiane.local</code> / <code>admin</code></div>
+      </div>
+      <p class="muted" style="margin-top: 12px;">
+        Si la DB est vide : exécuter <code>php bin/console app:dev:reset</code> dans le container backend.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Ce que tu testes</h2>
+      <ul class="list">
+        <li>HTTP Hydra: collection, item, PATCH, DELETE</li>
+        <li>Headers: content-type, bearer auth</li>
+        <li>Defaults: timeout, retry (HTTP Lab)</li>
+        <li>SSE/Mercure: watch/unwatch, status</li>
+        <li>Upload multipart: <code>/api/file_assets/upload</code></li>
+      </ul>
+    </section>
+  </div>
+</section>
+

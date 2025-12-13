@@ -8,13 +8,13 @@ api_platform:
         hub_url: '%env(string:MERCURE_PUBLIC_URL)%'
     patch_formats:
         json: [ "application/merge-patch+json" ]
-        jsonapi: [ "application/vnd.api+json" ]
     formats:
         jsonld: [ 'application/ld+json' ]
-        multipart: [ 'multipart/form-data' ]
+        json: [ 'application/json' ]
     docs_formats:
         json: [ 'application/json' ]
         html: [ 'text/html' ]
+    jsonschema_formats: [ 'jsonld', 'json' ]
     defaults:
         stateless: true
         cache_headers:
@@ -30,5 +30,3 @@ api_platform:
             JWT:
                 name: Authorization
                 type: header
-
-

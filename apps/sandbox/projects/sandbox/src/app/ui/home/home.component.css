@@ -1,0 +1,14 @@
+.page { display: grid; gap: 16px; }
+.page__header h1 { margin: 0; font-size: 22px; }
+.page__header p { margin: 6px 0 0; }
+.grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 860px) {
+  .grid--2 { grid-template-columns: 1fr; }
+}
+.card { padding: 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.kv__k { color: var(--muted); font-size: 13px; }
+.kv__v { overflow: auto; }
+.list { margin: 10px 0 0; padding-left: 18px; color: var(--text); }
+

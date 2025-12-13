@@ -53,7 +53,11 @@ if [ "$1" = 'frankenphp' ] || [ "$1" = 'php' ] || [ "$1" = 'bin/console' ]; then
 		fi
 
 		if [ "$(find ./migrations -iname '*.php' -print -quit)" ]; then
-			php bin/console doctrine:migrations:migrate --no-interaction --all-or-nothing
+			if [ "${APP_ENV}" = "dev" ] && [ "${DEV_RESET_DB}" = "1" ]; then
+				php bin/console app:dev:reset --no-interaction || true
+			else
+				php bin/console doctrine:migrations:migrate --no-interaction --all-or-nothing
+			fi
 		fi
 	fi
 

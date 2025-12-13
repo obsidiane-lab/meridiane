@@ -1,13 +1,16 @@
-import {Component, computed, signal, WritableSignal} from '@angular/core';
+import {Component, computed, inject, signal, WritableSignal} from '@angular/core';
 import {CommonModule} from '@angular/common';
-import {FormsModule} from '@angular/forms';
-import {Router} from "@angular/router";
+import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
+import {ActivatedRoute, Router} from "@angular/router";
 
 import {Message} from '../../entities/message';
 
-import {FacadeFactory, Iri, ResourceFacade} from "@obsidiane/bridge-sandbox";
+import {BridgeFacade, FacadeFactory, Iri, ResourceFacade} from "@obsidiane/bridge-sandbox";
 import {tap} from 'rxjs';
 import {upsertInSignal} from "@obsidiane/bridge-sandbox";
+import {JsonViewerComponent} from '../shared/json-viewer.component';
+import {Conversation} from '../../entities/conversation';
+import {BACKEND_BASE_URL} from '../../core/backend';
 
 interface LogEntry {
   t: number;
@@ -19,20 +22,31 @@ interface LogEntry {
 @Component({
   selector: 'app-messages-lab',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, JsonViewerComponent],
   templateUrl: './messages-lab.component.html',
   styleUrls: ['./messages-lab.component.css'],
 })
 export class MessagesLabComponent {
 
   readonly facade: ResourceFacade<Message>;
+  readonly conversationFacade: ResourceFacade<Conversation>;
   // Signals façade
   readonly messages: WritableSignal<readonly Message[]> = signal<readonly Message[]>([]);
+  readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
   readonly status
 
   // Sélection & formulaire
   readonly selectedId = signal<Iri | undefined>(undefined);
-  formOriginalText = '';
+  private readonly fb = inject(FormBuilder);
+  readonly createForm = this.fb.nonNullable.group({
+    originalText: ['New message', [Validators.required]],
+  });
+
+  readonly editForm = this.fb.nonNullable.group({
+    originalText: ['', [Validators.required]],
+  });
+  readonly conversationId: string;
 
   // Logs
   private readonly _logs = signal<LogEntry[]>([]);
@@ -45,52 +59,80 @@ export class MessagesLabComponent {
     return this.messages().find(m => m['@id'] === iri) ?? null;
   });
 
-  constructor(private router: Router, protected facadeFactory: FacadeFactory) {
-    this.facade = facadeFactory.create<Message>({url: `/api/conversations/1/messages`})
+  readonly searchForm = this.fb.nonNullable.group({q: ['']});
+  readonly filtered = computed(() => {
+    const q = this.searchForm.controls.q.value.trim().toLowerCase();
+    const list = this.messages();
+    if (!q) return list;
+    return list.filter((m) => {
+      const id = String(m.id ?? '');
+      const iri = String(m['@id'] ?? '');
+      const txt = String(m.originalText ?? '');
+      return [id, iri, txt].some((x) => x.toLowerCase().includes(q));
+    });
+  });
+
+  private sseSub?: { unsubscribe(): void };
+
+  constructor(
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
+    protected facadeFactory: FacadeFactory,
+    private readonly bridge: BridgeFacade,
+  ) {
+    const id = this.route.snapshot.paramMap.get('id') ?? '1';
+    this.conversationId = id;
+    this.facade = facadeFactory.create<Message>({url: `/api/conversations/${id}/messages`})
+    this.conversationFacade = facadeFactory.create<Conversation>({url: `/api/conversations`})
     this.status = this.facade.connectionStatus;
     this.pushLog({t: Date.now(), kind: 'init'});
+    this.load();
+    this.enableSse();
   }
 
   routing() {
+    this.disableSse();
     this.router.navigate(["/conversations"]);
   }
 
   load() {
+    this.loading.set(true);
+    this.error.set(null);
     this.facade.getCollection$({page: 1, itemsPerPage: 20})
       .pipe(
         tap(list => {
           this.messages.set(list.member)
+          this.loading.set(false);
         })
       )
-      .subscribe();
+      .subscribe({
+        error: (err) => {
+          this.error.set(err?.message || 'Failed to load messages');
+          this.loading.set(false);
+        }
+      });
   }
 
   watchAll() {
-    this.facade.watch$(this.messages().map(message => message['@id'])).subscribe(result => {
-      upsertInSignal(this.messages, result)
-    });
+    this.enableSse();
   }
 
   unwatchAll() {
-    this.facade.unwatch(this.messages().map(message => message['@id']));
+    this.disableSse();
   }
 
   select(m: Message) {
     this.selectedId.set(m["@id"]);
-    this.formOriginalText = m.originalText ?? '';
+    this.editForm.setValue({originalText: m.originalText ?? ''});
     this.pushLog({t: Date.now(), kind: 'select', iri: m["@id"], snapshot: m});
   }
 
   watchOne() {
-    const id = this.selectedId();
-    if (id) this.facade.watch$(id).subscribe(result => {
-      upsertInSignal(this.messages, result)
-    });
+    this.enableSse();
   }
 
   unwatchOne() {
-    const id = this.selectedId();
-    if (id) this.facade.unwatch(id);
+    this.disableSse();
   }
 
   manualGet() {
@@ -104,10 +146,74 @@ export class MessagesLabComponent {
   patchOriginalText() {
     const iri = this.selectedId();
     if (!iri) return;
-    const ext = this.formOriginalText?.trim();
-    this.facade.patch$(iri, {originalText: ext}).subscribe(res => {
+    if (this.editForm.invalid) {
+      this.editForm.markAllAsTouched();
+      return;
+    }
+    this.loading.set(true);
+    this.error.set(null);
+    const {originalText} = this.editForm.getRawValue();
+    this.facade.patch$(iri, {originalText: originalText.trim()}).subscribe(res => {
       this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
+      this.loading.set(false);
+    }, (err) => {
+      this.error.set(err?.message || 'Failed to patch message');
+      this.loading.set(false);
     });
+  }
+
+  create() {
+    if (this.createForm.invalid) {
+      this.createForm.markAllAsTouched();
+      return;
+    }
+    this.loading.set(true);
+    this.error.set(null);
+    const {originalText} = this.createForm.getRawValue();
+
+    const conversation = `/api/conversations/${this.conversationId}`;
+    this.bridge
+      .post$('/api/messages', {conversation, originalText: originalText.trim()})
+      .subscribe((res: any) => {
+        const iri = res?.['@id'] as Iri | undefined;
+        if (iri) upsertInSignal(this.messages, res);
+        this.pushLog({t: Date.now(), kind: 'update', iri, snapshot: res});
+        this.loading.set(false);
+        this.createForm.reset({originalText: 'New message'});
+      }, (err) => {
+        this.error.set(err?.message || 'Failed to create message');
+        this.loading.set(false);
+      });
+  }
+
+  private enableSse(): void {
+    if (this.sseSub) return;
+    const conversationIri = `/api/conversations/${this.conversationId}`;
+    const topics = this.topicsForConversationIri(conversationIri);
+    this.sseSub = this.conversationFacade
+      .watchSubResource$<Message>(topics, 'conversation')
+      .subscribe((msg) => upsertInSignal(this.messages, msg));
+  }
+
+  private disableSse(): void {
+    const conversationIri = `/api/conversations/${this.conversationId}`;
+    const topics = this.topicsForConversationIri(conversationIri);
+    this.conversationFacade.unwatch(topics);
+    this.sseSub?.unsubscribe();
+    this.sseSub = undefined;
+  }
+
+  private topicsForConversationIri(iri: string): string[] {
+    const abs = this.resolveBackendIri(iri);
+    return abs === iri ? [iri] : [iri, abs];
+  }
+
+  private resolveBackendIri(iri: string): string {
+    try {
+      return new URL(iri, BACKEND_BASE_URL).toString();
+    } catch {
+      return iri;
+    }
   }
 
   // utils logs

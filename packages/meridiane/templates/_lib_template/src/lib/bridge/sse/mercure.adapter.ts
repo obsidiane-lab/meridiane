@@ -85,8 +85,8 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
         filter((raw: any) => {
           if (fieldPath) {
-            const relIri = this.extractRelationIris(raw, fieldPath);
-            return Array.from(filterSet).some((iri) => relIri === iri || relIri?.startsWith(`${iri}/`));
+            const relIris = this.extractRelationIris(raw, fieldPath);
+            return Array.from(filterSet).some((iri) => relIris.some((relIri) => relIri === iri || relIri.startsWith(`${iri}/`)));
           }
           const id = raw?.['@id'];
           return typeof id === 'string' && Array.from(filterSet).some((iri) => {
@@ -212,8 +212,22 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     return JSON.parse(raw) as Item;
   }
 
-  private extractRelationIris(raw: any, path: string): string {
-    return raw?.[path];
+  private extractRelationIris(raw: any, path: string): string[] {
+    const readPath = (obj: any, dotPath: string): any => {
+      return dotPath
+        .split('.')
+        .filter(Boolean)
+        .reduce((acc, key) => acc?.[key], obj);
+    };
+
+    const normalize = (value: any): string[] => {
+      if (!value) return [];
+      if (typeof value === 'string') return value.length > 0 ? [value] : [];
+      if (Array.isArray(value)) return value.flatMap(normalize);
+      return [];
+    };
+
+    return normalize(readPath(raw, path));
   }
 
 }

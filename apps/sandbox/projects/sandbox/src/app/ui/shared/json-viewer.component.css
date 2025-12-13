@@ -1,0 +1,4 @@
+.json { display: grid; gap: 8px; }
+.json__head { display:flex; align-items:center; justify-content: space-between; gap: 12px; }
+.json__head h3 { margin: 0; font-size: 14px; color: var(--muted); font-weight: 700; }
+

@@ -1,1 +1,99 @@
-/* You can add global styles to this file, and also import other style files */
+:root{
+  --bg: #f7f8fb;
+  --panel: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #111827;
+  --primary-contrast: #ffffff;
+  --good: #16a34a;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --shadow: 0 1px 2px rgba(0,0,0,.05);
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+input, button, textarea { font: inherit; }
+
+a { color: inherit; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.muted { color: var(--muted); }
+.grid { display: grid; gap: 12px; }
+.grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.card, .panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.panel { padding: 12px; }
+.card { padding: 12px; }
+
+.btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn--primary{
+  background: var(--primary);
+  color: var(--primary-contrast);
+  border-color: var(--primary);
+}
+.btn--ghost{
+  background: transparent;
+}
+.btn[disabled]{ opacity: .6; cursor: default; }
+
+.input, input, textarea{
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+}
+.badge--good{ background: #dcfce7; border-color: #bbf7d0; color: #166534; }
+.badge--warn{ background: #fef3c7; border-color: #fde68a; color: #92400e; }
+.badge--bad{ background: #fee2e2; border-color: #fecaca; color: #991b1b; }
+
+pre{
+  background: #0b1020;
+  color: #d7e0ff;
+  padding: 12px;
+  border-radius: var(--radius);
+  overflow: auto;
+  margin: 0;
+}

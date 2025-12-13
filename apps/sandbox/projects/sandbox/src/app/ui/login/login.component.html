@@ -1,0 +1,30 @@
+<section class="wrap">
+  <header class="header">
+    <h1>Meridiane Sandbox</h1>
+    <p>Login dev (JWT HS256) pour tester le bridge Angular sur un backend Symfony/API Platform.</p>
+  </header>
+
+  <section class="panel">
+    <form [formGroup]="form" (ngSubmit)="login()">
+      <div class="row">
+        <label>Email</label>
+        <input formControlName="email" placeholder="dev@meridiane.local"/>
+      </div>
+      <div class="row">
+        <label>Password</label>
+        <input formControlName="password" type="password" placeholder="dev"/>
+      </div>
+
+      <div class="actions">
+        <button type="submit" [disabled]="loading()">Login</button>
+        <button type="button" (click)="loginAsDev()" [disabled]="loading()">Dev</button>
+        <button type="button" (click)="loginAsAdmin()" [disabled]="loading()">Admin</button>
+        <a class="link" [href]="backendBaseUrl + '/api/docs'" target="_blank">API docs</a>
+      </div>
+    </form>
+
+    @if (error()) {
+      <div class="error">{{ error() }}</div>
+    }
+  </section>
+</section>

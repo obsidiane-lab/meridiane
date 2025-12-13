@@ -1,1 +1,26 @@
-<router-outlet />
+<header class="app-header">
+  <div class="app-header__brand">
+    <a routerLink="/home">Meridiane Sandbox</a>
+    <span class="app-header__meta">Backend: <code>{{ backendBaseUrl }}</code></span>
+  </div>
+
+  <div class="app-header__auth">
+    @if (shortToken(); as t) {
+      <span class="token">JWT: {{ t }}</span>
+      <button class="btn btn--ghost" type="button" (click)="logout()">Logout</button>
+    } @else {
+      <a class="btn btn--primary" routerLink="/login">Login</a>
+    }
+  </div>
+</header>
+
+<div class="app-shell">
+  <aside class="app-nav">
+    <a routerLink="/home" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">Home</a>
+    <a routerLink="/conversations" routerLinkActive="active">Conversations</a>
+    <a routerLink="/http" routerLinkActive="active">HTTP Lab</a>
+  </aside>
+  <main class="app-main">
+    <router-outlet />
+  </main>
+</div>

@@ -12,14 +12,19 @@ services:
 
       MERCURE_URL: http://php/.well-known/mercure
       MERCURE_PUBLIC_URL: ${APP_BASE_URL}/.well-known/mercure
-      MERCURE_PUBLISHER_JWT_KEY: ${JWT_SECRET}
-      MERCURE_SUBSCRIBER_JWT_KEY: ${JWT_SECRET}
+      MERCURE_PUBLISHER_JWT_KEY: "!ChangeThisMercureHubJWTSecretKey!"
+      MERCURE_SUBSCRIBER_JWT_KEY: "!ChangeThisMercureHubJWTSecretKey!"
+      MERCURE_PUBLISHER_JWT_ALG: "HS256"
+      MERCURE_SUBSCRIBER_JWT_ALG: "HS256"
       MERCURE_ALLOW_ORIGINS: "http://localhost:4200 http://localhost:8000"
+      # DEV_RESET_DB=1 => drop schema + migrate + seed on boot
+      DEV_RESET_DB: "0"
       FRANKENPHP_WORKER_CONFIG: watch
       MERCURE_EXTRA_DIRECTIVES: >
         demo
-        cors_origins ${MERCURE_ALLOW_ORIGINS}
-      CORS_ALLOW_ORIGIN: "http://localhost:4200"
+        cors_origins http://localhost:4200 http://localhost:8000
+      # Regex (nelmio_cors.origin_regex=true) - reflect Origin and allow credentials
+      CORS_ALLOW_ORIGIN: '^https?://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$'
     volumes:
       - ./:/app
       - ./frankenphp/Caddyfile:/etc/frankenphp/Caddyfile:ro

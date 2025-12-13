@@ -1,8 +1,15 @@
 lexik_jwt_authentication:
     # Utilise la même clé HS256 que le service obsidiane/auth
-    secret_key: '%env(JWT_SECRET)%'
+    secret_key: '%env(string:JWT_SECRET)%'
     encoder:
         signature_algorithm: HS256
+    token_ttl: 86400
+
+    api_platform:
+        enabled: true
+        check_path: /api/auth/login
+        username_path: email
+        password_path: password
 
     token_extractors:
         authorization_header:

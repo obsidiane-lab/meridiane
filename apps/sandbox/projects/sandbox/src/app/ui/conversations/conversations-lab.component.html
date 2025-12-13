@@ -1,25 +1,55 @@
 <section class="panel" style="margin-bottom: 12px;">
-  <div class="toolbar">
-    <button (click)="routing()">Go Messages</button>
+  <div class="toolbar" style="justify-content: space-between; gap: 12px;">
+    <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+      <h1 style="margin:0; font-size: 18px;">Conversations</h1>
+      <span class="badge"
+            [class.badge--good]="status() === 'connected'"
+            [class.badge--warn]="status() === 'connecting'"
+            [class.badge--bad]="status() === 'closed'">
+        SSE: {{ status() }}
+      </span>
+      <span class="badge">Items: {{ conversations().length }}</span>
+      @if (loading()) { <span class="badge">Loading…</span> }
+    </div>
 
-    <button (click)="load()">Load list</button>
-    <button (click)="watchAll()">[+] Watch all (SSE)</button>
-    <button (click)="unwatchAll()">[-] Unwatch all (SSE)</button>
-    <span class="badge status {{status()}}">SSE: {{ status() }}</span>
-    <span class="badge">Count: {{ conversations().length }}</span>
-
+    <div class="toolbar" style="gap: 8px; align-items: center;">
+      <form [formGroup]="searchForm">
+        <input class="input" formControlName="q" placeholder="Search (id, title, externalId, IRI)" style="min-width: 280px;"/>
+      </form>
+      <button class="btn" type="button" (click)="load()">Reload</button>
+      <button class="btn" type="button" (click)="routing()" [disabled]="!selectedId()">Open messages</button>
+      <button class="btn" type="button" (click)="watchAll()" [disabled]="conversations().length === 0">Watch all</button>
+      <button class="btn" type="button" (click)="unwatchAll()" [disabled]="conversations().length === 0">Unwatch all</button>
+    </div>
   </div>
+
+  @if (error()) {
+    <div class="badge badge--bad" style="margin-top: 10px;">{{ error() }}</div>
+  }
+</section>
+
+<section class="panel" style="margin-bottom: 12px;">
+  <form class="toolbar" style="gap: 10px; flex-wrap: wrap;" [formGroup]="createForm" (ngSubmit)="create()">
+    <strong>Create</strong>
+    <input formControlName="title" placeholder="title" style="min-width: 240px;"/>
+    <input formControlName="externalId" placeholder="externalId (optional)" style="min-width: 200px;"/>
+    <button class="btn btn--primary" type="submit" [disabled]="loading()">Create</button>
+  </form>
 </section>
 
 <section class="layout">
   <!-- LISTE GAUCHE -->
   <div class="panel list">
-    @for (c of conversations(); track c['@id']) {
+    @if (filtered().length === 0) {
+      <div class="muted" style="padding: 8px;">No conversations.</div>
+    }
+    @for (c of filtered(); track c['@id']) {
       <div class="row"
            [class.active]="c['@id'] === selectedId()"
            (click)="select(c)">
         <div>
           <div><strong>#{{ c['@id'] }}</strong></div>
+          <div style="font-size:12px;color:#374151">title: {{ c.title || '—' }}</div>
           <div style="font-size:12px;color:#6b7280">externalId: {{ c.externalId || '—' }}</div>
         </div>
         <div style="display:flex; gap:6px; align-items:center;">
@@ -31,52 +61,109 @@
   </div>
 
   <!-- DETAIL DROITE -->
-  <div class="panel" *ngIf="selected() as conv; else empty">
-    <header class="toolbar" style="justify-content:space-between;">
-      <div style="display:flex; gap:10px; align-items:center;">
-        <h3 style="margin:0">Conversation #{{ conv.id }}</h3>
-        <span class="badge">SSE: {{ status() }}</span>
-      </div>
-      <div class="toolbar">
-        <button (click)="watchOne()" [disabled]="!selectedId()">[+] Watch one now</button>
-        <button (click)="unwatchOne()" [disabled]="!selectedId()">[-] Unwatch one now</button>
-
-        <button (click)="manualGet()" [disabled]="!selectedId()">Manual GET</button>
-      </div>
-    </header>
-
-    <section style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top: 12px;">
-      <div>
-        <h4>Mise à jour (PATCH)</h4>
-        <div style="display:grid; gap:8px;">
-          <label>
-            <div style="font-size:12px;color:#6b7280">externalId</div>
-            <input [(ngModel)]="formExternalId" placeholder="nouvel externalId"/>
-          </label>
-          <button (click)="patchExternalId()" [disabled]="!selectedId()">Envoyer PATCH</button>
+  @if (selected(); as conv) {
+    <section class="chat">
+      <header class="chat__header">
+        <div style="display:flex; flex-direction: column; gap: 2px;">
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap: wrap;">
+            <h3 style="margin:0">#{{ conv.id }} — {{ conv.title || 'Conversation' }}</h3>
+            <span class="badge">msgs: {{ conv.messages?.length ?? 0 }}</span>
+            <span class="badge">SSE: {{ status() }}</span>
+          </div>
+          <div class="muted" style="font-size: 12px;">
+            <span>IRI: <code>{{ conv['@id'] }}</code></span>
+            @if (meIdentifier()) { <span style="margin-left: 8px;">You: <strong>{{ meIdentifier() }}</strong></span> }
+          </div>
         </div>
+
+        <div class="toolbar" style="justify-content:flex-end;">
+          <button class="btn" type="button" (click)="watchOne()" [disabled]="!selectedId()">Watch</button>
+          <button class="btn" type="button" (click)="unwatchOne()" [disabled]="!selectedId()">Unwatch</button>
+          <button class="btn" type="button" (click)="manualGet()" [disabled]="!selectedId()">GET</button>
+        </div>
+      </header>
+
+      <div class="chat__messages panel" #messagesViewport>
+        @if (messagesLoading()) {
+          <div class="muted">Loading…</div>
+        }
+
+        @if (!messagesLoading() && selectedMessages().length === 0) {
+          <div class="muted">No messages yet. Send the first one.</div>
+        }
+
+        @for (m of selectedMessages(); track m['@id']) {
+          <div class="msg" [class.msg--mine]="isMine(m)">
+            <div class="msg__meta">
+              <span class="msg__author">{{ displayAuthor(m) }}</span>
+              <span class="msg__time">{{ formatTime(m.createdAt) }}</span>
+            </div>
+            <div class="msg__bubble">
+              {{ m.originalText || '—' }}
+            </div>
+          </div>
+        }
       </div>
 
-      <div>
-        <h4>Meta</h4>
-        <div class="badge">messages: {{ conv.messages?.length ?? 0 }}</div>
-      </div>
-    </section>
+      <form class="chat__composer panel" [formGroup]="sendMessageForm" (ngSubmit)="sendMessage()">
+        <textarea
+          #composer
+          formControlName="text"
+          rows="2"
+          placeholder="Write a message… (Enter to send, Shift+Enter for newline)"
+          (keydown.enter)="onComposerEnter($event)"
+        ></textarea>
+        <div class="chat__composerActions">
+          <button class="btn btn--primary" type="submit" [disabled]="sending() || sendMessageForm.invalid">
+            @if (sending()) { Sending… } @else { Send }
+          </button>
+        </div>
+      </form>
 
-    <section style="margin-top: 16px;">
-      <h4>Snapshot courant</h4>
-      <pre>{{ conv | json }}</pre>
-    </section>
+      <details class="panel devtools">
+        <summary>Dev tools</summary>
 
-    <section style="margin-top: 16px;">
-      <h4>Event log</h4>
-      <pre>{{ logs() | json }}</pre>
-    </section>
-  </div>
+        <section style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top: 12px;">
+          <div>
+            <h4 style="margin:0 0 8px;">Update (PATCH)</h4>
+            <form style="display:grid; gap:8px;" [formGroup]="editForm" (ngSubmit)="patch()">
+              <label>
+                <div style="font-size:12px;color:#6b7280">title</div>
+                <input formControlName="title" placeholder="nouveau title"/>
+              </label>
+              <label>
+                <div style="font-size:12px;color:#6b7280">externalId</div>
+                <input formControlName="externalId" placeholder="nouvel externalId"/>
+              </label>
+              <button class="btn btn--primary" type="submit" [disabled]="!selectedId() || loading()">Save</button>
+            </form>
+          </div>
 
-  <ng-template #empty>
+          <div>
+            <h4 style="margin:0 0 8px;">Meta</h4>
+            <div class="badge">messages: {{ conv.messages?.length ?? 0 }}</div>
+            <div class="badge">createdAt: {{ conv.createdAt || '—' }}</div>
+            <div class="toolbar" style="margin-top: 8px;">
+              <button class="btn" type="button" (click)="removeSelected()" [disabled]="!selectedId()">DELETE</button>
+            </div>
+          </div>
+        </section>
+
+        <section style="margin-top: 16px;">
+          <h4 style="margin:0 0 8px;">Snapshot</h4>
+          <app-json-viewer [value]="conv" title="Conversation JSON"></app-json-viewer>
+        </section>
+
+        <section style="margin-top: 16px;">
+          <h4 style="margin:0 0 8px;">Logs</h4>
+          <app-json-viewer [value]="logs()" title="Logs"></app-json-viewer>
+        </section>
+      </details>
+    </section>
+  } @else {
     <div class="panel">
-      <em>Sélectionne une conversation dans la liste pour voir le détail.</em>
+      <h3 style="margin-top: 0;">Select a conversation</h3>
+      <p class="muted">Load the list, then click a conversation to open the chat.</p>
     </div>
-  </ng-template>
+  }
 </section>

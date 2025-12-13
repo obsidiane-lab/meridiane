@@ -3,6 +3,8 @@ import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
 import {provideBridge} from '@obsidiane/bridge-sandbox';
+import {BACKEND_BASE_URL, MERCURE_HUB_URL} from './core/backend';
+import {getStoredToken} from './core/auth-state.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -10,11 +12,12 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideBridge({
-      baseUrl: 'http://localhost:8000',
+      baseUrl: BACKEND_BASE_URL,
       mercure: {
-        hubUrl: 'http://localhost:8000/.well-known/mercure',
+        hubUrl: MERCURE_HUB_URL,
         init: {credentials: 'include'},
       },
+      auth: {type: 'bearer', getToken: getStoredToken},
       defaults: {
         timeoutMs: 30_000,
         retries: {count: 1, delayMs: 250},

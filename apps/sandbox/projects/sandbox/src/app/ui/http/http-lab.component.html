@@ -1,0 +1,50 @@
+<section class="panel">
+  <h1 style="margin:0 0 6px; font-size: 18px;">HTTP Lab</h1>
+  <p class="muted">Tests “hors Hydra” et cas réels (auth, headers, retry, timeout, upload).</p>
+
+  <form class="grid" [formGroup]="form">
+    <div class="card">
+      <h3>Auth</h3>
+      <button type="button" (click)="me()" [disabled]="busy()">GET /auth/me</button>
+    </div>
+
+    <div class="card">
+      <h3>Echo</h3>
+      <button type="button" (click)="echoGet()" [disabled]="busy()">GET /test/echo</button>
+      <label>
+        <div class="muted">POST /test/echo (JSON)</div>
+        <textarea formControlName="echoPayload" rows="4"></textarea>
+      </label>
+      <button type="button" (click)="echoPostJson()" [disabled]="busy()">POST /test/echo</button>
+    </div>
+
+    <div class="card">
+      <h3>Delay / Flaky</h3>
+      <label>
+        <div class="muted">Delay (ms)</div>
+        <input type="number" formControlName="delayMs"/>
+      </label>
+      <button type="button" (click)="delay()" [disabled]="busy()">GET /test/delay</button>
+
+      <label style="margin-top: 10px;">
+        <div class="muted">Flaky fails</div>
+        <input type="number" formControlName="flakyFails"/>
+      </label>
+      <button type="button" (click)="flaky()" [disabled]="busy()">GET /test/flaky</button>
+    </div>
+
+    <div class="card">
+      <h3>Upload</h3>
+      <input type="file" (change)="upload($event)"/>
+      <div class="muted">POST /api/file_assets/upload (multipart/form-data)</div>
+    </div>
+  </form>
+
+  @if (err()) {
+    <div class="badge badge--bad" style="margin-top: 12px;">{{ err() }}</div>
+  }
+
+  <div style="margin-top: 12px;">
+    <app-json-viewer [value]="out()" title="Output"></app-json-viewer>
+  </div>
+</section>

@@ -1,0 +1,12 @@
+<section class="json">
+  <header class="json__head">
+    <h3>{{ title() }}</h3>
+    <div class="json__actions">
+      <button class="btn btn--ghost" type="button" (click)="copy()">
+        @if (copied()) { Copied } @else { Copy }
+      </button>
+    </div>
+  </header>
+  <pre>{{ value() | json }}</pre>
+</section>
+
