@@ -37,6 +37,12 @@ cd dist/backend-bridge
 npm publish
 ```
 
+Si votre workspace ne contient pas `ng-packagr` (souvent le cas dans une app Angular “pure”), installez-le :
+
+```bash
+npm i -D ng-packagr
+```
+
 ## Configuration (models.config.js)
 
 Le générateur de modèles charge automatiquement un fichier `models.config.js` s’il existe dans le répertoire courant (CWD).

@@ -45,3 +45,4 @@ Thumbs.db
 apps/sandbox/projects/bridge-sandbox/
 projects/
 .npm-cache/
+*.tgz

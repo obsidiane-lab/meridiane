@@ -158,6 +158,12 @@ npx ng build backend-bridge
 npm publish ./dist/backend-bridge
 ```
 
+Prérequis build : si votre workspace ne contient pas encore de librairie Angular, vous devrez peut‑être installer `ng-packagr` :
+
+```bash
+npm i -D ng-packagr
+```
+
 > Assurez-vous d’avoir les bons `name`, `version` et `peerDependencies` dans le `package.json` de la lib.
 
 ---

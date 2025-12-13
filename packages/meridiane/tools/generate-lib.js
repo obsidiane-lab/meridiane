@@ -98,6 +98,28 @@ async function generate(libName, packageName, version, urlRegistry) {
 
   console.log(`✅ Library '${libName}' generated at projects/${libName}` +
     ` with package '${packageName}@${version}'`);
+
+  const ngPackagrPkg = findUpNodeModulePackageJson(workspaceRoot, 'ng-packagr');
+  if (!ngPackagrPkg) {
+    console.warn(
+      [
+        "⚠️  'ng-packagr' n'est pas installé dans ce workspace.",
+        "   Pour builder une librairie (ng-packagr), installez-le dans votre projet Angular :",
+        "   npm i -D ng-packagr",
+      ].join('\n')
+    );
+  }
+}
+
+function findUpNodeModulePackageJson(startDir, packageName) {
+  let dir = startDir;
+  while (true) {
+    const candidate = path.join(dir, 'node_modules', packageName, 'package.json');
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
 }
 
 // CLI args: node generate-lib.js <lib-name> <package-name> [version] <url-registry>

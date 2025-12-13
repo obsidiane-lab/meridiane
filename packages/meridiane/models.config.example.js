@@ -1,7 +1,8 @@
-// Exemple de configuration pour la génération des modèles
+// Exemple de configuration pour la génération des modèles.
 // Copiez ce fichier en `models.config.js` dans le dossier où vous lancez la commande (`meridiane models`).
+// Format CommonJS pour éviter les warnings Node dans la plupart des workspaces Angular.
 
-export default {
+module.exports = {
   // Dossier de sortie (relatif au CWD)
   outDir: 'projects/backend-bridge/src/models',
 
