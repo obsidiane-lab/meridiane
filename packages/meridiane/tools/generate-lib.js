@@ -2,6 +2,7 @@
 import fs from "fs-extra"
 import path from "path"
 import { fileURLToPath } from 'url';
+import {loadDotEnv} from './utils/dotenv.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -122,12 +123,22 @@ function findUpNodeModulePackageJson(startDir, packageName) {
   }
 }
 
-// CLI args: node generate-lib.js <lib-name> <package-name> [version] <url-registry>
+await loadDotEnv();
+const debug = process.argv.includes('--debug') || /^(1|true|yes)$/i.test(process.env.MERIDIANE_DEBUG ?? '');
+
 // CLI args: node generate-lib.js <lib-name> <package-name> [version] [url-registry]
-const [,, libName, packageName, version = '0.0.1', urlRegistry] = process.argv;
+// + support .env via MERIDIANE_LIB_VERSION / MERIDIANE_NPM_REGISTRY_URL
+const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const [libName, packageName, versionArg, urlRegistryArg] = positional;
+const version = versionArg ?? process.env.MERIDIANE_LIB_VERSION ?? '0.0.1';
+const urlRegistry = urlRegistryArg ?? process.env.MERIDIANE_NPM_REGISTRY_URL;
 if (!libName || !packageName) {
   console.error('Usage: generate-lib.js <lib-name> <package-name> [version] [url-registry]');
   process.exit(1);
+}
+
+if (debug) {
+  console.log('[meridiane lib] debug', {libName, packageName, version, urlRegistry: urlRegistry ? '<set>' : '<unset>'});
 }
 
 generate(libName, packageName, version, urlRegistry).catch(err => {

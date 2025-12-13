@@ -1,39 +1,40 @@
-# Meridiane — Générateur de librairie Angular & *bridge* backend (avec modèles dynamiques)
+# Meridiane — générer un “bridge” Angular pour API Platform
 
-> **TL;DR**  
 > Ce paquet npm fournit :
-> 1) un **template de librairie Angular** prêt à l’emploi (bridge REST + SSE) ;
-> 2) un **CLI** pour **générer une librairie** et **générer des modèles TypeScript** depuis une **spec OpenAPI**.
+> - un **CLI** pour générer une **lib Angular** (bridge) + des **models TypeScript** depuis OpenAPI ;
+> - un **template** prêt à l’emploi (REST API Platform/Hydra + Mercure/SSE + facades).
 
 ---
 
-## ✨ Ce que fait le projet
+## ✨ Ce que fait Meridiane
 
-- **Scaffold** une librairie Angular à partir d’un **template** (embarqué dans `@obsidiane/meridiane`).
-- Expose un **bridge** pour communiquer avec votre backend :
-  - REST (adapter **API Platform / Hydra** prêt à l’emploi) ;
-  - **SSE** via **Mercure** pour le temps réel — *mono-connexion EventSource* + **comptage de références par topic** (plusieurs façades peuvent s’abonner au même topic sans conflits) ;
-  - **interceptors** (`Content-Type`, `X-Request-ID` de corrélation).
-- **Génère des modèles TypeScript** à partir d’une **spec OpenAPI** (via Handlebars).
-- Fournit une **facade** ergonomique (signals Angular) pour lister, lire, créer, mettre à jour, supprimer et **écouter** les entités en temps réel.
+- Génère une **lib Angular** (dans `projects/<lib-name>`) à partir d’un template embarqué.
+- Génère des **models TypeScript** depuis une **spec OpenAPI** (API Platform).
+- Fournit des helpers runtime :
+  - REST (API Platform / Hydra) ;
+  - Mercure/SSE (mono-connexion, topics ref-count) ;
+  - facades (signals) + interceptors (Content-Type, etc.).
 
 ---
 
-## ⚡️ Utilisation rapide (en tant qu’utilisateur)
+## ⚡️ Démarrage rapide (repo du bridge)
 
-Dans un workspace Angular existant (dossier qui contient `angular.json`) :
+Dans le repo qui va publier votre bridge (workspace Angular avec `angular.json`) :
 
 ```bash
 # 1) Installer le CLI
 npm install -D @obsidiane/meridiane
 
-# 2) Générer une librairie bridge
+# 2) (Recommandé) Générer la config + snippets
+npx meridiane init
+
+# 3) Générer la lib bridge (une fois)
 npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0
 
-# 3) Générer les modèles depuis la spec OpenAPI
+# 4) Générer les models (à relancer quand le backend change)
 npx meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
 
-# 4) Builder la librairie
+# 5) Builder la lib
 npx ng build backend-bridge
 ```
 
@@ -41,7 +42,19 @@ La lib générée peut ensuite être publiée (`dist/backend-bridge`) et consomm
 
 ---
 
-## 🧭 Structure (vue d’ensemble)
+## 🎯 Contexte (à garder en tête)
+
+Meridiane est optimisé pour ce workflow :
+
+- 1 backend **Symfony / API Platform** → 1 package npm “bridge” (ex: `@acme/backend-bridge`) → n apps Angular.
+
+Deux rôles :
+- **Mainteneur** : génère/compile/publie le bridge.
+- **Consommateur** : installe le package et configure `provideBridge()` dans l’app.
+
+---
+
+## 🧭 Ce repo (Meridiane)
 
 ```
 packages/
@@ -66,396 +79,15 @@ apps/
 
 ---
 
-## 🚀 1) Générer une librairie à partir du template
-
-### Via le paquet npm (recommandé)
-
-Depuis la racine de votre workspace Angular :
-
-```bash
-npx meridiane lib <lib-name> <npm-package-name> [version] [url-registry]
-```
-
-**Exemple**
-```bash
-npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0
-```
-
-> Recommandé : configurez le registry via `.npmrc` / variables CI et gardez `url-registry` optionnel.
-
-### Depuis ce repo (développement / contribution)
-
-```bash
-node packages/meridiane/tools/generate-lib.js <lib-name> <npm-package-name> [version] [url-registry]
-```
-
-**Placeholders remplacés**
-- `__LIB_NAME__` → `<lib-name>`
-- package.json, ng-package.json, chemins de sortie, etc.
-
----
-
-## 🧬 2) Générer les modèles TypeScript depuis OpenAPI
-
-### Via le paquet npm
-
-Depuis le dossier de la librairie générée :
-
-```bash
-npx meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
-```
-
-### Depuis ce repo (développement / contribution)
-
-```bash
-node packages/meridiane/tools/generate-models.js <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
-```
-
-- `--out` : dossier de sortie **relatif au CWD** (défaut : `models`).
-- `--item-import` : chemin d’import de l’interface `Item` utilisé par les modèles (défaut : `../lib/ports/resource-repository.port`).
-- `--required-mode` : contrôle les `?` des propriétés. `all-optional` (défaut) marque toutes les propriétés optionnelles; `spec` respecte le tableau `required` de la spec.
-- `--no-index` : n’écrit pas `index.ts` d’export.
-
-**Exemples (à lancer depuis le dossier de la lib générée)**
-
-```bash
-# 1) Depuis une URL (API Platform expose souvent /docs.json)
-meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
-
-# 2) Depuis un fichier local déjà en JSON
-meridiane models ./openapi.json --out=projects/backend-bridge/src/models
-```
-
-> Les interfaces générées étendent `Item` et importent les types nécessaires.  
-> Un `index.ts` est créé (sauf `--no-index`) pour centraliser les exports.
-
-Règles de nommage
-- Variantes `.jsonld`/`.jsonapi` sont dé-dupliquées (préférence `jsonld`).
-- Si un schéma groupé a un nom de base unique et non en conflit avec une racine, on conserve le nom de base (ex. `RegisterIdentityInput.jsonld-user.register` → `RegisterIdentityInput`).
-- Sinon, on garde un nom enrichi lisible (ex. `Identity.jsonld-user.read` → `IdentityUserRead`).
-
-Configuration via fichier `models.config.js`
-- Placez un fichier `models.config.js` dans le répertoire où vous lancez la commande (CWD).
-- Exemple : `cp node_modules/@obsidiane/meridiane/models.config.example.js ./models.config.js` (après installation).
-- Propriétés supportées:
-  - `outDir` (string) — dossier de sortie par défaut.
-  - `itemImportPath` (string) — import `Item` dans les templates.
-  - `requiredMode` ('all-optional' | 'spec') — optionnalité des propriétés.
-  - `preferFlavor` ('jsonld' | 'jsonapi' | 'none') — préférence de variante.
-  - `hydraBaseRegex` (RegExp|string) — regex des schémas Hydra à ignorer.
-- Priorité: paramètres CLI > `models.config.js` > valeurs par défaut.
-
----
-
-## 🏗️ 3) Builder (et publier) la librairie
-
-```bash
-# Build de la lib (ng-packagr)
-npx ng build backend-bridge
-
-# Le package est dans dist/<lib-name>
-# Publication NPM (optionnel)
-npm publish ./dist/backend-bridge
-```
-
-Prérequis build : si votre workspace ne contient pas encore de librairie Angular, vous devrez peut‑être installer `ng-packagr` :
-
-```bash
-npm i -D ng-packagr
-```
-
-> Assurez-vous d’avoir les bons `name`, `version` et `peerDependencies` dans le `package.json` de la lib.
-
----
-
-## 🧩 Utiliser la lib dans une app Angular
-
-### Installation
-
-```bash
-npm i @acme/backend-bridge
-```
-
-### Configuration minimale (bridge)
-
-Dans `main.ts` (ou `app.config.ts`), fournissez le bridge :
-
-```ts
-import { bootstrapApplication } from '@angular/platform-browser';
-import { provideHttpClient } from '@angular/common/http';
-import { AppComponent } from './app/app.component';
-
-import { provideBridge } from '<npm-package-name>';
-
-bootstrapApplication(AppComponent, {
-  providers: [
-    provideHttpClient(),
-    provideBridge({
-      apiBaseUrl: 'http://localhost:8000',
-      mercureHubUrl: 'http://localhost:8000/.well-known/mercure/',
-      mercure: {
-        headers: { Authorization: 'Bearer <token>' },
-        // withCredentials: true,
-      },
-    }),
-  ]
-});
-```
-
-> `provideBridge()` configure `HttpClient` (fetch + interceptors),  
-> et fournit **API_BASE_URL**, **MERCURE_CONFIG** et **MERCURE_HUB_URL**.
-
-### Exemple d’utilisation avec FacadeFactory
-
-```ts
-import {Component, computed, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {FormsModule} from '@angular/forms';
-import type {Conversation} from '../../entities/conversation';
-import {FacadeFactory, ResourceFacade} from "@acme/backend-bridge";
-
-@Component({
-  selector: 'app-conversations',
-  imports: [CommonModule, FormsModule],
-  templateUrl: './conversations.component.html',
-  styleUrls: ['./conversations.component.css'],
-})
-export class ConversationsLabComponent {
-  readonly facade: ResourceFacade<Conversation>;
-
-  // Signals façade
-  readonly conversations = signal<readonly Conversation[]>([]);
-  readonly status = this.facade.connectionStatus;
-
-  // Sélection & formulaire
-  readonly selectedId = signal<string | null>(null);
-  formExternalId = '';
-
-  // Conversation sélectionnée
-  readonly selected = computed<Conversation | null>(() => {
-    const iri = this.selectedId();
-    if (!iri) return null;
-    return this.conversations().find(c => c['@id'] === iri) ?? null;
-  });
-
-  constructor(protected facadeFactory: FacadeFactory) {
-    this.facade = facadeFactory.create<Conversation>({url: `/api/conversations`})
-  }
-
-  select(c: Conversation) {
-    this.selectedId.set(c['@id']!);
-    this.formExternalId = c.externalId ?? '';
-  }
-  
-  load() {
-    this.facade.list$({page: 1, itemsPerPage: 20}).subscribe(list => {
-      this.conversations.set(list.member);
-    });
-  }
-
-  watchAll() {
-    this.facade.watch$(this.conversations().map(c => c['@id']!)).subscribe(updated => {
-      // mettre à jour le signal à partir des événements SSE
-      const arr = this.conversations();
-      const idx = arr.findIndex(c => c['@id'] === updated['@id']);
-      this.conversations.set(
-        idx === -1 ? [updated, ...arr] : [...arr.slice(0, idx), updated, ...arr.slice(idx + 1)],
-      );
-    });
-  }
-
-  unwatchAll() {
-    this.facade.unwatch(this.conversations().map(c => c['@id']!));
-  }
-  
-  watchOne() {
-    const iri = this.selectedId();
-    if (iri) {
-      this.facade.watch$(iri).subscribe(updated => {
-        const arr = this.conversations();
-        const idx = arr.findIndex(c => c['@id'] === updated['@id']);
-        this.conversations.set(
-          idx === -1 ? [updated, ...arr] : [...arr.slice(0, idx), updated, ...arr.slice(idx + 1)],
-        );
-      });
-    }
-  }
-
-  unwatchOne() {
-    const iri = this.selectedId();
-    if (iri) this.facade.unwatch(iri);
-  }
-
-  manualGet() {
-    const id = this.selectedId();
-    if (!id) return;
-    this.facade.get$(id).subscribe(res => {
-      console.log("get entity", res)
-    });
-  }
-
-  patchExternalId() {
-    const iri = this.selectedId();
-    if (!iri) return;
-    const ext = this.formExternalId?.trim();
-    this.facade.update$({iri, changes: {externalId: ext}}).subscribe(res => {
-      console.log("patched", res)
-    });
-  }
-}
-
-```
-
-**FacadeFactory fournit un objet `ResourceFacade<T>`**
-
-- `connectionStatus: Signal<RealtimeStatus>` — état de la connexion SSE (`connecting` | `connected` | `closed`)
-- `list$(query?: Query)` — charge une page (`page`, `itemsPerPage`, `filters`)
-- `get$(iri: Iri)` — récupère un item
-- `create$(cmd: { payload: T })`
-- `update$(cmd: { iri?: Iri; changes: Partial<T> })`
-- `delete$(iri: Iri)`
-- `request$<R>(config: { method; url?; query?; body?; headers?; responseType?; options?; withCredentials? })` — requête HTTP générique (chemin relatif à `apiBaseUrl` ou URL absolue) avec passage des options supplémentaires à `HttpClient`
-- Helpers `post$`, `put$`, `patch$` → versions typées qui fixent la méthode et délèguent à `request$` (les `get$(iri)` / `delete$(iri)` existants restent inchangés pour les ressources)
-
-Exemple helper :
-```ts
-facade.post$<MaRessource>({
-  url: '/api/ma-ressource',
-  body: { foo: 'bar' },
-});
-```
-- `watch$(iri: Iri | Iri[])` — (SSE) abonne un ou plusieurs topics et émet les entités reçues
-- `unwatch(iri: Iri | Iri[])` — (SSE) décrémente le compteur sur les topics
-
-**Note (SSE & topics)**  
-  Le bridge maintient un **compteur par topic** (`@id`).  
-   Chaque `watch*` **incrémente** ce compteur ; chaque `unwatch*` **décrémente**.  
-  Le **désabonnement effectif** d’un topic n’a lieu **que lorsque le compteur retombe à 0**.  
-  👉 Plusieurs façades peuvent donc observer **la même ressource** sans se gêner :
-```ts
-facadeA.watchOne('/api/conversations/1');
-facadeB.watchOne('/api/conversations/1');
-facadeA.unwatchOne('/api/conversations/1'); // toujours abonné (compteur > 0)
-facadeB.unwatchOne('/api/conversations/1'); // désabonnement effectif (compteur = 0)
-```
-
-
-### 🔔 Temps réel (SSE/Mercure) — écouter des **sous-ressources** par **relation**
-
-Vous pouvez vous abonner à un **topic parent** (ex. une *Conversation*) et ne recevoir que les événements dont une **relation** (ex. `conversation`) pointe vers ce topic.
-Aucune 2ᵉ connexion SSE n’est ouverte : le filtrage est fait côté client.
-
-#### RealtimePort — `subscribe$` (filtre par relation)
-
-```ts
-// Reçoit les Message dont message.conversation == '/api/conversations/1'
-this.conversationFacade
-  .watchSubResource$<Message>({ url: '/api/conversations/1', field: 'conversation' })
-  .subscribe(msg => {
-    console.log('nouveau Message:', msg);
-  });
-```
-
-**Variantes**
-
-```ts
-// Plusieurs conversations ouvertes
-this.conversationFacade.watchSubResource$<Message>({
-  url: ['/api/conversations/1', '/api/conversations/2'],
-  field: 'conversation'
-}).subscribe();
-
-// Relation imbriquée ou tableau
-// field: 'conversation.@id'        // si la relation est un objet { '@id': ... } // TODO
-// field: 'conversations'           // si la relation est un tableau d'IRIs/objets
-```
-
-### Côté API Platform
-
-Publiez la sous-ressource **sur le topic parent** **et** sur son propre topic, et exposez la relation dans le payload :
-
-```php
-mercure: {
-  topics: [
-    '@=iri(object)',                      // /api/conversations/{id}/messages/{mid}
-    '@=iri(object.getConversation())'     // /api/conversations/{id}
-  ]
-}
-```
-
-Le payload Mercure doit contenir la relation :
-
-```json
-{
-  "@type": "Message",
-  "@id": "/api/conversations/1/messages/72",
-  "conversation": "/api/conversations/1",
-  "originalText": "Bien l",
-  "createdAt": "2025-08-24T10:01:13+00:00",
-  "senderId": "user-123"
-}
-```
-
-
-## Paramétrage des interceptors HTTP
-
-- **`content-type.interceptor`** :
-  - `Accept: application/ld+json`
-  - `Content-Type` :
-    - `POST` / `PUT` → `application/ld+json`
-    - `PATCH` → `application/merge-patch+json`
-
-Vous pouvez injecter vos propres interceptors via `extraInterceptors` dans `provideBridge()`.
----
-
-## 🛠️ Personnalisation
-
-- **Modèles** : adaptez les templates Handlebars (`packages/meridiane/tools/generator/models/templates/`) selon votre style/linters.
-
----
-
-## 🧑‍💻 Développement de Meridiane (ce repo)
-
-Prérequis : Node.js ≥ 18, npm.
-
-```bash
-# Installer toutes les dépendances (workspaces)
-npm install
-
-# (Re)générer la lib de sandbox + build (lib + app)
-npm run sandbox:build
-
-# (Re)générer la lib de sandbox + lancer l'app
-npm run sandbox:dev
-```
-
-Notes
-- `apps/sandbox/projects/bridge-sandbox` est généré et ignoré par git.
-- Le sandbox consomme la lib via `@obsidiane/bridge-sandbox` (paths TS) afin de tester l’API publique.
-
----
-
-## 🚢 Publication (production) de `@obsidiane/meridiane` (npm public)
-
-```bash
-# Vérifier le contenu publié (sans toucher au cache global npm)
-npm -w packages/meridiane run pack:check
-
-# Publier sur npm (scopé -> public)
-cd packages/meridiane
-npm publish
-```
-
-En CI (projets consommateurs), pinnez une version :
-
-```bash
-npx -y @obsidiane/meridiane@0.1.0 lib <lib-name> <npm-package-name> [version]
-npx -y @obsidiane/meridiane@0.1.0 models <SPEC> --out=projects/<lib-name>/src/models
-npx ng build <lib-name>
-```
-- **Auth** : passez un provider `auth` et/ou des `extraInterceptors` dans `provideBridge()` (Bearer, CSRF, etc.).
-- **SSE** : fournissez `mercureHubUrl` et `mercure` (headers/cookies).
-
----
-
-Bon dev ! 🚀
+## 📚 Documentation
+
+- Index : `docs/index.md`
+- Créer un bridge : `docs/creation/creer-un-bridge.md`
+- Fonctionnalités HTTP : `docs/fonctionnalites/fonctionnalites-http.md`
+- Fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
+- API publique du bridge : `docs/fonctionnalites/api-publique.md`
+- CLI Meridiane : `docs/utilisation/cli.md`
+- Configuration : `docs/utilisation/configuration.md`
+- Tutoriel CI/CD : `docs/utilisation/tutoriel-ci-cd.md`
+- Tutoriel local : `docs/utilisation/tutoriel-local.md`
+- FAQ : `docs/utilisation/faq.md`

@@ -1,7 +1,7 @@
-import {DOCUMENT, Inject, Injectable, OnDestroy, PLATFORM_ID} from '@angular/core';
+import {DOCUMENT, Inject, Injectable, OnDestroy, Optional, PLATFORM_ID} from '@angular/core';
 import {BehaviorSubject, defer, fromEvent, Observable, of, Subject} from 'rxjs';
 import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
-import {API_BASE_URL, MERCURE_CONFIG, MERCURE_HUB_URL} from '../../tokens';
+import {API_BASE_URL, BRIDGE_LOGGER, BridgeLogger, MERCURE_CONFIG, MERCURE_HUB_URL} from '../../tokens';
 import {RealtimeEvent, RealtimePort, RealtimeStatus} from '../../ports/realtime.port';
 import {EventSourceWrapper} from './eventsource-wrapper';
 import {Item} from "../../ports/resource-repository.port";
@@ -31,10 +31,11 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
   constructor(
     @Inject(API_BASE_URL) private readonly apiBase: string,
-    @Inject(MERCURE_CONFIG) private readonly init: string,
-    @Inject(MERCURE_HUB_URL) private readonly hubUrl: string,
+    @Inject(MERCURE_CONFIG) private readonly init: RequestInit,
     @Inject(DOCUMENT) private readonly doc: Document,
     @Inject(PLATFORM_ID) private readonly platformId: object,
+    @Optional() @Inject(MERCURE_HUB_URL) private readonly hubUrl?: string,
+    @Optional() @Inject(BRIDGE_LOGGER) private readonly logger?: BridgeLogger,
   ) {
     this.urlBuilder = new MercureUrlBuilder(apiBase);
     this.credentialsPolicy = new CredentialsPolicy(init);
@@ -66,6 +67,11 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
   subscribe$<T>(iris: string[], _filter?: { field?: string }): Observable<RealtimeEvent<T>> {
     if (iris.length === 0) {
+      return new Observable<RealtimeEvent<T>>((sub) => sub.complete());
+    }
+
+    if (!this.hubUrl) {
+      this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
       return new Observable<RealtimeEvent<T>>((sub) => sub.complete());
     }
 
@@ -131,6 +137,12 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
       if (this.shuttingDown) return of(void 0);
 
       try {
+        if (!this.hubUrl) {
+          this.currentKey = undefined;
+          this._status$.next('closed');
+          return of(void 0);
+        }
+
         const hasTopics = this.topicsRegistry.hasAny();
         const key = hasTopics ? this.topicsRegistry.computeKey(this.hubUrl, this.credentialsPolicy.withCredentials()) : undefined;
 
@@ -148,7 +160,8 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
         this.teardownConnection();
 
         const url = this.urlBuilder.build(this.hubUrl, this.topicsRegistry.snapshot(), this.lastEventId);
-        this.es = new EventSourceWrapper(url, {withCredentials: this.credentialsPolicy.withCredentials()});
+        this.logger?.debug?.('[Mercure] connect', {hubUrl: this.hubUrl, topics: this.topicsRegistry.snapshot(), lastEventId: this.lastEventId});
+        this.es = new EventSourceWrapper(url, {withCredentials: this.credentialsPolicy.withCredentials()}, this.logger);
 
         this.connectionStop$ = new Subject<void>();
 
@@ -167,7 +180,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
         this.es.open();
         this.currentKey = key;
       } catch (err) {
-        console.error('[Mercure] rebuild failed:', err);
+        this.logger?.error?.('[Mercure] rebuild failed:', err);
         this.currentKey = undefined;
         this._status$.next(this.topicsRegistry.hasAny() ? 'connecting' : 'closed');
       }

@@ -1,5 +1,6 @@
 import {ReplaySubject, Subject} from 'rxjs';
 import {SseEvent, SseOptions, RealtimeStatus} from '../../ports/realtime.port';
+import {BridgeLogger} from '../../tokens';
 
 export class EventSourceWrapper {
     private es?: EventSource;
@@ -10,12 +11,10 @@ export class EventSourceWrapper {
     readonly status$ = this.statusSub.asObservable();
     readonly events$ = this.eventSub.asObservable();
 
-    /** Activer pour conversations local */
-    private readonly debug = false;
-
     constructor(
         private readonly url: string,
-        private readonly opts: SseOptions = {}
+        private readonly opts: SseOptions = {},
+        private readonly logger?: BridgeLogger
     ) {
         this.setState('closed');
         this.log('[SSE] initialized', url, opts);
@@ -69,6 +68,6 @@ export class EventSourceWrapper {
     }
 
     private log(...args: unknown[]): void {
-        if (this.debug) console.log(...args);
+        this.logger?.debug?.(...args);
     }
 }

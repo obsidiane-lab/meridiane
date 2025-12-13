@@ -10,9 +10,16 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideBridge({
-      apiBaseUrl: 'http://localhost:8000',
-      mercure: {credentials: 'include'},
-      mercureHubUrl: 'http://localhost:8000/.well-known/mercure',
+      baseUrl: 'http://localhost:8000',
+      mercure: {
+        hubUrl: 'http://localhost:8000/.well-known/mercure',
+        init: {credentials: 'include'},
+      },
+      defaults: {
+        timeoutMs: 30_000,
+        retries: {count: 1, delayMs: 250},
+      },
+      debug: false,
     })
   ]
 };

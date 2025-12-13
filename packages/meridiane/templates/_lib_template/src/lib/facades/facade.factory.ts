@@ -22,7 +22,7 @@ export class FacadeFactory {
   constructor(
     private readonly http: HttpClient,
     @Inject(API_BASE_URL) private readonly baseUrl: string,
-    @Inject(MERCURE_CONFIG) private readonly init: string,
+    @Inject(MERCURE_CONFIG) private readonly init: RequestInit,
     private readonly mercureAny: MercureRealtimeAdapter
   ) {
   }
