@@ -1,3 +1,5 @@
+import {resolveUrl} from '../../utils/url';
+
 export class MercureUrlBuilder {
   constructor(private readonly apiBase: string) {
   }
@@ -10,7 +12,7 @@ export class MercureUrlBuilder {
     }
     url.searchParams.delete('topic');
     for (const iri of iris) {
-      url.searchParams.append('topic', this.apiBase + iri);
+      url.searchParams.append('topic', resolveUrl(this.apiBase, iri));
     }
     return url.toString();
   }

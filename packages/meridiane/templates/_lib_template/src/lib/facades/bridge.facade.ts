@@ -1,4 +1,4 @@
-import {Injectable} from '@angular/core';
+import {Inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {filter, map, shareReplay} from 'rxjs/operators';
@@ -8,6 +8,7 @@ import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
 import {API_BASE_URL, MERCURE_CONFIG} from '../tokens';
 import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequired, Item} from '../ports/resource-repository.port';
 import {SubscribeFilter} from '../ports/realtime.port';
+import {resolveUrl} from '../utils/url';
 
 
 @Injectable({providedIn: 'root'})
@@ -109,14 +110,6 @@ export class BridgeFacade {
 
   private resolveUrl(path?: Iri): string {
     if (!path) throw new Error('BridgeFacade: missing url');
-    if (/^https?:\/\//i.test(path)) return path;
-    if (path.startsWith('//')) return path;
-    return joinUrl(this.apiBase, path);
+    return resolveUrl(this.apiBase, path);
   }
-}
-
-function joinUrl(base: string, path: string): string {
-  const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${normalizedBase}${normalizedPath}`;
 }

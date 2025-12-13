@@ -12,6 +12,7 @@ import {
   ResourceRepository,
 } from '../../ports/resource-repository.port';
 import {CredentialsPolicy} from '../credentials.policy';
+import {resolveUrl} from '../../utils/url';
 
 
 export class ApiPlatformRestRepository<T extends Item> implements ResourceRepository<T> {
@@ -102,14 +103,6 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
   private resolveUrl(path?: Iri): string {
     const effectivePath = path ?? this.resourcePath;
     if (!effectivePath) throw new Error('ApiPlatformRestRepository.resolveUrl: missing url and resourcePath');
-    if (/^https?:\/\//i.test(effectivePath)) return effectivePath;
-    if (effectivePath.startsWith('//')) return effectivePath;
-    return joinUrl(this.apiBase, effectivePath);
+    return resolveUrl(this.apiBase, effectivePath);
   }
-}
-
-function joinUrl(base: string, path: string): string {
-  const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${normalizedBase}${normalizedPath}`;
 }
