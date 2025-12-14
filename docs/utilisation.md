@@ -1,4 +1,4 @@
-# Utilisation (Meridiane)
+# Utilisation
 
 Référence CLI (options, presets, sorties). Pour le workflow end-to-end : `docs/creer-un-bridge.md`.
 

@@ -15,3 +15,7 @@ Meridiane est **standalone** : pas de config persistante, pas de patch de worksp
 - HTTP (API Platform / Hydra) : `docs/fonctionnalites/fonctionnalites-http.md`
 - Mercure / SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
 - FAQ / limites : `docs/fonctionnalites/faq.md`
+
+## Maintien du projet
+
+- Versioning & releases : `docs/versioning.md`

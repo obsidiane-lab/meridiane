@@ -80,6 +80,7 @@ apps/
 
 - Index : `docs/index.md`
 - Créer un bridge (workflow CI/CD) : `docs/creer-un-bridge.md`
+- Versioning & releases : `docs/versioning.md`
 - Fonctionnalités HTTP : `docs/fonctionnalites/fonctionnalites-http.md`
 - Fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
 - API publique du bridge : `docs/fonctionnalites/api-publique.md`
