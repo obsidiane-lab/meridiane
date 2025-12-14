@@ -58,6 +58,14 @@ export async function readJson(filePath) {
   }
 }
 
-export async function writeJson(filePath, data) {
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+export async function writeJsonIfChanged(filePath, data) {
+  const next = JSON.stringify(data, null, 2) + '\n';
+  try {
+    const prev = await fs.readFile(filePath, 'utf8');
+    if (prev === next) return false;
+  } catch {
+    // ignore (file missing / unreadable)
+  }
+  await fs.writeFile(filePath, next, 'utf8');
+  return true;
 }

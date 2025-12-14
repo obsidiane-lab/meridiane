@@ -33,14 +33,7 @@ export function pascalCase(tokens) {
  * @param {Set<string>} used
  */
 export function sanitizeTypeName(original, used) {
-  const dotTail = original.includes('.') ? original.split('.').pop() : undefined;
-  const keepDottedName = typeof dotTail === 'string'
-    && ['jsonmergepatch', 'jsonpatch', 'mergepatch', 'jsonld', 'jsonapi'].includes(dotTail.toLowerCase());
-
-  // "Namespace-like" dotted names (ex: Workflow.WorkflowInput) default to the tail segment,
-  // but keep the full name for known format suffixes (ex: Conversation.jsonMergePatch) to avoid collisions.
-  const base = (dotTail && !keepDottedName) ? dotTail : original;
-  const tokens = String(base).split(/[^A-Za-z0-9]+/);
+  const tokens = String(original).split(/[^A-Za-z0-9]+/);
   let name = pascalCase(tokens) || 'Model';
   if (/^[0-9]/.test(name)) name = '_' + name;
   if (RESERVED.has(name)) name = name + 'Model';

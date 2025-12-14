@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readJson, writeJson } from './json.js';
+import { readJson, writeJsonIfChanged } from './json.js';
 import { findRootTsconfig } from './paths.js';
 import { renderTemplateToFile } from '../generator/models/handlebars.js';
 import { ensureCleanDir } from '../generator/models/utils.js';
@@ -48,12 +48,6 @@ function buildAngularProjectConfig(libName) {
         },
         defaultConfiguration: 'production',
       },
-      test: {
-        builder: '@angular/build:karma',
-        options: {
-          tsConfig: `projects/${libName}/tsconfig.spec.json`,
-        },
-      },
     },
   };
 }
@@ -63,7 +57,7 @@ async function patchAngularJson({ cwd, libName }) {
   const ng = await readJson(angularJsonPath);
   if (!ng.projects || typeof ng.projects !== 'object') ng.projects = {};
   ng.projects[libName] = buildAngularProjectConfig(libName);
-  await writeJson(angularJsonPath, ng);
+  await writeJsonIfChanged(angularJsonPath, ng);
 }
 
 async function patchTsconfigPaths({ cwd, libName, packageName }) {
@@ -88,7 +82,7 @@ async function patchTsconfigPaths({ cwd, libName, packageName }) {
   cfg.compilerOptions.paths[key1] = val1;
   cfg.compilerOptions.paths[key2] = val2;
 
-  await writeJson(tsconfigPath, cfg);
+  await writeJsonIfChanged(tsconfigPath, cfg);
 }
 
 async function generateLibrary({ cwd, libName, packageName, version, debug }) {
@@ -108,7 +102,7 @@ async function generateLibrary({ cwd, libName, packageName, version, debug }) {
     const libPkg = await readJson(libPackageJsonPath);
     libPkg.name = packageName;
     libPkg.version = version;
-    await writeJson(libPackageJsonPath, libPkg);
+    await writeJsonIfChanged(libPackageJsonPath, libPkg);
   }
 
   await patchAngularJson({ cwd, libName });
@@ -139,6 +133,7 @@ async function generateModels({ cwd, libName, spec, requiredMode, preset, includ
         name: m.name,
         props: m.props,
         imports: m.imports,
+        extendsTypes: m.extendsTypes || [],
       },
     });
   }

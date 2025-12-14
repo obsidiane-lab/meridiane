@@ -1,5 +1,5 @@
 import { sanitizeTypeName, quoteKeyIfNeeded } from './utils.js';
-import { filterSchemaNames, applySchemaNameFilters, mergeAllOf, isObject } from './schema-utils.js';
+import { filterSchemaNames, applySchemaNameFilters, mergeAllOf, isObject, schemaNameFromRef } from './schema-utils.js';
 import { schemaLabel } from './naming.js';
 import { tsTypeOf, withNullable } from './type-resolver.js';
 
@@ -69,18 +69,48 @@ export function buildModelsFromOpenAPI(spec, options) {
 
   for (const originalName of schemaNames) {
     const raw = schemas[originalName];
+    const sanitized = nameMap.get(originalName);
+    if (!sanitized) continue;
+
+    /** @type {string[]} */
+    const extendsTypes = [];
+
     let effective = raw;
     if (raw?.allOf) {
       const merged = mergeAllOf(raw.allOf);
-      if (merged) effective = merged;
+      if (merged) {
+        effective = merged;
+      } else {
+        // Non-flattenable allOf (refs, mixed forms): keep inline object props and model refs as extends.
+        const props = {};
+        const required = new Set();
+        const ext = new Set();
+
+        for (const part of raw.allOf) {
+          if (part?.$ref) {
+            const orig = schemaNameFromRef(part.$ref);
+            const refName = orig ? nameMap.get(orig) : undefined;
+            if (refName && refName !== sanitized && allSanitizedNames.has(refName)) ext.add(refName);
+            continue;
+          }
+          const isObj = part?.type === 'object' || isObject(part?.properties);
+          if (!isObj) continue;
+          Object.assign(props, part.properties || {});
+          for (const r of part.required || []) required.add(r);
+        }
+
+        extendsTypes.push(...[...ext].sort((a, b) => a.localeCompare(b)));
+        effective = { type: 'object', properties: props, required: [...required] };
+      }
     }
 
-    const isObjectLike = effective?.type === 'object' || isObject(effective?.properties);
+    const isObjectLike = effective?.type === 'object' || isObject(effective?.properties) || extendsTypes.length > 0;
     if (!isObjectLike) continue;
 
-    const sanitized = nameMap.get(originalName);
     const required = new Set(effective.required || []);
     const deps = new Set();
+
+    for (const e of extendsTypes) deps.add(e);
 
     const props = Object.entries(effective.properties || {}).map(([propName, prop]) => {
       const baseType = tsTypeOf(prop, deps, nameMap);
@@ -98,7 +128,7 @@ export function buildModelsFromOpenAPI(spec, options) {
       .filter((n) => allSanitizedNames.has(n))
       .sort((a, b) => a.localeCompare(b));
 
-    models.push({name: sanitized, props, imports});
+    models.push({name: sanitized, props, imports, extendsTypes});
   }
 
   return {models};
