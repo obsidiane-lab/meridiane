@@ -16,6 +16,7 @@ export const appConfig: ApplicationConfig = {
       mercure: {
         hubUrl: MERCURE_HUB_URL,
         init: {credentials: 'include'},
+        topicMode: "url"
       },
       auth: {type: 'bearer', getToken: getStoredToken},
       defaults: {

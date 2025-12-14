@@ -1,7 +1,7 @@
 import {DOCUMENT, Inject, Injectable, OnDestroy, Optional, PLATFORM_ID} from '@angular/core';
 import {BehaviorSubject, defer, EMPTY, fromEvent, Observable, of, Subject} from 'rxjs';
 import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
-import {API_BASE_URL, BRIDGE_LOGGER, BridgeLogger, MERCURE_CONFIG, MERCURE_HUB_URL} from '../../tokens';
+import {API_BASE_URL, BRIDGE_LOGGER, BridgeLogger, MERCURE_CONFIG, MERCURE_HUB_URL, MERCURE_TOPIC_MODE, MercureTopicMode} from '../../tokens';
 import {RealtimeEvent, RealtimePort, RealtimeStatus} from '../../ports/realtime.port';
 import {EventSourceWrapper} from './eventsource-wrapper';
 import {Item} from "../../ports/resource-repository.port";
@@ -9,6 +9,7 @@ import {isPlatformBrowser} from '@angular/common';
 import {MercureUrlBuilder} from './mercure-url.builder';
 import {RefCountTopicRegistry} from './ref-count-topic.registry';
 import {CredentialsPolicy} from '../credentials.policy';
+import {MercureTopicMapper} from './mercure-topic.mapper';
 
 
 @Injectable({providedIn: 'root'})
@@ -19,6 +20,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
   private readonly topicsRegistry = new RefCountTopicRegistry();
   private readonly urlBuilder: MercureUrlBuilder;
+  private readonly topicMapper: MercureTopicMapper;
   private readonly credentialsPolicy: CredentialsPolicy;
 
   private readonly destroy$ = new Subject<void>();
@@ -35,10 +37,12 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     @Inject(DOCUMENT) private readonly doc: Document,
     @Inject(PLATFORM_ID) private readonly platformId: object,
     @Optional() @Inject(MERCURE_HUB_URL) private readonly hubUrl?: string,
+    @Optional() @Inject(MERCURE_TOPIC_MODE) topicMode?: MercureTopicMode,
     @Optional() @Inject(BRIDGE_LOGGER) private readonly logger?: BridgeLogger,
   ) {
-    this.urlBuilder = new MercureUrlBuilder(apiBase);
+    this.urlBuilder = new MercureUrlBuilder();
     this.credentialsPolicy = new CredentialsPolicy(init);
+    this.topicMapper = new MercureTopicMapper(apiBase, topicMode ?? 'url');
 
     this.rebuild$
       .pipe(
@@ -67,17 +71,23 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
   subscribe$<T>(iris: string[], _filter?: { field?: string }): Observable<RealtimeEvent<T>> {
     return defer(() => {
-      if (iris.length === 0) return EMPTY;
+      const inputIris = iris.filter((v): v is string => typeof v === 'string' && v.length > 0);
+      if (inputIris.length === 0) return EMPTY;
 
       if (!this.hubUrl) {
         this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
         return EMPTY;
       }
 
-      this.topicsRegistry.addAll(iris);
+      // Canonicalise topics (ref-count + URL) to avoid duplicates like:
+      // - "/api/conversations/1" and "http://localhost:8000/api/conversations/1"
+      const registeredTopics = inputIris.map((i) => this.topicMapper.toTopic(i));
+
+      this.topicsRegistry.addAll(registeredTopics);
       this.scheduleRebuild();
 
-      const filterSet = new Set(iris);
+      // Matching is done against the payload IRIs (typically "/api/...").
+      const filterSet = new Set(inputIris.map((i) => this.topicMapper.toPayloadIri(i)));
       const fieldPath = _filter?.field;
 
       return this.incoming$.pipe(
@@ -85,10 +95,11 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
         filter((raw: any) => {
           if (fieldPath) {
-            const relIris = this.extractRelationIris(raw, fieldPath);
+            const relIris = this.extractRelationIris(raw, fieldPath).map((i) => this.topicMapper.toPayloadIri(i));
             return Array.from(filterSet).some((iri) => relIris.some((relIri) => relIri === iri || relIri.startsWith(`${iri}/`)));
           }
-          const id = raw?.['@id'];
+          const rawId = raw?.['@id'];
+          const id = typeof rawId === 'string' ? this.topicMapper.toPayloadIri(rawId) : undefined;
           return typeof id === 'string' && Array.from(filterSet).some((iri) => {
             const normalized = iri.endsWith('/') ? iri.slice(0, -1) : iri;
             return id === normalized || id.startsWith(`${normalized}/`);
@@ -96,7 +107,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
         }),
         map((payload) => ({iri: payload['@id'] as string, data: payload as T})),
         finalize(() => {
-          this.topicsRegistry.removeAll(iris);
+          this.topicsRegistry.removeAll(registeredTopics);
           this.scheduleRebuild();
         }),
         share()
@@ -105,8 +116,9 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   }
 
   unsubscribe(iris: string[]): void {
-    if (!iris || iris.length === 0) return;
-    this.topicsRegistry.removeAll(iris);
+    const inputIris = iris.filter((v): v is string => typeof v === 'string' && v.length > 0);
+    if (inputIris.length === 0) return;
+    this.topicsRegistry.removeAll(inputIris.map((i) => this.topicMapper.toTopic(i)));
     this.scheduleRebuild();
   }
 

@@ -1,18 +1,12 @@
-import {resolveUrl} from '../../utils/url';
-
 export class MercureUrlBuilder {
-  constructor(private readonly apiBase: string) {
-  }
-
-
-  build(hubUrl: string, iris: ReadonlySet<string>, lastEventId?: string): string {
+  build(hubUrl: string, topics: ReadonlySet<string>, lastEventId?: string): string {
     const url = new URL(hubUrl);
     if (lastEventId) {
       url.searchParams.set('lastEventID', lastEventId);
     }
     url.searchParams.delete('topic');
-    for (const iri of iris) {
-      url.searchParams.append('topic', resolveUrl(this.apiBase, iri));
+    for (const topic of topics) {
+      url.searchParams.append('topic', topic);
     }
     return url.toString();
   }

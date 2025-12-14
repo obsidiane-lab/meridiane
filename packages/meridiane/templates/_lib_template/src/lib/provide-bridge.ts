@@ -1,6 +1,17 @@
 import {EnvironmentProviders, makeEnvironmentProviders} from '@angular/core';
 import {HttpInterceptorFn, provideHttpClient, withFetch, withInterceptors} from '@angular/common/http';
-import {API_BASE_URL, BRIDGE_DEBUG, BRIDGE_DEFAULTS, BRIDGE_LOGGER, BridgeDefaults, BridgeLogger, MERCURE_CONFIG, MERCURE_HUB_URL} from './tokens';
+import {
+  API_BASE_URL,
+  BRIDGE_DEBUG,
+  BRIDGE_DEFAULTS,
+  BRIDGE_LOGGER,
+  BridgeDefaults,
+  BridgeLogger,
+  MercureTopicMode,
+  MERCURE_CONFIG,
+  MERCURE_HUB_URL,
+  MERCURE_TOPIC_MODE,
+} from './tokens';
 import {contentTypeInterceptor} from './interceptors/content-type.interceptor';
 import {bridgeDefaultsInterceptor} from './interceptors/bridge-defaults.interceptor';
 import {bridgeDebugInterceptor} from './interceptors/bridge-debug.interceptor';
@@ -15,6 +26,7 @@ export type BridgeAuth =
 export interface BridgeMercureOptions {
   hubUrl?: string;
   init?: RequestInit;
+  topicMode?: MercureTopicMode;
 }
 
 export interface BridgeOptions {
@@ -52,6 +64,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
 
   const resolvedMercureInit: RequestInit = resolvedMercure.init ?? {credentials: 'include' as RequestCredentials};
   const resolvedMercureHubUrl = resolvedMercure.hubUrl ?? mercureHubUrl;
+  const resolvedMercureTopicMode: MercureTopicMode = resolvedMercure.topicMode ?? 'url';
 
   const loggerProvider: BridgeLogger = createBridgeLogger(debug);
 
@@ -71,6 +84,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
     {provide: API_BASE_URL, useValue: resolvedBaseUrl},
     {provide: MERCURE_CONFIG, useValue: resolvedMercureInit},
     ...(resolvedMercureHubUrl ? [{provide: MERCURE_HUB_URL, useValue: resolvedMercureHubUrl}] : []),
+    {provide: MERCURE_TOPIC_MODE, useValue: resolvedMercureTopicMode},
     {provide: BRIDGE_DEBUG, useValue: debug},
     {provide: BRIDGE_DEFAULTS, useValue: defaults ?? {}},
     {provide: BRIDGE_LOGGER, useValue: loggerProvider},

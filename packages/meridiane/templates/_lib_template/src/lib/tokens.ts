@@ -6,6 +6,9 @@ export const MERCURE_HUB_URL = new InjectionToken<string>('MERCURE_HUB_URL');
 
 export const MERCURE_CONFIG = new InjectionToken<RequestInit>('MERCURE_CONFIG');
 
+export type MercureTopicMode = 'url' | 'iri';
+export const MERCURE_TOPIC_MODE = new InjectionToken<MercureTopicMode>('MERCURE_TOPIC_MODE');
+
 export interface BridgeLogger {
   debug: (...args: unknown[]) => void;
   info: (...args: unknown[]) => void;
