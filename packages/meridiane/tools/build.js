@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import process from 'node:process';
 import { spawn } from 'node:child_process';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 
 import { deriveLibName } from './core/lib-name.js';
-import { assertAngularWorkspace, normalizePreset, splitListArgs } from './core/paths.js';
+import { normalizePreset, splitListArgs } from './core/paths.js';
 import { readOpenApiSpec } from './core/spec.js';
 import { createLogger } from './core/logger.js';
 import { generateBridgeWorkspace } from './core/generate.js';
+import { ensureStandaloneWorkspace, ensureToolchainInstalled } from './core/standalone.js';
 
 function run(cmd, args, { cwd, env } = {}) {
   return new Promise((resolve) => {
@@ -23,13 +23,8 @@ function run(cmd, args, { cwd, env } = {}) {
 
 export async function runBuild(packageName, opts) {
   const cwd = process.cwd();
-  await assertAngularWorkspace(cwd);
-
-  const libName = deriveLibName(packageName);
   const debug = !!opts.debug;
   const log = createLogger({ debug });
-
-  const requireFromCwd = createRequire(path.join(cwd, 'package.json'));
 
   const version = opts.version;
   if (!version) throw new Error('Missing --version');
@@ -39,13 +34,19 @@ export async function runBuild(packageName, opts) {
   const include = splitListArgs(opts.include);
   const exclude = splitListArgs(opts.exclude);
 
+  const libName = deriveLibName(packageName);
   const requiredMode = 'spec';
-  log.title('build — génération + packaging npm');
-  log.info(`workspace: ${cwd}`);
+
+  // Standalone mode (native): works from any repo (backend pipeline or otherwise).
+  log.title('build — standalone');
+  log.info(`repo: ${cwd}`);
   log.info(`package: ${packageName}@${version}`);
-  log.info(`lib: projects/${libName}`);
+  log.info(`lib: ${libName}`);
   if (noModels) log.info('models: désactivés (--no-models)');
   else log.info(`spec: ${opts.spec} | preset: ${preset}`);
+
+  const { workspaceRoot, distRoot, npmCacheDir, requireFromWs } = await ensureStandaloneWorkspace({ repoRoot: cwd, log });
+  log.info(`workspace: ${workspaceRoot}`);
 
   let spec;
   if (!noModels) {
@@ -54,8 +55,10 @@ export async function runBuild(packageName, opts) {
     log.success('spec chargée');
   }
 
+  await ensureToolchainInstalled({ workspaceRoot, requireFromWs, npmCacheDir, log });
+
   await generateBridgeWorkspace({
-    cwd,
+    cwd: workspaceRoot,
     libName,
     packageName,
     version,
@@ -67,26 +70,32 @@ export async function runBuild(packageName, opts) {
     exclude,
     debug,
     log,
+    distRoot,
   });
 
-  // Build the Angular library, then pack the dist output.
-  log.step(`ng build ${libName}`);
-  const ngPath = requireFromCwd.resolve('@angular/cli/bin/ng.js');
-  const ngCode = await run(process.execPath, [ngPath, 'build', libName], { cwd });
-  if (ngCode !== 0) process.exit(ngCode);
+  const ngPackageJsonPath = path.join(workspaceRoot, 'projects', libName, 'ng-package.json');
+  const tsconfigProdPath = path.join(workspaceRoot, 'projects', libName, 'tsconfig.lib.prod.json');
 
-  const distDir = `dist/${libName}`;
-  log.step(`npm pack (${distDir})`);
-  const npmCacheDir = path.join(cwd, '.npm-cache');
+  log.step('ng-packagr');
+  const ngPackagrPath = requireFromWs.resolve('ng-packagr/src/cli/main.js');
+  const packagrCode = await run(process.execPath, [ngPackagrPath, '-p', ngPackageJsonPath, '-c', tsconfigProdPath], {
+    cwd: workspaceRoot,
+  });
+  if (packagrCode !== 0) process.exit(packagrCode);
+
+  const distDir = path.join(distRoot, libName);
+  log.step(`npm pack (${path.relative(cwd, distDir)})`);
   const packCode = await run('npm', ['pack'], {
     cwd: distDir,
     env: {
       ...process.env,
       npm_config_cache: npmCacheDir,
       npm_config_update_notifier: 'false',
+      npm_config_fund: 'false',
+      npm_config_audit: 'false',
     },
   });
-  if (packCode === 0) log.success(`package prêt: ${distDir}`);
+  if (packCode === 0) log.success(`package prêt: ${path.relative(cwd, distDir)}`);
   process.exit(packCode);
 }
 

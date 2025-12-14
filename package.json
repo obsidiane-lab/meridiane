@@ -6,7 +6,6 @@
     "apps/*"
   ],
   "scripts": {
-    "sandbox:regen": "npm -w apps/sandbox run bridge:template",
     "sandbox:bridge": "npm -w apps/sandbox run bridge:sync",
     "sandbox:build": "npm -w apps/sandbox run build",
     "sandbox:dev": "npm -w apps/sandbox run dev"

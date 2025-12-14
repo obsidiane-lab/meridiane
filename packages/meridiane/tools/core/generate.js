@@ -4,7 +4,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { readJson, writeJsonIfChanged } from './json.js';
-import { findRootTsconfig } from './paths.js';
 import { renderTemplateToFile } from '../generator/models/handlebars.js';
 import { ensureCleanDir } from '../generator/models/utils.js';
 import { buildModelsFromOpenAPI } from '../generator/models/openapi-to-models.js';
@@ -30,61 +29,6 @@ async function replacePlaceholdersInDir(dir, placeholders) {
   }
 }
 
-function buildAngularProjectConfig(libName) {
-  return {
-    root: `projects/${libName}`,
-    sourceRoot: `projects/${libName}/src`,
-    projectType: 'library',
-    architect: {
-      build: {
-        builder: '@angular/build:ng-packagr',
-        configurations: {
-          production: {
-            tsConfig: `projects/${libName}/tsconfig.lib.prod.json`,
-          },
-          development: {
-            tsConfig: `projects/${libName}/tsconfig.lib.json`,
-          },
-        },
-        defaultConfiguration: 'production',
-      },
-    },
-  };
-}
-
-async function patchAngularJson({ cwd, libName }) {
-  const angularJsonPath = path.join(cwd, 'angular.json');
-  const ng = await readJson(angularJsonPath);
-  if (!ng.projects || typeof ng.projects !== 'object') ng.projects = {};
-  ng.projects[libName] = buildAngularProjectConfig(libName);
-  await writeJsonIfChanged(angularJsonPath, ng);
-}
-
-async function patchTsconfigPaths({ cwd, libName, packageName }) {
-  const tsconfigPath = await findRootTsconfig(cwd);
-  if (!tsconfigPath) return;
-
-  const cfg = await readJson(tsconfigPath);
-  if (!cfg.compilerOptions || typeof cfg.compilerOptions !== 'object') cfg.compilerOptions = {};
-  if (!cfg.compilerOptions.paths || typeof cfg.compilerOptions.paths !== 'object') cfg.compilerOptions.paths = {};
-
-  const key1 = packageName;
-  const key2 = `${packageName}/*`;
-  const val1 = [`./projects/${libName}/src/public-api.ts`];
-  const val2 = [`./projects/${libName}/src/*`];
-
-  const prev1 = cfg.compilerOptions.paths[key1];
-  const prev2 = cfg.compilerOptions.paths[key2];
-  const same1 = Array.isArray(prev1) && prev1.length === 1 && prev1[0] === val1[0];
-  const same2 = Array.isArray(prev2) && prev2.length === 1 && prev2[0] === val2[0];
-  if (same1 && same2) return;
-
-  cfg.compilerOptions.paths[key1] = val1;
-  cfg.compilerOptions.paths[key2] = val2;
-
-  await writeJsonIfChanged(tsconfigPath, cfg);
-}
-
 async function generateLibrary({ cwd, libName, packageName, version, debug }) {
   const tplDir = path.resolve(pkgRoot, 'templates/_lib_template');
   const targetDir = path.resolve(cwd, 'projects', libName);
@@ -105,8 +49,7 @@ async function generateLibrary({ cwd, libName, packageName, version, debug }) {
     await writeJsonIfChanged(libPackageJsonPath, libPkg);
   }
 
-  await patchAngularJson({ cwd, libName });
-  await patchTsconfigPaths({ cwd, libName, packageName });
+  // angular.json / workspace patching is intentionally not done here (Meridiane is standalone).
 }
 
 async function generateModels({ cwd, libName, spec, requiredMode, preset, include, exclude, debug }) {
@@ -161,6 +104,8 @@ async function generateModels({ cwd, libName, spec, requiredMode, preset, includ
  *   exclude: string[],
  *   debug: boolean,
  *   log?: { step?: (msg: string) => void, info?: (msg: string) => void, success?: (msg: string) => void, debug?: (msg: string, data?: any) => void },
+ *   workspaceMode?: 'angular'|'standalone',
+ *   distRoot?: string,
  * }} params
  */
 export async function generateBridgeWorkspace(params) {
@@ -177,10 +122,22 @@ export async function generateBridgeWorkspace(params) {
     exclude,
     debug,
     log,
+    distRoot,
   } = params;
 
   log?.step?.(`génération de la librairie (projects/${libName})`);
   await generateLibrary({ cwd, libName, packageName, version, debug });
+
+  // If a dist root is provided, force ng-packagr output to that directory.
+  if (distRoot) {
+    const ngPackagePath = path.resolve(cwd, 'projects', libName, 'ng-package.json');
+    const ngPkg = await readJson(ngPackagePath);
+    const desiredDestAbs = path.resolve(distRoot, libName);
+    const projectDir = path.dirname(ngPackagePath);
+    ngPkg.dest = path.relative(projectDir, desiredDestAbs).split(path.sep).join('/');
+    await writeJsonIfChanged(ngPackagePath, ngPkg);
+    log?.debug?.('ng-package.json dest overridden', { dest: ngPkg.dest });
+  }
 
   if (noModels) {
     log?.info?.('models ignorés (--no-models)');

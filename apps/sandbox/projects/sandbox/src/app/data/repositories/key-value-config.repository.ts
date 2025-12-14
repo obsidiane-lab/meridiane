@@ -3,7 +3,7 @@ import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
 import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
-import {KeyValueConfig} from '../../entities/key-value-config';
+import type {KeyValueConfig} from '@obsidiane/bridge-sandbox';
 import {KeyValueConfigStore} from '../stores/key-value-config.store';
 
 @Injectable({providedIn: 'root'})
@@ -52,4 +52,3 @@ export class KeyValueConfigRepository {
     this.facade.unwatch(iris);
   }
 }
-

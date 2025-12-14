@@ -42,6 +42,5 @@ testem.log
 .DS_Store
 Thumbs.db
 
-apps/sandbox/projects/bridge-sandbox/
 .npm-cache/
 *.tgz

@@ -2,7 +2,7 @@
 
 CLI pour générer une librairie Angular “bridge” (Symfony / API Platform / Mercure) et générer des modèles TypeScript depuis une spec OpenAPI.
 
-Documentation détaillée (repo) : `docs/index.md`.
+Documentation détaillée (repo) : `docs/index.md` et `docs/utilisation.md`.
 
 ## Installation
 
@@ -20,20 +20,23 @@ npm i -g @obsidiane/meridiane
 
 ```bash
 # Dev: génère le bridge (+ models par défaut)
-# À exécuter depuis la racine du workspace Angular (dossier contenant angular.json)
-npx meridiane dev <packageName> --spec <url|file> [--preset[=native|all]] [--include <substr>]... [--exclude <substr>]... [--no-models]
+# (build standalone + install local dans node_modules)
+npx meridiane dev <packageName> --spec <url|file> [--preset[=native|all]] [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 
 # CI/CD: génère + build Angular + npm pack (artefact prêt à publier)
-npx meridiane build <packageName> --version <semver> --spec <url|file> [--preset[=native|all]] [--include <substr>]... [--exclude <substr>]... [--no-models]
+npx meridiane build <packageName> --version <semver> --spec <url|file> [--preset[=native|all]] [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 ```
 
 Options :
 - `--debug` : active des logs supplémentaires (CLI).
 
 Bonnes pratiques :
-- exécuter Meridiane depuis la racine du workspace Angular (CWD = dossier contenant `angular.json`)
 - utiliser `--preset=native` si vous voulez des modèles “entity-like” (sans variantes `.jsonld/.jsonMergePatch`)
+- utiliser `--no-models` si vous voulez uniquement le runtime (pas besoin de `--spec`)
 - laisser le registry à la CI (`.npmrc`, variables d’environnement, `npm publish --registry …`)
+
+Note (repo Meridiane) :
+- dans le repo Meridiane, `meridiane dev` peut être exécutée sans `packageName` et se préconfigure pour `apps/sandbox` (`@obsidiane/bridge-sandbox`).
 
 ## Exemple CI (générer + build + publish)
 

@@ -12,8 +12,12 @@ npm run sandbox:dev
 ```
 
 Ce que ça fait :
-- régénère la lib `projects/bridge-sandbox` via le CLI local
+- build le package `@obsidiane/bridge-sandbox` via le CLI local (standalone)
+- installe le package dans `apps/sandbox/node_modules`
 - lance `ng serve sandbox`
+
+Pré-requis :
+- le backend doit exposer la spec OpenAPI sur `http://localhost:8000/api/docs.json` (valeurs par défaut de `meridiane dev` dans ce repo).
 
 ## Build (CI / vérification)
 
@@ -22,5 +26,4 @@ npm run sandbox:build
 ```
 
 Notes :
-- `apps/sandbox/projects/bridge-sandbox` est un artefact généré (ignoré par git).
-
+- l’artefact build est dans `apps/sandbox/dist/bridge-sandbox` (et un `.tgz` via `npm pack`)

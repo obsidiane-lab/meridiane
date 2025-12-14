@@ -5,7 +5,7 @@ import {Observable} from 'rxjs';
 import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
 import {BACKEND_BASE_URL} from '../../core/backend';
 
-import {Message} from '../../entities/message';
+import type {Message} from '@obsidiane/bridge-sandbox';
 import {MessageStore} from '../stores/message.store';
 
 @Injectable({providedIn: 'root'})

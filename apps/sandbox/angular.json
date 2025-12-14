@@ -87,25 +87,6 @@
           }
         }
       }
-    },
-    "bridge-sandbox": {
-      "root": "projects/bridge-sandbox",
-      "sourceRoot": "projects/bridge-sandbox/src",
-      "projectType": "library",
-      "architect": {
-        "build": {
-          "builder": "@angular/build:ng-packagr",
-          "configurations": {
-            "production": {
-              "tsConfig": "projects/bridge-sandbox/tsconfig.lib.prod.json"
-            },
-            "development": {
-              "tsConfig": "projects/bridge-sandbox/tsconfig.lib.json"
-            }
-          },
-          "defaultConfiguration": "production"
-        }
-      }
     }
   }
 }

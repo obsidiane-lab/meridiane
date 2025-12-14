@@ -13,8 +13,7 @@ import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router} from "@angular/router";
 import {BridgeFacade, Iri, IriRequired} from '@obsidiane/bridge-sandbox';
-import {Message} from '../../entities/message';
-import {Conversation} from '../../entities/conversation';
+import type {Conversation, Message} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Subject, Subscription, takeUntil} from 'rxjs';
@@ -360,7 +359,7 @@ export class ConversationsLabComponent implements AfterViewInit {
     return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   }
 
-  private extractNumericId(iri?: string): number | null {
+  private extractNumericId(iri?: string | null): number | null {
     if (!iri) return null;
     const m = String(iri).match(/\/(\d+)(?:\/)?$/);
     if (!m?.[1]) return null;

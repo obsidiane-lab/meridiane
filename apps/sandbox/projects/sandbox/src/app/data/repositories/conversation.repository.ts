@@ -4,8 +4,7 @@ import {Observable} from 'rxjs';
 
 import {AnyQuery, Collection, FacadeFactory, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
 
-import {Conversation} from '../../entities/conversation';
-import {Message} from '../../entities/message';
+import type {Conversation, Message} from '@obsidiane/bridge-sandbox';
 import {BACKEND_BASE_URL} from '../../core/backend';
 import {ConversationStore} from '../stores/conversation.store';
 import {MessageStore} from '../stores/message.store';

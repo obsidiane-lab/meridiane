@@ -3,7 +3,7 @@ import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
 import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
-import {EventLog} from '../../entities/event-log';
+import type {EventLog} from '@obsidiane/bridge-sandbox';
 import {EventLogStore} from '../stores/event-log.store';
 
 @Injectable({providedIn: 'root'})
@@ -52,4 +52,3 @@ export class EventLogRepository {
     this.facade.unwatch(iris);
   }
 }
-
