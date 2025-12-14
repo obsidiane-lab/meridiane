@@ -4,18 +4,10 @@ import process from 'node:process';
 import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 import {loadDotEnv} from './utils/dotenv.js';
+import {getArg, hasFlag} from './utils/cli-args.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '../../..');
-
-function isFlag(name) {
-  return process.argv.includes(`--${name}`);
-}
-
-function getArg(name, def) {
-  const a = process.argv.find((x) => x.startsWith(`--${name}=`));
-  return a ? a.split('=')[1] : def;
-}
 
 function run(args) {
   return new Promise((resolve) => {
@@ -40,6 +32,10 @@ Options:
   --spec=/api/docs.json
   --models-out=projects/bridge-sandbox/src/models
   --required-mode=all-optional|spec
+  --preset=all|native
+  --include=<substr>[,<substr>…] (repeatable)
+  --exclude=<substr>[,<substr>…] (repeatable)
+  --index=1|0
   --no-models
   --debug
 
@@ -51,7 +47,7 @@ Example:
 async function main() {
   await loadDotEnv();
 
-  if (isFlag('help') || isFlag('h')) {
+  if (hasFlag('help') || hasFlag('h')) {
     printHelp();
     process.exit(0);
   }

@@ -5,7 +5,7 @@
   "scripts": {
     "ng": "ng",
     "bridge:template": "node ../../packages/meridiane/cli.js lib bridge-sandbox @obsidiane/bridge-sandbox 0.1.0",
-    "bridge:sync": "node ../../packages/meridiane/cli.js sandbox-bridge",
+    "bridge:sync": "node ../../packages/meridiane/cli.js sandbox-bridge --preset=native",
     "build": "npm run bridge:template && ng build bridge-sandbox && ng build sandbox",
     "dev": "npm run bridge:sync && ng serve sandbox",
     "test": "ng test sandbox"

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import fs from 'fs-extra';
 import path from 'node:path';
 import process from 'node:process';
 import {fileURLToPath} from 'node:url';
+import fs from 'node:fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -10,33 +10,44 @@ function hasFlag(name) {
   return process.argv.includes(`--${name}`);
 }
 
-function boolFromEnv(name) {
-  return /^(1|true|yes)$/i.test(process.env[name] ?? '');
+async function pathExists(p) {
+  try {
+    await fs.stat(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureDir(p) {
+  await fs.mkdir(p, {recursive: true});
 }
 
 async function writeFileIfMissing(filePath, content, {force} = {}) {
-  const exists = await fs.pathExists(filePath);
+  const exists = await pathExists(filePath);
   if (exists && !force) return {written: false, reason: 'exists'};
-  await fs.outputFile(filePath, content, 'utf8');
+  await ensureDir(path.dirname(filePath));
+  await fs.writeFile(filePath, content, 'utf8');
   return {written: true};
 }
 
 async function copyFileIfMissing(src, dest, {force} = {}) {
-  const exists = await fs.pathExists(dest);
+  const exists = await pathExists(dest);
   if (exists && !force) return {written: false, reason: 'exists'};
-  await fs.copy(src, dest, {overwrite: true});
+  await ensureDir(path.dirname(dest));
+  await fs.copyFile(src, dest);
   return {written: true};
 }
 
 async function main() {
   const force = hasFlag('force');
-  const debug = boolFromEnv('MERIDIANE_DEBUG') || hasFlag('debug');
+  const debug = /^(1|true|yes)$/i.test(process.env.MERIDIANE_DEBUG ?? '') || hasFlag('debug');
 
   const cwd = process.cwd();
   const pkgRoot = path.resolve(__dirname, '..');
 
   const outDir = path.resolve(cwd, 'meridiane');
-  await fs.ensureDir(outDir);
+  await ensureDir(outDir);
 
   const modelsExample = path.join(pkgRoot, 'models.config.example.js');
   const modelsOut = path.resolve(cwd, 'models.config.js');
@@ -65,7 +76,8 @@ async function main() {
       '# MERIDIANE_MODELS_OUT=projects/backend-bridge/src/models',
       '# MERIDIANE_MODELS_REQUIRED_MODE=spec',
       '# MERIDIANE_MODELS_ITEM_IMPORT=../lib/ports/resource-repository.port',
-      '# MERIDIANE_MODELS_NO_INDEX=0',
+      '# MERIDIANE_MODELS_PRESET=all',
+      '# MERIDIANE_MODELS_INDEX=1',
       '',
       '# Runtime (Angular) - à recopier dans provideBridge(...)',
       '# MERIDIANE_API_BASE_URL=http://localhost:8000',
@@ -134,4 +146,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

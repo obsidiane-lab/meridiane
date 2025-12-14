@@ -48,14 +48,16 @@ La commande écrit un fichier par modèle et un `index.ts` optionnel.
 Usage :
 
 ```bash
-meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=<path>] [--required-mode=all-optional|spec] [--no-index]
+meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=<path>] [--required-mode=all-optional|spec] [--preset=all|native] [--include=<substr>] [--exclude=<substr>] [--index=1|0]
 ```
 
 Points clés :
 
 - `--out` est relatif au CWD
 - `--required-mode=spec` respecte `required` dans la spec
-- `--no-index` évite la génération de `index.ts`
+- `--preset=native` retire les schémas “techniques” (Hydra*, jsonMergePatch…)
+- `--include/--exclude` filtrent les schémas (sur leurs noms OpenAPI)
+- `--index=1` (défaut) génère `index.ts` ; `--index=0` le désactive
 
 ## `meridiane dev-bridge`
 

@@ -2,10 +2,9 @@ import {EnvironmentProviders, makeEnvironmentProviders} from '@angular/core';
 import {HttpInterceptorFn, provideHttpClient, withFetch, withInterceptors} from '@angular/common/http';
 import {
   API_BASE_URL,
-  BRIDGE_DEBUG,
   BRIDGE_DEFAULTS,
   BRIDGE_LOGGER,
-  MERCURE_CONFIG,
+  BRIDGE_WITH_CREDENTIALS,
   MERCURE_HUB_URL,
   MERCURE_TOPIC_MODE,
 } from './tokens';
@@ -29,18 +28,13 @@ export interface BridgeMercureOptions {
 
 export interface BridgeOptions {
   /** Base URL of the API (e.g. `http://localhost:8000`). */
-  baseUrl?: string;
-  /** @deprecated Legacy alias of `baseUrl`. */
-  apiBaseUrl?: string;
+  baseUrl: string;
   /** Auth strategy used to attach an Authorization header. */
   auth?: BridgeAuth;
   /**
-   * Mercure options. Can be either a full object, or a raw `RequestInit` (legacy).
    * Use `topicMode` to control the `topic=` values sent to the hub.
    */
-  mercure?: BridgeMercureOptions | RequestInit;
-  /** @deprecated Legacy alias of `mercure.hubUrl`. */
-  mercureHubUrl?: string;
+  mercure?: BridgeMercureOptions;
   /** Default HTTP behaviour (headers, timeout, retries). */
   defaults?: BridgeDefaults;
   /** Enables debug logging via the debug interceptor and console logger. */
@@ -53,28 +47,21 @@ export interface BridgeOptions {
 export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
   const {
     baseUrl,
-    apiBaseUrl,
     auth,
     mercure,
-    mercureHubUrl,
     defaults,
     debug = false,
     extraInterceptors = [],
   } = opts;
 
-  const resolvedBaseUrl = baseUrl ?? apiBaseUrl;
-  if (!resolvedBaseUrl) {
-    throw new Error("provideBridge(): missing 'baseUrl' (or legacy 'apiBaseUrl')");
+  if (!baseUrl) {
+    throw new Error("provideBridge(): missing 'baseUrl'");
   }
 
-  const resolvedMercure: BridgeMercureOptions =
-    mercure && typeof mercure === 'object' && mercure !== null && ('hubUrl' in mercure || 'init' in mercure || 'topicMode' in mercure)
-      ? (mercure as BridgeMercureOptions)
-      : {init: mercure as RequestInit | undefined};
-
-  const resolvedMercureInit: RequestInit = resolvedMercure.init ?? {credentials: 'include' as RequestCredentials};
-  const resolvedMercureHubUrl = resolvedMercure.hubUrl ?? mercureHubUrl;
-  const resolvedMercureTopicMode: MercureTopicMode = resolvedMercure.topicMode ?? 'url';
+  const resolvedMercureInit: RequestInit = mercure?.init ?? {credentials: 'include' as RequestCredentials};
+  const resolvedMercureHubUrl = mercure?.hubUrl;
+  const resolvedMercureTopicMode: MercureTopicMode = mercure?.topicMode ?? 'url';
+  const withCredentials = resolveWithCredentials(resolvedMercureInit);
 
   const loggerProvider: BridgeLogger = createBridgeLogger(debug);
 
@@ -91,11 +78,10 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
       withFetch(),
       withInterceptors(interceptors)
     ),
-    {provide: API_BASE_URL, useValue: resolvedBaseUrl},
-    {provide: MERCURE_CONFIG, useValue: resolvedMercureInit},
+    {provide: API_BASE_URL, useValue: baseUrl},
+    {provide: BRIDGE_WITH_CREDENTIALS, useValue: withCredentials},
     ...(resolvedMercureHubUrl ? [{provide: MERCURE_HUB_URL, useValue: resolvedMercureHubUrl}] : []),
     {provide: MERCURE_TOPIC_MODE, useValue: resolvedMercureTopicMode},
-    {provide: BRIDGE_DEBUG, useValue: debug},
     {provide: BRIDGE_DEFAULTS, useValue: defaults ?? {}},
     {provide: BRIDGE_LOGGER, useValue: loggerProvider},
   ]);
@@ -109,6 +95,12 @@ function createBridgeLogger(debug: boolean): BridgeLogger {
     warn: debug ? console.warn.bind(console) : noop,
     error: console.error.bind(console),
   };
+}
+
+function resolveWithCredentials(init: RequestInit | undefined): boolean {
+  if (!init) return false;
+  const anyInit = init as RequestInit & {withCredentials?: boolean};
+  return anyInit.withCredentials === true || init.credentials === 'include';
 }
 
 function createAuthInterceptors(auth?: BridgeAuth): HttpInterceptorFn[] {

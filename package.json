@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "sandbox:regen": "npm -w apps/sandbox run bridge:template",
-    "sandbox:bridge": "node packages/meridiane/cli.js sandbox-bridge",
+    "sandbox:bridge": "node packages/meridiane/cli.js sandbox-bridge --preset=native",
     "sandbox:build": "npm -w apps/sandbox run build",
     "sandbox:dev": "npm -w apps/sandbox run dev"
   }

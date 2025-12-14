@@ -11,7 +11,7 @@ import {
 } from '../ports/resource-repository.port';
 import {RealtimePort, RealtimeStatus} from '../ports/realtime.port';
 import {toSignal} from '@angular/core/rxjs-interop';
-import {map, shareReplay, filter, Observable} from 'rxjs';
+import {filter, map, Observable, share} from 'rxjs';
 import {Facade} from './facade.interface';
 
 export class ResourceFacade<T extends Item> implements Facade<T> {
@@ -33,39 +33,27 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
   }
 
   get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.get$(iri, opts).pipe(
-      shareReplay({bufferSize: 1, refCount: true})
-    );
+    return this.repo.get$(iri, opts);
   }
 
   patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.patch$(iri, changes, opts).pipe(
-      shareReplay({bufferSize: 1, refCount: true})
-    );
+    return this.repo.patch$(iri, changes, opts);
   }
 
   post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.post$(payload, opts).pipe(
-      shareReplay({bufferSize: 1, refCount: true})
-    );
+    return this.repo.post$(payload, opts);
   }
 
   put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.put$(iri, payload, opts).pipe(
-      shareReplay({bufferSize: 1, refCount: true})
-    );
+    return this.repo.put$(iri, payload, opts);
   }
 
   delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void> {
-    return this.repo.delete$(iri, opts).pipe(
-      shareReplay({bufferSize: 1, refCount: true})
-    );
+    return this.repo.delete$(iri, opts);
   }
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
-    return this.repo.request$<R, B>(req).pipe(
-      shareReplay({bufferSize: 1, refCount: true})
-    );
+    return this.repo.request$<R, B>(req);
   }
 
   /**
@@ -97,7 +85,7 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
       .pipe(
         map(e => e.data),
         filter((d): d is R => d !== undefined),
-        shareReplay({bufferSize: 1, refCount: true})
+        share()
       );
   }
 
@@ -107,7 +95,7 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
       .pipe(
         map(event => event.data),
         filter((data): data is T => data !== undefined),
-        shareReplay({bufferSize: 1, refCount: true})
+        share()
       );
   }
 }

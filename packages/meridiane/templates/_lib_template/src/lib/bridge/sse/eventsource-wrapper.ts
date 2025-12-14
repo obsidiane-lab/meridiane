@@ -17,7 +17,7 @@ export class EventSourceWrapper {
     private readonly logger?: BridgeLogger,
   ) {
     this.setState('closed');
-    this.log('[SSE] initialized', url, opts);
+    this.log('[SSE] init', {url, withCredentials: !!opts.withCredentials});
   }
 
   open(): void {
@@ -27,7 +27,7 @@ export class EventSourceWrapper {
     }
 
     this.setState('connecting');
-    this.log('[SSE] creating EventSource');
+    this.log('[SSE] open', {url: this.url});
 
     const es = new EventSource(this.url, {
       withCredentials: !!this.opts.withCredentials,
@@ -39,14 +39,12 @@ export class EventSourceWrapper {
     };
 
     es.onmessage = (ev) => {
-      this.log('[SSE] event', ev);
-      this.log('[SSE] message', ev.data);
       this.eventSub.next({type: 'message', data: ev.data, lastEventId: ev.lastEventId || undefined});
     };
 
     es.onerror = () => {
       // The browser will retry automatically. We stay in "connecting".
-      this.log('[SSE] error → retrying (browser)');
+      this.log('[SSE] error');
       this.setState('connecting');
     };
   }
@@ -63,7 +61,6 @@ export class EventSourceWrapper {
   // ──────────────── internals ────────────────
 
   private setState(state: RealtimeStatus): void {
-    this.log('[SSE] state', state);
     this.statusSub.next(state);
   }
 

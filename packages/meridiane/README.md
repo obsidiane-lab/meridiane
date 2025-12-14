@@ -26,7 +26,7 @@ npx meridiane init
 npx meridiane lib <lib-name> <npm-package-name> [version] [url-registry]
 
 # Générer des modèles depuis OpenAPI
-npx meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
+npx meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--preset=all|native] [--include=<substr>] [--exclude=<substr>] [--index=1|0]
 
 # Dev: regen lib + models depuis un backend (localhost par défaut)
 npx meridiane dev-bridge <lib-name> <npm-package-name> [version]
@@ -85,7 +85,7 @@ Variables utiles :
 - `MERIDIANE_MODELS_OUT=projects/<lib>/src/models`
 - `MERIDIANE_MODELS_REQUIRED_MODE=spec`
 - `MERIDIANE_MODELS_ITEM_IMPORT=../lib/ports/resource-repository.port`
-- `MERIDIANE_MODELS_NO_INDEX=1`
+- `MERIDIANE_MODELS_INDEX=1`
 
 Ordre de priorité :
 1) flags CLI

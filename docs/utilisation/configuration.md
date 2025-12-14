@@ -17,6 +17,8 @@ Le rôle de ce fichier est de définir des defaults raisonnables :
 - dossier de sortie
 - chemin d’import de `Item`
 - stratégie `requiredMode`
+- preset de génération (`preset: 'all' | 'native'`)
+- filtres de schémas (`includeSchemaNames` / `excludeSchemaNames`)
 
 ## `.env`
 
@@ -31,7 +33,8 @@ Variables utiles :
 - `MERIDIANE_MODELS_OUT=projects/<lib-name>/src/models`
 - `MERIDIANE_MODELS_REQUIRED_MODE=spec`
 - `MERIDIANE_MODELS_ITEM_IMPORT=../lib/ports/resource-repository.port`
-- `MERIDIANE_MODELS_NO_INDEX=1`
+- `MERIDIANE_MODELS_PRESET=native`
+- `MERIDIANE_MODELS_INDEX=1` (génère `index.ts`, `0` pour le désactiver)
 - `MERIDIANE_DEV_BACKEND=http://localhost:8000` (pour `dev-bridge`)
 - `MERIDIANE_DEV_SPEC=/api/docs.json` (pour `dev-bridge`)
 - `MERIDIANE_DEV_WORKSPACE=apps/sandbox` (pour `dev-bridge`)

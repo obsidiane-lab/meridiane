@@ -123,3 +123,62 @@ export function filterSchemaNames(schemas, cfg) {
   const noGroupSelected = [...variantsNoGroup.values()];
   return [...roots, ...[...grouped.values()], ...noGroupSelected].sort((a, b) => a.localeCompare(b));
 }
+
+/**
+ * @param {unknown} rule
+ * @returns {rule is ((name: string) => boolean)}
+ */
+function isRuleFn(rule) {
+  return typeof rule === 'function';
+}
+
+/**
+ * @param {string} name
+ * @param {RegExp|string|((name: string) => boolean)} rule
+ */
+function matchesRule(name, rule) {
+  if (rule instanceof RegExp) return rule.test(name);
+  if (isRuleFn(rule)) return !!rule(name);
+  if (typeof rule === 'string' && rule.length) return name.includes(rule);
+  return false;
+}
+
+/**
+ * Applique un preset de génération et/ou des règles include/exclude.
+ *
+ * - `preset: "all"`: ne filtre rien (comportement par défaut)
+ * - `preset: "native"`: retire les schémas "techniques" (Hydra*, jsonMergePatch…)
+ *
+ * Les règles `includeSchemaNames` / `excludeSchemaNames` s'appliquent sur les noms
+ * de schémas OpenAPI (ex: "User-user.read", "Conversation.jsonMergePatch", …).
+ *
+ * @param {string[]} schemaNames
+ * @param {{
+ *   preset?: 'all'|'native',
+ *   includeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
+ *   excludeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
+ * }} [cfg]
+ */
+export function applySchemaNameFilters(schemaNames, cfg) {
+  const preset = cfg?.preset ?? 'all';
+
+  /** @type {Array<RegExp|string|((name: string) => boolean)>} */
+  const include = Array.isArray(cfg?.includeSchemaNames) ? cfg.includeSchemaNames : [];
+  /** @type {Array<RegExp|string|((name: string) => boolean)>} */
+  const exclude = Array.isArray(cfg?.excludeSchemaNames) ? [...cfg.excludeSchemaNames] : [];
+
+  if (preset === 'native') {
+    exclude.push(/^Hydra/i);
+    exclude.push(/jsonMergePatch/i);
+    exclude.push(/\.jsonld\b/i);
+    exclude.push(/\.jsonapi\b/i);
+  }
+
+  const hasInclude = include.length > 0;
+
+  return schemaNames.filter((name) => {
+    if (hasInclude && !include.some((r) => matchesRule(name, r))) return false;
+    if (exclude.some((r) => matchesRule(name, r))) return false;
+    return true;
+  });
+}

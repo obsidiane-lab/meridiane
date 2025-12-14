@@ -2,7 +2,7 @@ import {EnvironmentInjector, inject, Injectable, runInInjectionContext} from '@a
 import {HttpClient} from '@angular/common/http';
 import {RealtimePort} from '../ports/realtime.port';
 import {Item, ResourceRepository} from '../ports/resource-repository.port';
-import {API_BASE_URL, MERCURE_CONFIG} from '../tokens';
+import {API_BASE_URL, BRIDGE_WITH_CREDENTIALS} from '../tokens';
 import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
 import {ApiPlatformRestRepository} from '../bridge/rest/api-platform.adapter';
 import {ResourceFacade} from './resource.facade';
@@ -19,7 +19,7 @@ export class FacadeFactory {
   private readonly env = inject(EnvironmentInjector);
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);
-  private readonly init = inject(MERCURE_CONFIG);
+  private readonly withCredentials = inject(BRIDGE_WITH_CREDENTIALS);
   private readonly mercure = inject(MercureRealtimeAdapter);
 
   /**
@@ -30,7 +30,7 @@ export class FacadeFactory {
    */
   create<T extends Item>(config: FacadeConfig<T>): ResourceFacade<T> {
     const url = config.url;
-    const repo = config.repo ?? new ApiPlatformRestRepository<T>(this.http, this.baseUrl, url, this.init);
+    const repo = config.repo ?? new ApiPlatformRestRepository<T>(this.http, this.baseUrl, url, this.withCredentials);
     const realtime = config.realtime ?? this.mercure;
 
     return runInInjectionContext(this.env, () => new ResourceFacade<T>(repo, realtime));

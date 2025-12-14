@@ -18,6 +18,21 @@ module.exports = {
   // Valeurs possibles: 'jsonld' | 'jsonapi' | 'none'
   preferFlavor: 'jsonld',
 
+  // Preset de génération:
+  // - 'all' (défaut): génère tout ce qui ressemble à un objet
+  // - 'native': exclut les schémas "techniques" (Hydra*, jsonMergePatch…)
+  preset: 'all',
+
+  // Générer `index.ts` dans le dossier des models
+  writeIndex: true,
+
+  // Filtres additionnels (sur les noms OpenAPI des schémas, ex: "User-user.read", "Conversation.jsonMergePatch")
+  // - includeSchemaNames: si non vide, ne garde que les matchs
+  // - excludeSchemaNames: supprime les matchs
+  // Règles possibles: RegExp, string (substring), ou (name) => boolean.
+  includeSchemaNames: [],
+  excludeSchemaNames: [],
+
   // Hydra: regex pour les schémas de base à ignorer (merge allOf / filtrage)
   // Peut être une RegExp ou une string passée à `new RegExp(...)`
   hydraBaseRegex: /^Hydra(?:Item|Collection)BaseSchema$/,

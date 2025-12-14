@@ -1,18 +1,16 @@
 #!/usr/bin/env node
-import fs from "fs-extra"
-import path from "path"
-import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
+import {existsSync} from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+
 import {loadDotEnv} from './utils/dotenv.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-/**
- * Recursively replace all placeholders in files under a directory
- * @param {string} srcDir - source directory path
- * @param {Object.<string,string>} placeholders - map of placeholder -> value
- */
+const __dirname = path.dirname(__filename);
+
 async function replacePlaceholdersInDir(srcDir, placeholders) {
-  const entries = await fs.readdir(srcDir, { withFileTypes: true });
+  const entries = await fs.readdir(srcDir, {withFileTypes: true});
   for (const entry of entries) {
     const fullPath = path.join(srcDir, entry.name);
     if (entry.isDirectory()) {
@@ -28,33 +26,37 @@ async function replacePlaceholdersInDir(srcDir, placeholders) {
   }
 }
 
-/**
- * Generate a new Angular library from template
- * @param {string} libName - folder and project name
- * @param {string} packageName - NPM package name (e.g. @org/lib)
- * @param {string} version - initial version for the package
- * @param {string} urlRegistry  - NPM registry url
- */
+async function readJson(filePath) {
+  const raw = await fs.readFile(filePath, 'utf8');
+  return JSON.parse(raw);
+}
+
+async function writeJson(filePath, data) {
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+}
+
 async function generate(libName, packageName, version, urlRegistry) {
   const tplDir = path.resolve(__dirname, '../templates/_lib_template');
   const workspaceRoot = process.cwd();
   const targetDir = path.resolve(workspaceRoot, 'projects', libName);
 
   // 1) Copy the template directory
-  await fs.copy(tplDir, targetDir);
+  await fs.rm(targetDir, {recursive: true, force: true});
+  await fs.mkdir(targetDir, {recursive: true});
+  await fs.cp(tplDir, targetDir, {recursive: true});
 
   // 2) Replace placeholders __LIB_NAME__, __PACKAGE_NAME__, __VERSION__
   const placeholders = {
     '__LIB_NAME__': libName,
     '__PACKAGE_NAME__': packageName,
-    '__VERSION__': version
+    '__VERSION__': version,
   };
   await replacePlaceholdersInDir(targetDir, placeholders);
 
   // 3) Update the library's package.json
   const libPackageJsonPath = path.join(targetDir, 'package.json');
-  if (await fs.pathExists(libPackageJsonPath)) {
-    const libPkg = await fs.readJson(libPackageJsonPath);
+  try {
+    const libPkg = await readJson(libPackageJsonPath);
     libPkg.name = packageName;
     libPkg.version = version;
     if (urlRegistry) {
@@ -63,39 +65,41 @@ async function generate(libName, packageName, version, urlRegistry) {
       delete libPkg.publishConfig.registry;
       if (Object.keys(libPkg.publishConfig).length === 0) delete libPkg.publishConfig;
     }
-    await fs.writeJson(libPackageJsonPath, libPkg, { spaces: 2 });
+    await writeJson(libPackageJsonPath, libPkg);
+  } catch {
+    // ignore: missing or invalid package.json in template
   }
 
   // 4) Update angular.json
   const angularJsonPath = path.resolve(workspaceRoot, 'angular.json');
-  const ng = await fs.readJson(angularJsonPath);
+  const ng = await readJson(angularJsonPath);
 
   ng.projects[libName] = {
     root: `projects/${libName}`,
     sourceRoot: `projects/${libName}/src`,
     projectType: 'library',
-    "architect": {
-      "build": {
-        "builder": "@angular/build:ng-packagr",
-        "configurations": {
-          "production": {
-            "tsConfig": `projects/${libName}/tsconfig.lib.prod.json`
+    architect: {
+      build: {
+        builder: '@angular/build:ng-packagr',
+        configurations: {
+          production: {
+            tsConfig: `projects/${libName}/tsconfig.lib.prod.json`,
           },
-          "development": {
-            "tsConfig": `projects/${libName}/tsconfig.lib.json`
-          }
+          development: {
+            tsConfig: `projects/${libName}/tsconfig.lib.json`,
+          },
         },
-        "defaultConfiguration": "production"
+        defaultConfiguration: 'production',
       },
-      "test": {
-        "builder": "@angular/build:karma",
-        "options": {
-          "tsConfig": `projects/${libName}/tsconfig.spec.json`
-        }
-      }
-    }
+      test: {
+        builder: '@angular/build:karma',
+        options: {
+          tsConfig: `projects/${libName}/tsconfig.spec.json`,
+        },
+      },
+    },
   };
-  await fs.writeJson(angularJsonPath, ng, { spaces: 2 });
+  await writeJson(angularJsonPath, ng);
 
   console.log(`✅ Library '${libName}' generated at projects/${libName}` +
     ` with package '${packageName}@${version}'`);
@@ -116,7 +120,7 @@ function findUpNodeModulePackageJson(startDir, packageName) {
   let dir = startDir;
   while (true) {
     const candidate = path.join(dir, 'node_modules', packageName, 'package.json');
-    if (fs.existsSync(candidate)) return candidate;
+    if (existsSync(candidate)) return candidate;
     const parent = path.dirname(dir);
     if (parent === dir) return undefined;
     dir = parent;
@@ -141,7 +145,7 @@ if (debug) {
   console.log('[meridiane lib] debug', {libName, packageName, version, urlRegistry: urlRegistry ? '<set>' : '<unset>'});
 }
 
-generate(libName, packageName, version, urlRegistry).catch(err => {
+generate(libName, packageName, version, urlRegistry).catch((err) => {
   console.error(err);
   process.exit(1);
 });

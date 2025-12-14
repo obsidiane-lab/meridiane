@@ -20,12 +20,15 @@ npm run sandbox:bridge
 ```
 
 Par défaut, la commande récupère la spec OpenAPI sur `http://localhost:8000/api/docs.json`.
+Dans ce repo, elle utilise le preset `native` pour éviter de générer des schémas “techniques” (ex: `jsonMergePatch`).
 
 Options utiles :
 
 ```bash
 node packages/meridiane/cli.js sandbox-bridge --backend=http://localhost:8000
 node packages/meridiane/cli.js sandbox-bridge --spec=/api/docs.json
+node packages/meridiane/cli.js sandbox-bridge --preset=all
+node packages/meridiane/cli.js sandbox-bridge --index=0
 node packages/meridiane/cli.js sandbox-bridge --no-models
 ```
 
@@ -46,4 +49,3 @@ Le sandbox adopte le pattern :
 - `Component` : consomme uniquement le repository + signals (pas de logique HTTP/Mercure directe)
 
 Objectif : garder un front découplé, testable et aligné avec une API Platform “relations = IRIs”.
-

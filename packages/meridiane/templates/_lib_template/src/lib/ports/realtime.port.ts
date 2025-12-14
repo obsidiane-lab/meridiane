@@ -11,7 +11,6 @@ export interface SseEvent {
 
 export interface SseOptions {
   withCredentials?: boolean;
-  listen?: string[];
 }
 
 export interface RealtimeEvent<T> {

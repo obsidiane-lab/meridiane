@@ -14,16 +14,12 @@ La surface publique est volontairement petite : `provideBridge`, les facades, et
 
 Options principales :
 
-- `baseUrl` : URL de base du backend (ex: `https://api.example.com`)
+- `baseUrl` : URL de base du backend (ex: `https://api.example.com`) (requis)
 - `auth` : configuration Bearer (token direct ou `getToken()`) ou interceptor custom
 - `mercure` : `{ hubUrl, init, topicMode? }` pour activer le realtime Mercure
 - `defaults` : headers/timeout/retries appliqués par défaut
 - `extraInterceptors` : injecter vos interceptors Angular
 - `debug` : active des logs runtime (HTTP + Mercure) via le logger du bridge
-
-Compat :
-
-- `apiBaseUrl` et `mercureHubUrl` restent acceptés pour compatibilité avec les signatures plus anciennes
 
 ### `mercure.topicMode`
 

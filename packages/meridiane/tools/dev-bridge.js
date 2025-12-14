@@ -4,17 +4,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 import {loadDotEnv} from './utils/dotenv.js';
+import {getArg, getArgs, hasFlag} from './utils/cli-args.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-function getArg(name, def) {
-  const a = process.argv.find((x) => x.startsWith(`--${name}=`));
-  return a ? a.split('=')[1] : def;
-}
-
-function isFlag(name) {
-  return process.argv.includes(`--${name}`);
-}
 
 function normalizeBaseUrl(u) {
   if (!u) return u;
@@ -51,6 +43,10 @@ Options:
   --spec=/api/docs.json                  Spec path or full URL (default: /api/docs.json)
   --models-out=projects/<lib>/src/models Output dir for generated models
   --required-mode=all-optional|spec      Models required-mode (default: all-optional)
+  --preset=all|native                    Models preset (default: all)
+  --include=<substr>[,<substr>…]         Include schema names (repeatable)
+  --exclude=<substr>[,<substr>…]         Exclude schema names (repeatable)
+  --index=1|0                             Generate index.ts (default: 1)
   --no-models                            Skip models generation
   --debug                                Enable debug logs
 
@@ -64,7 +60,7 @@ Examples:
 async function main() {
   await loadDotEnv();
 
-  const debug = isFlag('debug') || /^(1|true|yes)$/i.test(process.env.MERIDIANE_DEBUG ?? '');
+  const debug = hasFlag('debug') || /^(1|true|yes)$/i.test(process.env.MERIDIANE_DEBUG ?? '');
   if (debug) process.env.MERIDIANE_DEBUG = '1';
 
   const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -106,15 +102,23 @@ async function main() {
   if (libCode !== 0) process.exit(libCode);
 
   // 2) Generate models from the backend spec (dev-only convenience).
-  if (isFlag('no-models')) return;
+  if (hasFlag('no-models')) return;
 
   const modelsOut = getArg('models-out', `projects/${libName}/src/models`);
   const requiredMode = getArg('required-mode', process.env.MERIDIANE_MODELS_REQUIRED_MODE ?? 'all-optional');
+  const preset = getArg('preset', process.env.MERIDIANE_MODELS_PRESET);
+  const include = getArgs('include');
+  const exclude = getArgs('exclude');
+  const index = getArg('index', process.env.MERIDIANE_MODELS_INDEX);
 
   const modelsArgs = [
     specUrl,
     `--out=${modelsOut}`,
     `--required-mode=${requiredMode}`,
+    ...(preset ? [`--preset=${preset}`] : []),
+    ...include.map((v) => `--include=${v}`),
+    ...exclude.map((v) => `--exclude=${v}`),
+    ...(index ? [`--index=${index}`] : []),
   ];
 
   // Try the configured URL first, then fallback to API Platform alternative endpoint.

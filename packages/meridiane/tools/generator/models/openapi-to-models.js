@@ -1,7 +1,18 @@
 import { sanitizeTypeName, quoteKeyIfNeeded } from './utils.js';
-import { filterSchemaNames, mergeAllOf, isObject } from './schema-utils.js';
+import { filterSchemaNames, applySchemaNameFilters, mergeAllOf, isObject } from './schema-utils.js';
 import { friendlyName } from './naming.js';
 import { tsTypeOf, withNullable } from './type-resolver.js';
+
+/**
+ * @typedef {{
+ *   requiredMode?: 'all-optional'|'spec',
+ *   preferFlavor?: 'jsonld'|'jsonapi'|'none',
+ *   hydraBaseRegex?: RegExp|string,
+ *   preset?: 'all'|'native',
+ *   includeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
+ *   excludeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
+ * }} BuildOptions
+ */
 
 /**
  * Construit une map originalName -> sanitizedName, en assurant l’unicité
@@ -53,7 +64,7 @@ function buildNameMap(schemaNames) {
 export function buildModelsFromOpenAPI(spec, options) {
   const opts = { requiredMode: 'all-optional', ...(options || {}) };
   const schemas = spec?.components?.schemas || {};
-  const schemaNames = filterSchemaNames(schemas, opts);
+  const schemaNames = applySchemaNameFilters(filterSchemaNames(schemas, opts), opts);
   const nameMap = buildNameMap(schemaNames);
   const allSanitizedNames = new Set([...nameMap.values()]);
 

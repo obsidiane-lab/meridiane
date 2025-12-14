@@ -1,31 +1,27 @@
 import {Inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
-import {filter, map, shareReplay} from 'rxjs/operators';
+import {filter, map, share} from 'rxjs/operators';
 import {toHttpParams} from '../bridge/rest/query-builder';
-import {CredentialsPolicy} from '../bridge/credentials.policy';
 import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
-import {API_BASE_URL, MERCURE_CONFIG} from '../tokens';
+import {API_BASE_URL, BRIDGE_WITH_CREDENTIALS} from '../tokens';
 import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequired, Item} from '../ports/resource-repository.port';
 import {SubscribeFilter} from '../ports/realtime.port';
 import {resolveUrl} from '../utils/url';
 
-@Injectable({providedIn: 'root'})
 /**
  * High-level facade for ad-hoc HTTP calls and Mercure subscriptions.
  *
  * Prefer `FacadeFactory` + `ResourceFacade<T>` when you want a resource-oriented API.
  */
+@Injectable({providedIn: 'root'})
 export class BridgeFacade {
-  private readonly credentialsPolicy: CredentialsPolicy;
-
   constructor(
     private readonly http: HttpClient,
     private readonly realtime: MercureRealtimeAdapter,
     @Inject(API_BASE_URL) private readonly apiBase: string,
-    @Inject(MERCURE_CONFIG) init: RequestInit,
+    @Inject(BRIDGE_WITH_CREDENTIALS) private readonly withCredentialsDefault: boolean,
   ) {
-    this.credentialsPolicy = new CredentialsPolicy(init);
   }
 
   // ──────────────── HTTP ────────────────
@@ -33,7 +29,7 @@ export class BridgeFacade {
   get$<R = unknown>(url: IriRequired, opts?: HttpCallOptions): Observable<R> {
     return this.http.get<R>(this.resolveUrl(url), {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
+      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
     });
   }
 
@@ -46,35 +42,35 @@ export class BridgeFacade {
     return this.http.get<Collection<T>>(this.resolveUrl(url), {
       params,
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
+      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
     });
   }
 
   post$<R = unknown, B = unknown>(url: IriRequired, payload: B, opts?: HttpCallOptions): Observable<R> {
     return this.http.post<R>(this.resolveUrl(url), payload, {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
+      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
     });
   }
 
   patch$<R = unknown, B = unknown>(url: IriRequired, changes: B, opts?: HttpCallOptions): Observable<R> {
     return this.http.patch<R>(this.resolveUrl(url), changes, {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
+      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
     });
   }
 
   put$<R = unknown, B = unknown>(url: IriRequired, payload: B, opts?: HttpCallOptions): Observable<R> {
     return this.http.put<R>(this.resolveUrl(url), payload, {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
+      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
     });
   }
 
   delete$(url: IriRequired, opts?: HttpCallOptions): Observable<void> {
     return this.http.delete<void>(this.resolveUrl(url), {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.credentialsPolicy.withCredentials(),
+      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
     });
   }
 
@@ -89,7 +85,7 @@ export class BridgeFacade {
 
     mergedOptions['responseType'] = (responseType ?? (mergedOptions['responseType'] as any) ?? 'json') as any;
     mergedOptions['withCredentials'] =
-      withCredentials ?? (mergedOptions['withCredentials'] as any) ?? this.credentialsPolicy.withCredentials();
+      withCredentials ?? (mergedOptions['withCredentials'] as any) ?? this.withCredentialsDefault;
     mergedOptions['observe'] = 'body';
 
     return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
@@ -104,7 +100,7 @@ export class BridgeFacade {
       .pipe(
         map((event) => event.data),
         filter((data): data is T => data !== undefined),
-        shareReplay({bufferSize: 1, refCount: true})
+        share()
       );
   }
 
