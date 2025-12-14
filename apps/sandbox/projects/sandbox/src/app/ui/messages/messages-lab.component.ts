@@ -1,16 +1,15 @@
-import {Component, computed, inject, signal, WritableSignal} from '@angular/core';
+import {Component, computed, inject, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from "@angular/router";
 
 import {Message} from '../../entities/message';
 
-import {BridgeFacade, FacadeFactory, Iri, ResourceFacade} from "@obsidiane/bridge-sandbox";
-import {tap} from 'rxjs';
-import {upsertInSignal} from "@obsidiane/bridge-sandbox";
+import {Iri, IriRequired} from "@obsidiane/bridge-sandbox";
 import {JsonViewerComponent} from '../shared/json-viewer.component';
-import {Conversation} from '../../entities/conversation';
-import {BACKEND_BASE_URL} from '../../core/backend';
+import {ConversationRepository} from '../../data/repositories/conversation.repository';
+import {MessageRepository} from '../../data/repositories/message.repository';
+import {Subscription} from 'rxjs';
 
 interface LogEntry {
   t: number;
@@ -27,14 +26,16 @@ interface LogEntry {
   styleUrls: ['./messages-lab.component.css'],
 })
 export class MessagesLabComponent {
+  private readonly messagesRepo = inject(MessageRepository);
+  private readonly conversationsRepo = inject(ConversationRepository);
 
-  readonly facade: ResourceFacade<Message>;
-  readonly conversationFacade: ResourceFacade<Conversation>;
-  // Signals façade
-  readonly messages: WritableSignal<readonly Message[]> = signal<readonly Message[]>([]);
+  readonly conversationId: string;
+  readonly conversationIri: IriRequired;
+  readonly messages = computed(() => this.messagesRepo.messagesForConversation(this.conversationIri)());
+
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly status
+  readonly status = this.conversationsRepo.status;
 
   // Sélection & formulaire
   readonly selectedId = signal<Iri | undefined>(undefined);
@@ -46,7 +47,6 @@ export class MessagesLabComponent {
   readonly editForm = this.fb.nonNullable.group({
     originalText: ['', [Validators.required]],
   });
-  readonly conversationId: string;
 
   // Logs
   private readonly _logs = signal<LogEntry[]>([]);
@@ -72,19 +72,15 @@ export class MessagesLabComponent {
     });
   });
 
-  private sseSub?: { unsubscribe(): void };
+  private sseSub?: Subscription;
 
   constructor(
     private readonly router: Router,
     private readonly route: ActivatedRoute,
-    protected facadeFactory: FacadeFactory,
-    private readonly bridge: BridgeFacade,
   ) {
     const id = this.route.snapshot.paramMap.get('id') ?? '1';
     this.conversationId = id;
-    this.facade = facadeFactory.create<Message>({url: `/api/conversations/${id}/messages`})
-    this.conversationFacade = facadeFactory.create<Conversation>({url: `/api/conversations`})
-    this.status = this.facade.connectionStatus;
+    this.conversationIri = `/api/conversations/${id}`;
     this.pushLog({t: Date.now(), kind: 'init'});
     this.load();
     this.enableSse();
@@ -98,18 +94,14 @@ export class MessagesLabComponent {
   load() {
     this.loading.set(true);
     this.error.set(null);
-    this.facade.getCollection$({page: 1, itemsPerPage: 20})
-      .pipe(
-        tap(list => {
-          this.messages.set(list.member)
-          this.loading.set(false);
-        })
-      )
+    this.messagesRepo
+      .fetchByConversation$(this.conversationIri, {page: 1, itemsPerPage: 20})
       .subscribe({
+        next: () => this.loading.set(false),
         error: (err) => {
           this.error.set(err?.message || 'Failed to load messages');
           this.loading.set(false);
-        }
+        },
       });
   }
 
@@ -138,9 +130,9 @@ export class MessagesLabComponent {
   manualGet() {
     const iri = this.selectedId();
     if (!iri) return;
-    this.facade.get$(iri).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'manual-get', iri, snapshot: res});
-    });
+    this.messagesRepo
+      .fetch$(iri as IriRequired)
+      .subscribe((res) => this.pushLog({t: Date.now(), kind: 'manual-get', iri, snapshot: res}));
   }
 
   patchOriginalText() {
@@ -153,12 +145,15 @@ export class MessagesLabComponent {
     this.loading.set(true);
     this.error.set(null);
     const {originalText} = this.editForm.getRawValue();
-    this.facade.patch$(iri, {originalText: originalText.trim()}).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
-      this.loading.set(false);
-    }, (err) => {
-      this.error.set(err?.message || 'Failed to patch message');
-      this.loading.set(false);
+    this.messagesRepo.patch$(iri as IriRequired, {originalText: originalText.trim()}).subscribe({
+      next: (res) => {
+        this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.error.set(err?.message || 'Failed to patch message');
+        this.loading.set(false);
+      },
     });
   }
 
@@ -171,49 +166,29 @@ export class MessagesLabComponent {
     this.error.set(null);
     const {originalText} = this.createForm.getRawValue();
 
-    const conversation = `/api/conversations/${this.conversationId}`;
-    this.bridge
-      .post$('/api/messages', {conversation, originalText: originalText.trim()})
-      .subscribe((res: any) => {
+    this.messagesRepo.create$(this.conversationIri, originalText.trim()).subscribe({
+      next: (res) => {
         const iri = res?.['@id'] as Iri | undefined;
-        if (iri) upsertInSignal(this.messages, res);
         this.pushLog({t: Date.now(), kind: 'update', iri, snapshot: res});
         this.loading.set(false);
         this.createForm.reset({originalText: 'New message'});
-      }, (err) => {
+      },
+      error: (err) => {
         this.error.set(err?.message || 'Failed to create message');
         this.loading.set(false);
-      });
+      },
+    });
   }
 
   private enableSse(): void {
     if (this.sseSub) return;
-    const conversationIri = `/api/conversations/${this.conversationId}`;
-    const topics = this.topicsForConversationIri(conversationIri);
-    this.sseSub = this.conversationFacade
-      .watchSubResource$<Message>(topics, 'conversation')
-      .subscribe((msg) => upsertInSignal(this.messages, msg));
+    this.sseSub = this.conversationsRepo.watchMessages$(this.conversationIri).subscribe(() => undefined);
   }
 
   private disableSse(): void {
-    const conversationIri = `/api/conversations/${this.conversationId}`;
-    const topics = this.topicsForConversationIri(conversationIri);
-    this.conversationFacade.unwatch(topics);
+    this.conversationsRepo.unwatchMessages(this.conversationIri);
     this.sseSub?.unsubscribe();
     this.sseSub = undefined;
-  }
-
-  private topicsForConversationIri(iri: string): string[] {
-    const abs = this.resolveBackendIri(iri);
-    return abs === iri ? [iri] : [iri, abs];
-  }
-
-  private resolveBackendIri(iri: string): string {
-    try {
-      return new URL(iri, BACKEND_BASE_URL).toString();
-    } catch {
-      return iri;
-    }
   }
 
   // utils logs

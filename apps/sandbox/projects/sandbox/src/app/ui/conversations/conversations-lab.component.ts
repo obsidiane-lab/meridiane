@@ -6,20 +6,20 @@ import {
   ElementRef,
   inject,
   signal,
+  Signal,
   ViewChild,
-  WritableSignal,
 } from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router} from "@angular/router";
-import {BridgeFacade, ResourceFacade, FacadeFactory} from '@obsidiane/bridge-sandbox';
+import {BridgeFacade, Iri, IriRequired} from '@obsidiane/bridge-sandbox';
 import {Message} from '../../entities/message';
 import {Conversation} from '../../entities/conversation';
-import {Iri, upsertInSignal} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {Subject, takeUntil} from 'rxjs';
-import {BACKEND_BASE_URL} from '../../core/backend';
+import {Subject, Subscription, takeUntil} from 'rxjs';
+import {ConversationRepository} from '../../data/repositories/conversation.repository';
+import {MessageRepository} from '../../data/repositories/message.repository';
 
 interface LogEntry {
   t: number;
@@ -44,17 +44,13 @@ type MeResponse = {
   styleUrls: ['./conversations-lab.component.css'],
 })
 export class ConversationsLabComponent implements AfterViewInit {
-  readonly facade: ResourceFacade<Conversation>;
-  private readonly messagesFacade: ResourceFacade<Message>;
-  readonly selectedMessages: WritableSignal<readonly Message[]> = signal<readonly Message[]>([]);
   readonly messagesLoading = signal(false);
   readonly sending = signal(false);
 
-  // Signals façade
-  readonly conversations: WritableSignal<readonly Conversation[]> = signal<readonly Conversation[]>([])
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly status
+  readonly status: Signal<'connecting' | 'connected' | 'closed'>;
+  readonly conversations: Signal<readonly Conversation[]>;
 
   readonly meId = signal<number | null>(null);
   readonly meIdentifier = signal<string | null>(null);
@@ -62,6 +58,9 @@ export class ConversationsLabComponent implements AfterViewInit {
   // Sélection & formulaire
   readonly selectedId = signal<Iri | undefined>(undefined);
   private readonly fb = inject(FormBuilder);
+  private readonly conversationsRepo = inject(ConversationRepository);
+  private readonly messagesRepo = inject(MessageRepository);
+
   readonly createForm = this.fb.nonNullable.group({
     title: ['New conversation', [Validators.required]],
     externalId: [''],
@@ -87,6 +86,9 @@ export class ConversationsLabComponent implements AfterViewInit {
     return this.conversations().find(c => c['@id'] === iri) ?? null;
   });
 
+  private readonly selectedMessagesSource = signal<Signal<readonly Message[]> | null>(null);
+  readonly selectedMessages = computed(() => this.selectedMessagesSource()?.() ?? []);
+
   readonly searchForm = this.fb.nonNullable.group({
     q: [''],
   });
@@ -106,20 +108,18 @@ export class ConversationsLabComponent implements AfterViewInit {
 
   private readonly stopSelectedSse$ = new Subject<void>();
   private readonly destroyRef = inject(DestroyRef);
+  private watchAllSub?: Subscription;
+  private watchOneSub?: Subscription;
 
   @ViewChild('messagesViewport') private messagesViewport?: ElementRef<HTMLElement>;
   @ViewChild('composer') private composer?: ElementRef<HTMLTextAreaElement>;
 
   constructor(
     private router: Router,
-    protected facadeFactory: FacadeFactory,
     private readonly bridge: BridgeFacade,
   ) {
-
-    this.facade = facadeFactory.create<Conversation>({url: `/api/conversations`})
-    this.messagesFacade = facadeFactory.create<Message>({url: `/api/messages`})
-
-    this.status = this.facade.connectionStatus;
+    this.status = this.conversationsRepo.status;
+    this.conversations = this.conversationsRepo.conversations();
 
     this.bridge.get$<MeResponse>('/api/auth/me').subscribe({
       next: (res) => {
@@ -158,25 +158,33 @@ export class ConversationsLabComponent implements AfterViewInit {
   load() {
     this.loading.set(true);
     this.error.set(null);
-    this.facade.getCollection$({page: 1, itemsPerPage: 20})
-      .subscribe(list => {
-        this.conversations.set(list.member);
-        this.loading.set(false);
-      }, (err) => {
-        this.error.set(err?.message || 'Failed to load conversations');
-        this.loading.set(false);
+    this.conversationsRepo
+      .fetchAll$({page: 1, itemsPerPage: 20})
+      .subscribe({
+        next: () => this.loading.set(false),
+        error: (err) => {
+          this.error.set(err?.message || 'Failed to load conversations');
+          this.loading.set(false);
+        },
       });
   }
 
   watchAll() {
-    this.facade.watch$(this.conversations().map(conversation => conversation['@id'])).subscribe(result => {
-        upsertInSignal(this.conversations, result)
-      }
-    );
+    this.watchAllSub?.unsubscribe();
+    const iris = this.conversations()
+      .map((c) => c['@id'])
+      .filter((x): x is IriRequired => typeof x === 'string' && x.length > 0);
+
+    this.watchAllSub = this.conversationsRepo.watch$(iris).subscribe(() => undefined);
   }
 
   unwatchAll() {
-    this.facade.unwatch(this.conversations().map(conversation => conversation['@id']));
+    this.watchAllSub?.unsubscribe();
+    this.watchAllSub = undefined;
+    const iris = this.conversations()
+      .map((c) => c['@id'])
+      .filter((x): x is IriRequired => typeof x === 'string' && x.length > 0);
+    this.conversationsRepo.unwatch(iris);
   }
 
   select(c: Conversation) {
@@ -188,20 +196,29 @@ export class ConversationsLabComponent implements AfterViewInit {
     this.pushLog({t: Date.now(), kind: 'select', iri: c['@id'], snapshot: c});
 
     this.stopSelectedSse$.next();
-    this.loadMessagesForConversation(c);
+    const conversationIri = c['@id'];
+    if (!conversationIri) return;
+
+    this.selectedMessagesSource.set(this.messagesRepo.messagesForConversation(conversationIri));
+
+    this.messagesLoading.set(true);
+    this.messagesRepo
+      .fetchByConversation$(conversationIri, {page: 1, itemsPerPage: 50})
+      .subscribe({
+        next: () => {
+          this.messagesLoading.set(false);
+          this.scrollMessagesToBottom();
+        },
+        error: () => this.messagesLoading.set(false),
+      });
 
     // Listen to Message events published on Conversation topic
-    const topics = this.topicsForConversationIri(c["@id"]!);
-    this.facade
-      .watchSubResource$<Message>(topics, 'conversation')
+    this.conversationsRepo
+      .watchMessages$(conversationIri)
       .pipe(takeUntilDestroyed(this.destroyRef), takeUntil(this.stopSelectedSse$))
-      .subscribe((message) => {
-        this.upsertChatMessage(message as any);
+      .subscribe(() => {
         this.scrollMessagesToBottom();
-        const iri = c['@id'];
-        if (iri) {
-          this.facade.get$(iri).subscribe((fresh) => upsertInSignal(this.conversations, fresh));
-        }
+        this.conversationsRepo.fetch$(conversationIri).subscribe(() => undefined);
       });
 
     queueMicrotask(() => this.composer?.nativeElement?.focus());
@@ -210,21 +227,26 @@ export class ConversationsLabComponent implements AfterViewInit {
   watchOne() {
     const iri = this.selectedId();
     if (iri) {
-      this.facade.watch$(iri);
+      this.watchOneSub?.unsubscribe();
+      this.watchOneSub = this.conversationsRepo.watch$(iri as IriRequired).subscribe(() => undefined);
     }
   }
 
   unwatchOne() {
     const id = this.selectedId();
-    if (id) this.facade.unwatch(id);
+    if (id) {
+      this.watchOneSub?.unsubscribe();
+      this.watchOneSub = undefined;
+      this.conversationsRepo.unwatch(id as IriRequired);
+    }
   }
 
   manualGet() {
     const iri = this.selectedId();
     if (!iri) return;
-    this.facade.get$(iri).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'manual-get', iri, snapshot: res});
-    });
+    this.conversationsRepo
+      .fetch$(iri as IriRequired)
+      .subscribe((res) => this.pushLog({t: Date.now(), kind: 'manual-get', iri, snapshot: res}));
   }
 
   patch() {
@@ -240,9 +262,9 @@ export class ConversationsLabComponent implements AfterViewInit {
     const ext = externalId.trim();
     payload.externalId = ext === '' ? null : ext;
 
-    this.facade.patch$(iri, payload).subscribe(res => {
-      this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res});
-    });
+    this.conversationsRepo
+      .patch$(iri as IriRequired, payload)
+      .subscribe((res) => this.pushLog({t: Date.now(), kind: 'patch', iri, snapshot: res}));
   }
 
   sendMessage(): void {
@@ -257,14 +279,10 @@ export class ConversationsLabComponent implements AfterViewInit {
     if (!text) return;
 
     this.sending.set(true);
-    this.bridge
-      .post$<Message, {conversation: string; originalText: string}>('/api/messages', {
-        conversation: conv['@id'],
-        originalText: text,
-      })
+    this.messagesRepo
+      .create$(conv['@id'] as IriRequired, text)
       .subscribe({
-        next: (res) => {
-          this.upsertChatMessage(res);
+        next: () => {
           this.sendMessageForm.reset({text: ''});
           this.scrollMessagesToBottom();
         },
@@ -296,45 +314,28 @@ export class ConversationsLabComponent implements AfterViewInit {
     const ext = externalId.trim();
     if (ext !== '') payload.externalId = ext;
 
-    this.facade.post$(payload).subscribe(res => {
-      upsertInSignal(this.conversations, res);
-      this.pushLog({t: Date.now(), kind: 'update', iri: res['@id'], snapshot: res});
-      this.loading.set(false);
-      this.createForm.reset({title: 'New conversation', externalId: ''});
-    }, (err) => {
-      this.error.set(err?.message || 'Failed to create conversation');
-      this.loading.set(false);
+    this.conversationsRepo.create$(payload).subscribe({
+      next: (res) => {
+        this.pushLog({t: Date.now(), kind: 'update', iri: res['@id'], snapshot: res});
+        this.loading.set(false);
+        this.createForm.reset({title: 'New conversation', externalId: ''});
+      },
+      error: (err) => {
+        this.error.set(err?.message || 'Failed to create conversation');
+        this.loading.set(false);
+      },
     });
   }
 
   removeSelected() {
     const iri = this.selectedId();
     if (!iri) return;
-    this.facade.delete$(iri).subscribe(() => {
-      this.conversations.update(list => list.filter(c => c['@id'] !== iri));
+    this.stopSelectedSse$.next();
+    this.conversationsRepo.delete$(iri as IriRequired).subscribe(() => {
       this.selectedId.set(undefined);
+      this.selectedMessagesSource.set(null);
       this.pushLog({t: Date.now(), kind: 'update', iri, snapshot: {deleted: true}});
     });
-  }
-
-  private loadMessagesForConversation(c: Conversation): void {
-    const id = c.id;
-    const iri = c['@id'];
-    const convPath = id ? `/api/conversations/${id}/messages` : (iri ? `${iri}/messages` : null);
-    if (!convPath) return;
-
-    this.messagesLoading.set(true);
-    this.messagesFacade
-      .request$({method: 'GET', url: convPath, query: {page: 1, itemsPerPage: 50}})
-      .subscribe({
-        next: (col: any) => {
-          const items = (col?.member ?? []) as Message[];
-          this.selectedMessages.set(this.sortMessages(items));
-          this.messagesLoading.set(false);
-          this.scrollMessagesToBottom();
-        },
-        error: () => this.messagesLoading.set(false),
-      });
   }
 
   isMine(m: Message): boolean {
@@ -359,31 +360,6 @@ export class ConversationsLabComponent implements AfterViewInit {
     return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   }
 
-  private upsertChatMessage(message: Message): void {
-    this.selectedMessages.update((items) => {
-      const id = message['@id'];
-      if (!id) return this.sortMessages([...items, message]);
-
-      const existingIndex = items.findIndex((m) => m['@id'] === id);
-      if (existingIndex === -1) return this.sortMessages([...items, message]);
-
-      const next = items.slice() as Message[];
-      next[existingIndex] = message;
-      return this.sortMessages(next);
-    });
-  }
-
-  private sortMessages(items: Message[]): Message[] {
-    return items.slice().sort((a, b) => {
-      const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
-      const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
-      if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
-      if (!Number.isFinite(ta)) return -1;
-      if (!Number.isFinite(tb)) return 1;
-      return ta - tb;
-    });
-  }
-
   private extractNumericId(iri?: string): number | null {
     if (!iri) return null;
     const m = String(iri).match(/\/(\d+)(?:\/)?$/);
@@ -406,18 +382,5 @@ export class ConversationsLabComponent implements AfterViewInit {
     const next = [...arr, entry];
     if (next.length > 200) next.splice(0, next.length - 200);
     this._logs.set(next);
-  }
-
-  private topicsForConversationIri(iri: string): string[] {
-    const abs = this.resolveBackendIri(iri);
-    return abs === iri ? [iri] : [iri, abs];
-  }
-
-  private resolveBackendIri(iri: string): string {
-    try {
-      return new URL(iri, BACKEND_BASE_URL).toString();
-    } catch {
-      return iri;
-    }
   }
 }
