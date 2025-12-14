@@ -25,6 +25,12 @@ jobs:
       - name: CLI help
         run: node packages/meridiane/cli.js --help
 
+      - name: CLI dev help
+        run: node packages/meridiane/cli.js dev --help
+
+      - name: CLI build help
+        run: node packages/meridiane/cli.js build --help
+
       - name: Pack check
         run: npm -w packages/meridiane run pack:check
 

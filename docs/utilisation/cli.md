@@ -2,86 +2,48 @@
 
 Cette page fait partie des docs d’utilisation.
 
-Le CLI sert à générer le bridge et ses modèles, à partir d’un template et d’une spec OpenAPI.
-Cette page décrit ce que chaque commande **écrit** dans votre workspace.
+Le CLI sert à générer un bridge Angular (lib) et (optionnellement) ses modèles TypeScript depuis une spec OpenAPI (API Platform).
+Cette page décrit ce que chaque commande **écrit** dans votre workspace Angular (CWD = dossier contenant `angular.json`).
 
-## `meridiane init`
+## `meridiane dev`
 
-Crée des fichiers “starter” dans le workspace courant.
-Le but est de centraliser les réglages et de réduire la répétition des flags.
+Génère (ou régénère) le bridge pour le développement.
 
-Sorties typiques :
+La commande écrit principalement :
 
-- `models.config.js` : defaults de génération des models
-- `.env.example` : exemple de variables d’environnement pour le CLI
-- `meridiane/angular.example.ts` : snippet d’intégration `provideBridge(...)`
-
-Options :
-
-- `--force` : régénère/écrase les fichiers
-
-## `meridiane lib`
-
-Génère une lib Angular “bridge” à partir du template embarqué.
-La commande crée/écrit principalement :
-
-- `projects/<lib-name>` (sources du bridge)
-- une entrée `projects.<lib-name>` dans `angular.json` (build/test Angular)
-- `package.json` de la lib (name/version, publishConfig si configuré)
+- `projects/<libName>` (sources du bridge, générées depuis le template embarqué)
+- `projects/<libName>/src/models/*` (si models activés)
+- une entrée `projects.<libName>` dans `angular.json` (build/test Angular)
 
 Usage :
 
 ```bash
-meridiane lib <lib-name> <npm-package-name> [version] [url-registry]
+meridiane dev <packageName> --spec <url|file> [--preset[=native|all]] [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 ```
 
 Notes :
 
-- le registry est de préférence géré via `.npmrc` / variables CI
-- le build d’une lib Angular nécessite `ng-packagr` dans le workspace
+- `<packageName>` est le nom npm du bridge (ex: `@acme/backend-bridge`).
+  `libName` est dérivé de `<packageName>` (ex: `backend-bridge`) et sert au dossier `projects/<libName>`.
+- `--preset` par défaut est `all` (si absent). Si `--preset` est présent sans valeur, il vaut `native`.
+- `--preset=native` vise des modèles “entity-like” (ex: `User`, `Conversation`, `ConstraintViolation`).
+- `--preset=all` garde toutes les variantes (ex: `ConstraintViolationJsonld`, `ConversationJsonMergePatch`, …).
+- Tous les models générés étendent `Item` (type local au bridge).
 
-## `meridiane models`
+## `meridiane build`
 
-Génère des interfaces TypeScript depuis une spec OpenAPI (URL http(s) ou fichier JSON).
-La commande écrit un fichier par modèle et un `index.ts` optionnel.
-
-Usage :
-
-```bash
-meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=<path>] [--required-mode=all-optional|spec] [--preset=all|native] [--include=<substr>] [--exclude=<substr>] [--index=1|0]
-```
-
-Points clés :
-
-- `--out` est relatif au CWD
-- `--required-mode=spec` respecte `required` dans la spec
-- `--preset=native` retire les schémas “techniques” (Hydra*, jsonMergePatch…)
-- `--include/--exclude` filtrent les schémas (sur leurs noms OpenAPI)
-- `--index=1` (défaut) génère `index.ts` ; `--index=0` le désactive
-
-## `meridiane dev-bridge`
-
-Commande “confort dev” : génère la lib et les modèles en une seule commande, en allant chercher la spec OpenAPI sur un backend (localhost par défaut).
-
-Usage :
+Commande CI/CD : génère le bridge, build la lib Angular, puis produit un artefact npm (`npm pack`).
 
 ```bash
-meridiane dev-bridge <lib-name> <npm-package-name> [version] [--workspace=<dir>] [--backend=<url>] [--spec=<path|url>] [--models-out=<dir>] [--no-models]
+meridiane build <packageName> --version <semver> --spec <url|file> [--preset[=native|all]] [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 ```
 
-## `meridiane sandbox-bridge`
+La commande écrit principalement :
 
-Commande “confort dev” dédiée à ce repo : met à jour **directement** le bridge utilisé par le sandbox (`apps/sandbox/projects/bridge-sandbox`) et (optionnellement) les models.
-
-Usage :
-
-```bash
-meridiane sandbox-bridge [--backend=http://localhost:8000] [--spec=/api/docs.json] [--no-models]
-```
-
-Note : `sandbox-bridge` est surtout utile dans ce repo (Meridiane) car il cible `apps/sandbox` par défaut.
+- `projects/<libName>` (sources du bridge)
+- `dist/<libName>` (sortie `ng build`)
+- un `.tgz` via `npm pack` (dans `dist/<libName>`)
 
 ## Debug
 
 Le flag `--debug` active des logs supplémentaires côté CLI.
-Il est équivalent à `MERIDIANE_DEBUG=1`.

@@ -25,23 +25,15 @@ Dans le repo qui va publier votre bridge (workspace Angular avec `angular.json`)
 # 1) Installer le CLI
 npm install -D @obsidiane/meridiane
 
-# 2) (Recommandé) Générer la config + snippets
-npx meridiane init
+# 2) Générer le bridge + models (dev)
+# (à exécuter depuis la racine du workspace Angular)
+npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --preset=native
 
-# 3) Générer la lib bridge (une fois)
-npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0
-
-# 4) Générer les models (à relancer quand le backend change)
-npx meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
-
-# (Optionnel) Dev: lib + models en une commande (localhost par défaut)
-npx meridiane dev-bridge backend-bridge @acme/backend-bridge 0.1.0
-
-# 5) Builder la lib
-npx ng build backend-bridge
+# 3) Build CI/CD (génère + build + npm pack)
+npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json --preset=native
 ```
 
-La lib générée peut ensuite être publiée (`dist/backend-bridge`) et consommée dans vos apps Angular via `npm i @acme/backend-bridge`.
+Le build produit `dist/<libName>` et un `.tgz` via `npm pack` (prêt à publier).
 
 ---
 
@@ -63,7 +55,7 @@ Deux rôles :
 packages/
   meridiane/                    # Paquet publié (@obsidiane/meridiane)
     cli.js                      # Entrypoint CLI
-    tools/                      # Générateurs (lib + models)
+    tools/                      # Génération (dev/build)
     templates/_lib_template/     # Template de librairie Angular (bridge)
 apps/
   sandbox/                      # App Angular de dev (non publiée)
@@ -90,7 +82,6 @@ apps/
 - Fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
 - API publique du bridge : `docs/fonctionnalites/api-publique.md`
 - CLI Meridiane : `docs/utilisation/cli.md`
-- Configuration : `docs/utilisation/configuration.md`
 - Tutoriel CI/CD : `docs/utilisation/tutoriel-ci-cd.md`
 - Tutoriel local : `docs/utilisation/tutoriel-local.md`
 - FAQ : `docs/fonctionnalites/faq.md`

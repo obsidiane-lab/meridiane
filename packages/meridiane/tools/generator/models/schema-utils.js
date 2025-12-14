@@ -1,16 +1,5 @@
-/** Hydra base schemas to ignore in merges and filtering */
-const DEFAULT_HYDRA_BASE_RE = /^Hydra(?:Item|Collection)BaseSchema$/;
-
-/**
- * Récupère la RegExp Hydra à partir d'une config optionnelle.
- * @param {{ hydraBaseRegex?: RegExp|string }} [cfg]
- */
-function hydraRe(cfg) {
-  const r = cfg?.hydraBaseRegex;
-  if (!r) return DEFAULT_HYDRA_BASE_RE;
-  if (r instanceof RegExp) return r;
-  try { return new RegExp(r); } catch { return DEFAULT_HYDRA_BASE_RE; }
-}
+/** Hydra base schemas to ignore in safe `allOf` merges */
+const HYDRA_BASE_RE = /^Hydra(?:Item|Collection)BaseSchema$/;
 
 /**
  * Détermine si une valeur est un objet simple (non tableau)
@@ -37,12 +26,12 @@ export function schemaNameFromRef($ref) {
  * @param {any[]} schemas
  * @returns {any|null}
  */
-export function mergeAllOf(schemas, cfg) {
+export function mergeAllOf(schemas) {
   const out = {type: 'object', properties: {}, required: []};
   for (const s of schemas) {
     if (s.$ref) {
       const ref = schemaNameFromRef(s.$ref);
-      if (hydraRe(cfg).test(ref)) {
+      if (HYDRA_BASE_RE.test(ref)) {
         continue;
       }
       return null;
@@ -59,69 +48,13 @@ export function mergeAllOf(schemas, cfg) {
 }
 
 /**
- * Filtre et déduplique les noms de schémas à générer.
- * Préférence entre variantes: jsonld > none > jsonapi.
- * - Exclut HydraItem/Collection base schemas
- * - Garde les noms groupés (avec `-`) en choisissant la meilleure variante
- * - Garde les racines sans point et sans suffixe jsonld/jsonapi
+ * Liste les noms de schémas dans `components.schemas`.
+ * La sélection/filtres est gérée par `applySchemaNameFilters`.
  * @param {Record<string, any>} schemas
  * @returns {string[]}
  */
 export function filterSchemaNames(schemas, cfg) {
-  const prefer = (cfg?.preferFlavor === 'jsonapi') ? ['jsonapi','none','jsonld']
-               : (cfg?.preferFlavor === 'none') ? ['none','jsonld','jsonapi']
-               : ['jsonld','none','jsonapi']; // default jsonld
-  const flavorOf = (name) => /\.jsonld\b/i.test(name) ? 'jsonld' : /\.jsonapi\b/i.test(name) ? 'jsonapi' : 'none';
-  const rank = (name) => 3 - prefer.indexOf(flavorOf(name));
-
-  const roots = [];
-  const grouped = new Map();
-  const variantsNoGroup = new Map(); // base -> best variant (no '-')
-
-  for (const n of Object.keys(schemas)) {
-    if (hydraRe(cfg).test(n)) continue;
-
-    const hasGroup = n.includes('-');
-    const hasDot = n.includes('.');
-    const isJsonFlavor = /\.jsonld\b|\.jsonapi\b/i.test(n);
-
-    if (!hasGroup) {
-      // Cas 1: racine simple (pas de point, pas de variante jsonld/jsonapi)
-      if (!hasDot && !isJsonFlavor) {
-        roots.push(n);
-        continue;
-      }
-      // Cas 2: variante jsonld/jsonapi sans groupe (ex: Workflow.WorkflowInput.jsonld ou Foo.jsonld)
-      if (isJsonFlavor) {
-        const base = n.replace(/\.(jsonld|jsonapi)\b/i, '');
-        // Si une base "pure" existe dans la spec, on préfère l’ignorer pour éviter les doublons
-        if (Object.prototype.hasOwnProperty.call(schemas, base)) {
-          continue;
-        }
-        const curr = variantsNoGroup.get(base);
-        if (!curr || rank(n) > rank(curr)) variantsNoGroup.set(base, n);
-        continue;
-      }
-      // Cas 3: nom avec point mais sans suffixe jsonld/jsonapi et sans group — on le considère tel quel
-      variantsNoGroup.set(n, n);
-      continue;
-    }
-
-    const m = n.match(/^(.*?)(?:\.(?:jsonld|jsonapi))?-(.+)$/i);
-    if (!m) {
-      const curr = grouped.get(n);
-      if (!curr || rank(n) > rank(curr)) grouped.set(n, n);
-      continue;
-    }
-    const base = m[1];
-    const group = m[2];
-    const key = `${base}|${group}`;
-    const curr = grouped.get(key);
-    if (!curr || rank(n) > rank(curr)) grouped.set(key, n);
-  }
-  // Ajoute les variantes sans groupe sélectionnées
-  const noGroupSelected = [...variantsNoGroup.values()];
-  return [...roots, ...[...grouped.values()], ...noGroupSelected].sort((a, b) => a.localeCompare(b));
+  return Object.keys(schemas).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -167,18 +100,44 @@ export function applySchemaNameFilters(schemaNames, cfg) {
   /** @type {Array<RegExp|string|((name: string) => boolean)>} */
   const exclude = Array.isArray(cfg?.excludeSchemaNames) ? [...cfg.excludeSchemaNames] : [];
 
-  if (preset === 'native') {
-    exclude.push(/^Hydra/i);
-    exclude.push(/jsonMergePatch/i);
-    exclude.push(/\.jsonld\b/i);
-    exclude.push(/\.jsonapi\b/i);
-  }
-
+  // 1) include/exclude user filters (always applied first)
   const hasInclude = include.length > 0;
-
-  return schemaNames.filter((name) => {
+  let out = schemaNames.filter((name) => {
     if (hasInclude && !include.some((r) => matchesRule(name, r))) return false;
     if (exclude.some((r) => matchesRule(name, r))) return false;
     return true;
   });
+
+  // 2) preset filters
+  if (preset === 'native') {
+    out = out
+      .filter((n) => !/^Hydra/i.test(n))
+      .filter((n) => !/jsonMergePatch/i.test(n))
+      .filter((n) => !/\.jsonld\b/i.test(n))
+      .filter((n) => !/\.jsonapi\b/i.test(n));
+
+    // 3) collapse group variants: keep one schema per base (before `-`)
+    const score = (name) => {
+      if (!name.includes('-')) return 100;
+      const group = name.split('-').slice(1).join('-');
+      if (/(^|[.\-])read($|[.\-])/i.test(group)) return 50;
+      return 0;
+    };
+    const byBase = new Map();
+    for (const name of out) {
+      const base = name.split('-')[0];
+      const prev = byBase.get(base);
+      if (!prev) {
+        byBase.set(base, name);
+        continue;
+      }
+      const a = prev, b = name;
+      const sa = score(a), sb = score(b);
+      if (sb > sa) byBase.set(base, b);
+      else if (sb === sa && b.localeCompare(a) < 0) byBase.set(base, b);
+    }
+    out = [...byBase.values()].sort((a, b) => a.localeCompare(b));
+  }
+
+  return out;
 }

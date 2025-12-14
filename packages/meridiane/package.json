@@ -14,21 +14,19 @@
     "pack:check": "npm_config_cache=./.npm-cache npm pack --dry-run"
   },
   "bin": {
-    "meridiane": "cli.js",
-    "meridiane-generate-lib": "tools/generate-lib.js",
-    "meridiane-generate-models": "tools/generate-models.js"
+    "meridiane": "cli.js"
   },
   "files": [
     "cli.js",
     "tools/**",
     "templates/**",
-    "models.config.example.js",
     "README.md"
   ],
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "commander": "^14.0.2",
     "handlebars": "^4.7.8",
     "tslib": "^2.3.0"
   }

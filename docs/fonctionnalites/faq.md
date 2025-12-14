@@ -19,7 +19,7 @@ Dans un workspace “app-only”, il faut généralement l’ajouter en devDepen
 
 ## Comment activer les logs ?
 
-Le CLI : `meridiane --debug ...` (ou `MERIDIANE_DEBUG=1`).  
+Le CLI : `meridiane --debug ...`.  
 Le runtime Angular : `provideBridge({ debug: true })`.
 
 ## Le bridge supporte-t-il SSR ?

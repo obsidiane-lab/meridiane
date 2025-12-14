@@ -1,13 +1,11 @@
 import { sanitizeTypeName, quoteKeyIfNeeded } from './utils.js';
 import { filterSchemaNames, applySchemaNameFilters, mergeAllOf, isObject } from './schema-utils.js';
-import { friendlyName } from './naming.js';
+import { schemaLabel } from './naming.js';
 import { tsTypeOf, withNullable } from './type-resolver.js';
 
 /**
  * @typedef {{
  *   requiredMode?: 'all-optional'|'spec',
- *   preferFlavor?: 'jsonld'|'jsonapi'|'none',
- *   hydraBaseRegex?: RegExp|string,
  *   preset?: 'all'|'native',
  *   includeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
  *   excludeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
@@ -18,40 +16,37 @@ import { tsTypeOf, withNullable } from './type-resolver.js';
  * Construit une map originalName -> sanitizedName, en assurant l’unicité
  * @param {string[]} schemaNames
  */
-function buildNameMap(schemaNames) {
-  const parse = (original) => {
-    const m = original.match(/^(.*?)(?:\.(?:jsonld|jsonapi))?-(.+)$/i);
-    return m ? { base: m[1], group: m[2] } : { base: original, group: null };
-  };
+function normalizeNativeBase(original) {
+  return String(original)
+    .replace(/\.jsonld\b/ig, '')
+    .replace(/\.jsonapi\b/ig, '')
+    .replace(/\.jsonmergepatch\b/ig, '')
+    .split('-')[0];
+}
 
-  const parsed = schemaNames.map((n) => ({ name: n, ...parse(n) }));
-  const roots = parsed.filter((p) => !p.group);
-  const grouped = parsed.filter((p) => !!p.group);
-
-  // Root sanitized names (to avoid collisions when dropping group)
-  const rootSanitized = new Set(roots.map((p) => sanitizeTypeName(p.base, new Set())));
-
-  // Count base candidates among grouped to see if unique
-  const baseCount = new Map();
-  for (const p of grouped) {
-    const cand = sanitizeTypeName(p.base, new Set());
-    baseCount.set(cand, (baseCount.get(cand) || 0) + 1);
-  }
-
-  // Build final map with uniqueness
+function buildNameMap(schemaNames, schemas, preset) {
+  // Build final map with uniqueness (deterministic order)
   const used = new Set();
   const nameMap = new Map();
-  for (const p of parsed) {
-    let label;
-    if (p.group) {
-      const cand = sanitizeTypeName(p.base, new Set());
-      const isUniqueBase = (baseCount.get(cand) === 1) && !rootSanitized.has(cand);
-      label = isUniqueBase ? p.base : friendlyName(p.name);
-    } else {
-      label = friendlyName(p.name);
-    }
-    nameMap.set(p.name, sanitizeTypeName(label, used));
+  for (const original of schemaNames) {
+    const label = schemaLabel(original, {preset});
+    nameMap.set(original, sanitizeTypeName(label, used));
   }
+
+  // In native mode, alias excluded variants to the selected base type
+  // so `$ref` doesn't leak "User-user.write" etc into generated types.
+  if (preset === 'native') {
+    const baseToSanitized = new Map();
+    for (const original of schemaNames) {
+      baseToSanitized.set(normalizeNativeBase(original), nameMap.get(original));
+    }
+    for (const original of Object.keys(schemas)) {
+      const base = normalizeNativeBase(original);
+      const sanitized = baseToSanitized.get(base);
+      if (sanitized) nameMap.set(original, sanitized);
+    }
+  }
+
   return nameMap;
 }
 
@@ -65,7 +60,8 @@ export function buildModelsFromOpenAPI(spec, options) {
   const opts = { requiredMode: 'all-optional', ...(options || {}) };
   const schemas = spec?.components?.schemas || {};
   const schemaNames = applySchemaNameFilters(filterSchemaNames(schemas, opts), opts);
-  const nameMap = buildNameMap(schemaNames);
+  const preset = opts.preset ?? 'all';
+  const nameMap = buildNameMap(schemaNames, schemas, preset);
   const allSanitizedNames = new Set([...nameMap.values()]);
 
   /** @type {ModelDefinition[]} */
@@ -75,7 +71,7 @@ export function buildModelsFromOpenAPI(spec, options) {
     const raw = schemas[originalName];
     let effective = raw;
     if (raw?.allOf) {
-      const merged = mergeAllOf(raw.allOf, opts);
+      const merged = mergeAllOf(raw.allOf);
       if (merged) effective = merged;
     }
 

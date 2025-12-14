@@ -1,76 +1,64 @@
 #!/usr/bin/env node
-import {fileURLToPath} from 'node:url';
-import path from 'node:path';
-import {spawn} from 'node:child_process';
+import process from 'node:process';
+import { Command } from 'commander';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { runDev } from './tools/dev.js';
+import { runBuild } from './tools/build.js';
 
-function runTool(scriptName, args) {
-  const scriptPath = path.join(__dirname, 'tools', scriptName);
-  const child = spawn(process.execPath, [scriptPath, ...args], {
-    stdio: 'inherit',
-    env: process.env,
-  });
+const program = new Command();
 
-  child.on('exit', (code) => {
-    process.exit(code ?? 0);
-  });
+program
+  .name('meridiane')
+  .description('Generate an Angular bridge + models from an API Platform OpenAPI spec.')
+  .showHelpAfterError()
+  .showSuggestionAfterError();
+
+function presetParser(value, previous) {
+  if (value === undefined && previous === undefined) return true; // `--preset` (no value) => native
+  return value ?? previous;
 }
 
-function printHelp() {
-  console.log(`
-Usage:
-  meridiane init [--force]
-  meridiane lib <lib-name> <npm-package-name> [version] [url-registry]
-  meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [options]
-  meridiane dev-bridge <lib-name> <npm-package-name> [version] [options]
-  meridiane sandbox-bridge [options]
-
-Options:
-  --debug  Active les logs (CLI et runtime)
-
-Examples:
-  npx -y @obsidiane/meridiane init
-  npx -y @obsidiane/meridiane lib backend-bridge @acme/backend-bridge 0.1.0
-  npx -y @obsidiane/meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
-  npx -y @obsidiane/meridiane dev-bridge bridge-sandbox @obsidiane/bridge-sandbox 0.1.0
-  npx -y @obsidiane/meridiane sandbox-bridge
-`);
+function collect(value, previous = []) {
+  return [...previous, value];
 }
 
-const argv = process.argv.slice(2);
-const debugIndex = argv.indexOf('--debug');
-if (debugIndex >= 0) {
-  argv.splice(debugIndex, 1);
-  process.env.MERIDIANE_DEBUG = process.env.MERIDIANE_DEBUG || '1';
+function commonOptions(cmd) {
+  return cmd
+    .option('--spec <urlOrFile>', 'OpenAPI spec source (URL or local JSON file)')
+    .option('--preset [mode]', 'Preset: native|all (default: all; `--preset` alone => native)', presetParser)
+    .option('--include <substr>', 'Include schema names containing substring (repeatable, supports commas)', collect, [])
+    .option('--exclude <substr>', 'Exclude schema names containing substring (repeatable, supports commas)', collect, [])
+    .option('--no-models', 'Skip models generation (then --spec is not required)')
+    .option('--debug', 'Enable debug logs');
 }
 
-const [cmd, ...rest] = argv;
+commonOptions(
+  program
+    .command('dev')
+    .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
+    .action(async (packageName, opts) => {
+      try {
+        await runDev(packageName, opts);
+      } catch (err) {
+        console.error(err?.message ?? err);
+        process.exit(1);
+      }
+    })
+);
 
-switch (cmd) {
-  case 'init':
-    runTool('init.js', rest);
-    break;
-  case 'lib':
-    runTool('generate-lib.js', rest);
-    break;
-  case 'models':
-    runTool('generate-models.js', rest);
-    break;
-  case 'dev-bridge':
-    runTool('dev-bridge.js', rest);
-    break;
-  case 'sandbox-bridge':
-    runTool('sandbox-bridge.js', rest);
-    break;
-  case '-h':
-  case '--help':
-  case undefined:
-    printHelp();
-    break;
-  default:
-    console.error(`Unknown command: ${cmd}`);
-    printHelp();
-    process.exit(1);
-}
+commonOptions(
+  program
+    .command('build')
+    .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
+    .requiredOption('--version <semver>', 'Version to write in the generated bridge package.json (CI/CD)')
+    .action(async (packageName, opts) => {
+      try {
+        await runBuild(packageName, opts);
+      } catch (err) {
+        console.error(err?.message ?? err);
+        process.exit(1);
+      }
+    })
+);
+
+program.parse(process.argv);

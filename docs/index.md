@@ -15,7 +15,6 @@ Ici, la doc reste volontairement centrée sur la **présentation des fonctionnal
 - Lire les fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
 - Voir l’API publique à consommer côté Angular : `docs/fonctionnalites/api-publique.md`
 - Comprendre le CLI (ce que chaque commande génère) : `docs/utilisation/cli.md`
-- Comprendre la configuration (`models.config.js`, `.env`, debug) : `docs/utilisation/configuration.md`
 - Utiliser le sandbox de ce repo (Angular + bridge régénéré) : `docs/utilisation/sandbox.md`
 
 ## Tutoriels
