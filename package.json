@@ -6,9 +6,9 @@
     "apps/*"
   ],
   "scripts": {
-    "sandbox:regen": "npm -w apps/sandbox run regen",
+    "sandbox:regen": "npm -w apps/sandbox run bridge:template",
+    "sandbox:bridge": "node packages/meridiane/cli.js sandbox-bridge",
     "sandbox:build": "npm -w apps/sandbox run build",
     "sandbox:dev": "npm -w apps/sandbox run dev"
   }
 }
-

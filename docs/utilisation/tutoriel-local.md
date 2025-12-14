@@ -33,6 +33,12 @@ npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0
 npx meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models --required-mode=spec
 ```
 
+## Variante (dev) : lib + modèles en une commande
+
+```bash
+npx meridiane dev-bridge backend-bridge @acme/backend-bridge 0.1.0 --backend=http://localhost:8000
+```
+
 ## Builder la lib
 
 ```bash

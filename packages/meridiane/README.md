@@ -27,6 +27,12 @@ npx meridiane lib <lib-name> <npm-package-name> [version] [url-registry]
 
 # Générer des modèles depuis OpenAPI
 npx meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [--out=<dir>] [--item-import=../lib/ports/resource-repository.port] [--required-mode=all-optional|spec] [--no-index]
+
+# Dev: regen lib + models depuis un backend (localhost par défaut)
+npx meridiane dev-bridge <lib-name> <npm-package-name> [version]
+
+# Dev (repo meridiane): met à jour le bridge du sandbox
+npx meridiane sandbox-bridge
 ```
 
 Options :

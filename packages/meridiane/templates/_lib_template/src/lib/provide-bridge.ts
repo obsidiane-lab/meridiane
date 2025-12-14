@@ -5,13 +5,11 @@ import {
   BRIDGE_DEBUG,
   BRIDGE_DEFAULTS,
   BRIDGE_LOGGER,
-  BridgeDefaults,
-  BridgeLogger,
-  MercureTopicMode,
   MERCURE_CONFIG,
   MERCURE_HUB_URL,
   MERCURE_TOPIC_MODE,
 } from './tokens';
+import {BridgeDefaults, BridgeLogger, MercureTopicMode} from './bridge.types';
 import {contentTypeInterceptor} from './interceptors/content-type.interceptor';
 import {bridgeDefaultsInterceptor} from './interceptors/bridge-defaults.interceptor';
 import {bridgeDebugInterceptor} from './interceptors/bridge-debug.interceptor';

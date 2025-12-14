@@ -24,6 +24,8 @@ Usage:
   meridiane init [--force]
   meridiane lib <lib-name> <npm-package-name> [version] [url-registry]
   meridiane models <SPEC_OPENAPI_URL_OU_FICHIER_JSON> [options]
+  meridiane dev-bridge <lib-name> <npm-package-name> [version] [options]
+  meridiane sandbox-bridge [options]
 
 Options:
   --debug  Active les logs (CLI et runtime)
@@ -32,6 +34,8 @@ Examples:
   npx -y @obsidiane/meridiane init
   npx -y @obsidiane/meridiane lib backend-bridge @acme/backend-bridge 0.1.0
   npx -y @obsidiane/meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
+  npx -y @obsidiane/meridiane dev-bridge bridge-sandbox @obsidiane/bridge-sandbox 0.1.0
+  npx -y @obsidiane/meridiane sandbox-bridge
 `);
 }
 
@@ -53,6 +57,12 @@ switch (cmd) {
     break;
   case 'models':
     runTool('generate-models.js', rest);
+    break;
+  case 'dev-bridge':
+    runTool('dev-bridge.js', rest);
+    break;
+  case 'sandbox-bridge':
+    runTool('sandbox-bridge.js', rest);
     break;
   case '-h':
   case '--help':

@@ -32,6 +32,10 @@ Variables utiles :
 - `MERIDIANE_MODELS_REQUIRED_MODE=spec`
 - `MERIDIANE_MODELS_ITEM_IMPORT=../lib/ports/resource-repository.port`
 - `MERIDIANE_MODELS_NO_INDEX=1`
+- `MERIDIANE_DEV_BACKEND=http://localhost:8000` (pour `dev-bridge`)
+- `MERIDIANE_DEV_SPEC=/api/docs.json` (pour `dev-bridge`)
+- `MERIDIANE_DEV_WORKSPACE=apps/sandbox` (pour `dev-bridge`)
+- `MERIDIANE_SANDBOX_BRIDGE_VERSION=0.1.0` (pour `sandbox-bridge`)
 
 ## Ordre de priorité
 

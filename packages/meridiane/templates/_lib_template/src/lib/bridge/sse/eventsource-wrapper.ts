@@ -1,6 +1,6 @@
 import {ReplaySubject, Subject} from 'rxjs';
 import {SseEvent, SseOptions, RealtimeStatus} from '../../ports/realtime.port';
-import {BridgeLogger} from '../../tokens';
+import {BridgeLogger} from '../../bridge.types';
 
 export class EventSourceWrapper {
   private es?: EventSource;

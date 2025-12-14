@@ -57,6 +57,28 @@ Points clés :
 - `--required-mode=spec` respecte `required` dans la spec
 - `--no-index` évite la génération de `index.ts`
 
+## `meridiane dev-bridge`
+
+Commande “confort dev” : génère la lib et les modèles en une seule commande, en allant chercher la spec OpenAPI sur un backend (localhost par défaut).
+
+Usage :
+
+```bash
+meridiane dev-bridge <lib-name> <npm-package-name> [version] [--workspace=<dir>] [--backend=<url>] [--spec=<path|url>] [--models-out=<dir>] [--no-models]
+```
+
+## `meridiane sandbox-bridge`
+
+Commande “confort dev” dédiée à ce repo : met à jour **directement** le bridge utilisé par le sandbox (`apps/sandbox/projects/bridge-sandbox`) et (optionnellement) les models.
+
+Usage :
+
+```bash
+meridiane sandbox-bridge [--backend=http://localhost:8000] [--spec=/api/docs.json] [--no-models]
+```
+
+Note : `sandbox-bridge` est surtout utile dans ce repo (Meridiane) car il cible `apps/sandbox` par défaut.
+
 ## Debug
 
 Le flag `--debug` active des logs supplémentaires côté CLI.

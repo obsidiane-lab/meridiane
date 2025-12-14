@@ -1,4 +1,4 @@
-import {MercureTopicMode} from '../../tokens';
+import {MercureTopicMode} from '../../bridge.types';
 
 export class MercureTopicMapper {
   private readonly apiBaseUrl: URL;
@@ -46,4 +46,3 @@ export class MercureTopicMapper {
     }
   }
 }
-

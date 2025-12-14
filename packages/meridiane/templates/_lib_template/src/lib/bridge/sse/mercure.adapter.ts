@@ -1,7 +1,8 @@
 import {Inject, Injectable, OnDestroy, Optional, PLATFORM_ID} from '@angular/core';
 import {BehaviorSubject, defer, EMPTY, fromEvent, Observable, of, Subject} from 'rxjs';
 import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
-import {API_BASE_URL, BRIDGE_LOGGER, BridgeLogger, MERCURE_CONFIG, MERCURE_HUB_URL, MERCURE_TOPIC_MODE, MercureTopicMode} from '../../tokens';
+import {API_BASE_URL, BRIDGE_LOGGER, MERCURE_CONFIG, MERCURE_HUB_URL, MERCURE_TOPIC_MODE} from '../../tokens';
+import {BridgeLogger, MercureTopicMode} from '../../bridge.types';
 import {RealtimeEvent, RealtimePort, RealtimeStatus} from '../../ports/realtime.port';
 import {EventSourceWrapper} from './eventsource-wrapper';
 import {Item} from "../../ports/resource-repository.port";

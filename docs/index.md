@@ -10,12 +10,13 @@ Ici, la doc reste volontairement centrée sur la **présentation des fonctionnal
 
 ## Je veux…
 
-- Comprendre ce qu’est un bridge et ce qu’il contient : `docs/creation/creer-un-bridge.md`
+- Comprendre ce qu’est un bridge et ce qu’il contient : `docs/creer-un-bridge.md`
 - Lire les fonctionnalités HTTP (API Platform/Hydra) : `docs/fonctionnalites/fonctionnalites-http.md`
 - Lire les fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
 - Voir l’API publique à consommer côté Angular : `docs/fonctionnalites/api-publique.md`
 - Comprendre le CLI (ce que chaque commande génère) : `docs/utilisation/cli.md`
 - Comprendre la configuration (`models.config.js`, `.env`, debug) : `docs/utilisation/configuration.md`
+- Utiliser le sandbox de ce repo (Angular + bridge régénéré) : `docs/utilisation/sandbox.md`
 
 ## Tutoriels
 
@@ -24,4 +25,4 @@ Ici, la doc reste volontairement centrée sur la **présentation des fonctionnal
 
 ## Dépannage
 
-- FAQ / limites : `docs/utilisation/faq.md`
+- FAQ / limites : `docs/fonctionnalites/faq.md`

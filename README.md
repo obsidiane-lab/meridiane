@@ -34,6 +34,9 @@ npx meridiane lib backend-bridge @acme/backend-bridge 0.1.0
 # 4) Générer les models (à relancer quand le backend change)
 npx meridiane models http://localhost:8000/api/docs.json --out=projects/backend-bridge/src/models
 
+# (Optionnel) Dev: lib + models en une commande (localhost par défaut)
+npx meridiane dev-bridge backend-bridge @acme/backend-bridge 0.1.0
+
 # 5) Builder la lib
 npx ng build backend-bridge
 ```
@@ -82,7 +85,7 @@ apps/
 ## 📚 Documentation
 
 - Index : `docs/index.md`
-- Créer un bridge : `docs/creation/creer-un-bridge.md`
+- Créer un bridge : `docs/creer-un-bridge.md`
 - Fonctionnalités HTTP : `docs/fonctionnalites/fonctionnalites-http.md`
 - Fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
 - API publique du bridge : `docs/fonctionnalites/api-publique.md`
@@ -90,4 +93,4 @@ apps/
 - Configuration : `docs/utilisation/configuration.md`
 - Tutoriel CI/CD : `docs/utilisation/tutoriel-ci-cd.md`
 - Tutoriel local : `docs/utilisation/tutoriel-local.md`
-- FAQ : `docs/utilisation/faq.md`
+- FAQ : `docs/fonctionnalites/faq.md`
