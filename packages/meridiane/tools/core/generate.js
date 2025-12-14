@@ -95,14 +95,7 @@ async function generateLibrary({ cwd, libName, packageName, version, debug }) {
   const tplDir = path.resolve(pkgRoot, 'templates/_lib_template');
   const targetDir = path.resolve(cwd, 'projects', libName);
 
-  if (debug) {
-    console.log('[meridiane] generate lib', {
-      libName,
-      packageName,
-      version,
-      targetDir: path.relative(cwd, targetDir),
-    });
-  }
+  if (debug) console.log('[meridiane] generate lib', { libName, packageName, version, targetDir: path.relative(cwd, targetDir) });
 
   await fs.rm(targetDir, { recursive: true, force: true });
   await fs.mkdir(targetDir, { recursive: true });
@@ -126,15 +119,7 @@ async function generateModels({ cwd, libName, spec, requiredMode, preset, includ
   const outDir = path.resolve(cwd, 'projects', libName, 'src', 'models');
   const templatesDir = path.resolve(pkgRoot, 'tools', 'generator', 'models', 'templates');
 
-  if (debug) {
-    console.log('[meridiane] generate models', {
-      outDir: path.relative(cwd, outDir),
-      requiredMode,
-      preset,
-      includeCount: include.length,
-      excludeCount: exclude.length,
-    });
-  }
+  if (debug) console.log('[meridiane] generate models', { outDir: path.relative(cwd, outDir), requiredMode, preset, includeCount: include.length, excludeCount: exclude.length });
 
   await ensureCleanDir(outDir);
 
@@ -180,6 +165,7 @@ async function generateModels({ cwd, libName, spec, requiredMode, preset, includ
  *   include: string[],
  *   exclude: string[],
  *   debug: boolean,
+ *   log?: { step?: (msg: string) => void, info?: (msg: string) => void, success?: (msg: string) => void, debug?: (msg: string, data?: any) => void },
  * }} params
  */
 export async function generateBridgeWorkspace(params) {
@@ -195,15 +181,20 @@ export async function generateBridgeWorkspace(params) {
     include,
     exclude,
     debug,
+    log,
   } = params;
 
+  log?.step?.(`génération de la librairie (projects/${libName})`);
   await generateLibrary({ cwd, libName, packageName, version, debug });
 
   if (noModels) {
+    log?.info?.('models ignorés (--no-models)');
     if (debug) console.log('[meridiane] --no-models enabled, skipping models generation');
     return;
   }
 
   if (!spec) throw new Error('Internal error: spec is required when noModels=false');
+  log?.step?.('génération des models (OpenAPI)');
   await generateModels({ cwd, libName, spec, requiredMode, preset, include, exclude, debug });
+  log?.success?.('génération terminée');
 }

@@ -19,17 +19,19 @@ Commande “dev” (contacte le backend et régénère la lib + les models) :
 npm run sandbox:bridge
 ```
 
-Par défaut, la commande utilise `meridiane dev` dans `apps/sandbox` et récupère la spec OpenAPI sur `http://localhost:8000/api/docs.json`.
-Dans ce repo, on utilise `--preset=native` pour éviter de générer des schémas “techniques” (ex: `jsonMergePatch`).
+Dans ce repo, `meridiane dev` est préconfigurée pour mettre à jour `projects/bridge-sandbox` :
+- `packageName` par défaut : `@obsidiane/bridge-sandbox`
+- `--spec` par défaut : `http://localhost:8000/api/docs.json`
+- `--preset` par défaut : `native` (évite de générer des schémas “techniques”, ex: `jsonMergePatch`)
 
 Exemples (depuis `apps/sandbox`) :
 
 ```bash
-# Bridge + models depuis le backend local
-node ../../packages/meridiane/cli.js dev @obsidiane/bridge-sandbox --spec http://localhost:8000/api/docs.json --preset=native
+# Bridge + models depuis le backend local (valeurs par défaut)
+node ../../packages/meridiane/cli.js dev
 
 # Bridge uniquement (pas besoin de backend)
-node ../../packages/meridiane/cli.js dev @obsidiane/bridge-sandbox --no-models
+node ../../packages/meridiane/cli.js dev --no-models
 ```
 
 ## Lancer le sandbox

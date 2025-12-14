@@ -4,6 +4,7 @@ import { Command } from 'commander';
 
 import { runDev } from './tools/dev.js';
 import { runBuild } from './tools/build.js';
+import { createLogger } from './tools/core/logger.js';
 
 const program = new Command();
 
@@ -35,12 +36,16 @@ function commonOptions(cmd) {
 commonOptions(
   program
     .command('dev')
-    .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
+    .argument(
+      '[packageName]',
+      'NPM package name of the generated bridge (e.g. @acme/backend-bridge). Optional in this repo (defaults to @obsidiane/bridge-sandbox).'
+    )
     .action(async (packageName, opts) => {
+      const log = createLogger({ debug: !!opts?.debug });
       try {
         await runDev(packageName, opts);
       } catch (err) {
-        console.error(err?.message ?? err);
+        log.error(err);
         process.exit(1);
       }
     })
@@ -52,10 +57,11 @@ commonOptions(
     .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
     .requiredOption('--version <semver>', 'Version to write in the generated bridge package.json (CI/CD)')
     .action(async (packageName, opts) => {
+      const log = createLogger({ debug: !!opts?.debug });
       try {
         await runBuild(packageName, opts);
       } catch (err) {
-        console.error(err?.message ?? err);
+        log.error(err);
         process.exit(1);
       }
     })
