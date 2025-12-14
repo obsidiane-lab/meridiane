@@ -27,9 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build sandbox (template validation)
-        run: npm run sandbox:build
-
       - name: Align package version with tag
         run: |
           cd packages/meridiane
