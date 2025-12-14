@@ -1,7 +1,5 @@
 # Fonctionnalités HTTP (API Platform / Hydra)
 
-Cette page fait partie des docs de fonctionnalités.
-
 Le bridge fournit une base HTTP qui colle aux conventions courantes d’API Platform, tout en restant extensible.
 L’objectif est de réduire le “boilerplate” dans les apps Angular, et de rendre les requêtes plus cohérentes (headers, credentials, timeouts, retries).
 
@@ -31,4 +29,4 @@ Le runtime expose des abstractions simples :
 - un repository REST pour les opérations CRUD et les requêtes génériques
 - une factory de facades pour instancier une façade par ressource (`/api/conversations`, etc.)
 
-L’intention est d’avoir un point d’entrée cohérent (list/get/create/update/delete + request) plutôt que des appels HTTP dispersés.
+But : un point d’entrée cohérent (list/get/create/update/delete + request) plutôt que des appels HTTP dispersés.

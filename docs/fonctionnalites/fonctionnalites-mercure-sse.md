@@ -1,7 +1,5 @@
 # Fonctionnalités Mercure / SSE
 
-Cette page fait partie des docs de fonctionnalités.
-
 Le bridge propose une intégration Mercure/SSE conçue pour les apps Angular :
 une seule connexion EventSource, une gestion de topics robuste, et une API simple côté facade.
 
@@ -20,8 +18,7 @@ L’objectif est de limiter les “trous” lors des reconnections.
 
 ## Activation optionnelle
 
-Mercure est optionnel.
-Sans `hubUrl`, le bridge désactive simplement la partie realtime, sans impacter les appels HTTP.
+Mercure est optionnel : sans `hubUrl`, le realtime est désactivé (les appels HTTP continuent).
 
 ## Canonicalisation des topics (éviter les doublons)
 

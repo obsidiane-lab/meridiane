@@ -8,7 +8,7 @@
 
 ## ✨ Ce que fait Meridiane
 
-- Génère une **lib Angular** (dans `projects/<lib-name>`) à partir d’un template embarqué.
+- Génère une **lib Angular** (bridge) à partir d’un template embarqué.
 - Génère des **models TypeScript** depuis une **spec OpenAPI** (API Platform).
 - Fournit des helpers runtime :
   - REST (API Platform / Hydra) ;
@@ -79,7 +79,7 @@ apps/
 ## 📚 Documentation
 
 - Index : `docs/index.md`
-- Créer un bridge : `docs/creer-un-bridge.md`
+- Créer un bridge (workflow CI/CD) : `docs/creer-un-bridge.md`
 - Fonctionnalités HTTP : `docs/fonctionnalites/fonctionnalites-http.md`
 - Fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
 - API publique du bridge : `docs/fonctionnalites/api-publique.md`

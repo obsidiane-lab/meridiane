@@ -2,7 +2,7 @@
 
 CLI pour générer une librairie Angular “bridge” (Symfony / API Platform / Mercure) et générer des modèles TypeScript depuis une spec OpenAPI.
 
-Documentation détaillée (repo) : `docs/index.md` et `docs/utilisation.md`.
+Documentation détaillée (repo) : `docs/index.md`.
 
 ## Installation
 
@@ -41,13 +41,8 @@ Note (repo Meridiane) :
 ## Exemple CI (générer + build + publish)
 
 ```bash
-npm ci
 npx -y @obsidiane/meridiane@0.1.0 build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json --preset=native
 npm publish dist/backend-bridge
 ```
 
-Si votre workspace ne contient pas `ng-packagr` (souvent le cas dans une app Angular “pure”), installez-le :
-
-```bash
-npm i -D ng-packagr
-```
+Note : Meridiane installe le toolchain (`ng-packagr`, `@angular/*`, …) dans `dist/.meridiane-workspace` si nécessaire.

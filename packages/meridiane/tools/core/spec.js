@@ -5,7 +5,17 @@ function isHttpUrl(v) {
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url);
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    const msg = err?.message ?? String(err);
+    throw new Error(
+      `Spec fetch failed: ${url}\n` +
+        `Reason: ${msg}\n` +
+        `Tip: if your environment cannot access the network, use a local JSON file via --spec ./openapi.json`
+    );
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Spec fetch failed: ${res.status} ${res.statusText}${body ? `\n${body}` : ''}`);
@@ -24,7 +34,13 @@ export async function readOpenApiSpec(specArg) {
       const isDocsJson = /\/api\/docs\.json$/i.test(spec);
       if (!isDocsJson) throw err;
       const fallback = spec.replace(/\/api\/docs\.json$/i, '/api/docs.jsonopenapi');
-      return await fetchJson(fallback);
+      try {
+        return await fetchJson(fallback);
+      } catch (err2) {
+        const m1 = err?.message ?? String(err);
+        const m2 = err2?.message ?? String(err2);
+        throw new Error(`Spec fetch failed (both endpoints tried)\n- ${spec}\n  ${m1}\n- ${fallback}\n  ${m2}`);
+      }
     }
   }
 
@@ -41,4 +57,3 @@ export async function readOpenApiSpec(specArg) {
     throw err;
   }
 }
-

@@ -1,7 +1,6 @@
 # Utilisation (Meridiane)
 
-Meridiane génère un **package npm bridge Angular** à partir d’une spec **OpenAPI (API Platform)**.
-Il est **standalone** : pas de config persistante, pas de patch de workspace, build via `dist/.meridiane-workspace`.
+Référence CLI (options, presets, sorties). Pour le workflow end-to-end : `docs/creer-un-bridge.md`.
 
 ## Prérequis
 
@@ -14,7 +13,7 @@ Il est **standalone** : pas de config persistante, pas de patch de workspace, bu
 # Dev (build + install local dans node_modules)
 meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --preset=native
 
-# CI/CD (build + artefact npm)
+# CI/CD (build + artefact npm publiable)
 meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --preset=native
 ```
 
@@ -35,12 +34,24 @@ Build le bridge et produit un `.tgz` prêt à publier.
 
 ## Options
 
-- `--spec <url|file>` : requis sauf `--no-models`
-- `--preset [native|all]` : absent ⇒ `all` ; `--preset` seul ⇒ `native`
-- `--include <substr>` / `--exclude <substr>` : filtres (répétables, support `,`)
-- `--no-models` : runtime uniquement
-- `--debug` : logs détaillés
-- `--version <semver>` : (build uniquement) version du package généré
+- `--spec <url|file>` : source OpenAPI (URL ou JSON local). Requis sauf `--no-models`.
+- `--preset [native|all]` : sélection des schémas.
+  - absent ⇒ `all`
+  - `--preset` seul ⇒ `native`
+- `--include <substr>` : ne garde que les schémas dont le nom contient `<substr>` (répétable, support `,`).
+- `--exclude <substr>` : retire les schémas dont le nom contient `<substr>` (répétable, support `,`).
+- `--no-models` : ne génère pas les models (et `--spec` devient inutile).
+- `--debug` : logs détaillés.
+- `--version <semver>` : (build uniquement) version du package généré.
+
+## Presets (naming)
+
+Meridiane génère toujours des interfaces TypeScript qui **étendent `Item`**.
+
+- `--preset=all` : conserve toutes les variantes présentes dans la spec.
+  - ex: `ConstraintViolation.jsonld` ⇒ `ConstraintViolationJsonld`
+- `--preset=native` : vise des types “entity-like”.
+  - ex: `ConstraintViolation.jsonld` / `ConstraintViolation` ⇒ `ConstraintViolation`
 
 ## Workflow CI/CD (pipeline backend)
 
@@ -52,6 +63,10 @@ npx -y @obsidiane/meridiane@0.1.0 build "$BRIDGE_PACKAGE_NAME" \
 
 npm publish dist/<libName>
 ```
+
+Notes :
+- `npx -y …` fonctionne aussi depuis un dossier “vide” : Meridiane crée `dist/` dans le répertoire courant.
+- `npm publish` est volontairement hors de Meridiane (le pipeline reste responsable).
 
 ## Développement Meridiane (ce repo)
 

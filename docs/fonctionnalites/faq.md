@@ -1,7 +1,5 @@
 # FAQ / limites
 
-Cette page fait partie des docs d’utilisation.
-
 ## Pourquoi un package “bridge” par backend ?
 
 Cela évite de mélanger plusieurs contrats API dans un même package.
@@ -14,8 +12,8 @@ Le bridge reste utilisable pour HTTP.
 
 ## Pourquoi `ng-packagr` est nécessaire ?
 
-Le bridge généré est une **lib Angular** construite avec `ng build <lib-name>`, qui s’appuie sur `ng-packagr`.
-Dans un workspace “app-only”, il faut généralement l’ajouter en devDependency.
+Le bridge généré est une **lib Angular** construite avec `ng-packagr`.
+Meridiane est standalone et installe le toolchain dans `dist/.meridiane-workspace` si nécessaire.
 
 ## Comment activer les logs ?
 

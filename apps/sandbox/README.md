@@ -18,6 +18,7 @@ Ce que ça fait :
 
 Pré-requis :
 - le backend doit exposer la spec OpenAPI sur `http://localhost:8000/api/docs.json` (valeurs par défaut de `meridiane dev` dans ce repo).
+  - alternative : vous pouvez passer une spec locale (JSON) : `npm -w apps/sandbox run bridge:sync -- --spec ./openapi.json`
 
 ## Build (CI / vérification)
 
