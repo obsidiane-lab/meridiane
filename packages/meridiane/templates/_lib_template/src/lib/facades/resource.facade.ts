@@ -20,13 +20,11 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
 
   constructor(
     protected readonly repo: ResourceRepository<T>,
-    protected readonly realtime: RealtimePort,
-    protected readonly resourcePath: string
+    protected readonly realtime: RealtimePort
   ) {
-    this.resourcePath = resourcePath;
     this.connectionStatus = toSignal(
       this.realtime.status$(),
-      {initialValue: 'offline' as RealtimeStatus}
+      {initialValue: 'closed'}
     );
   }
 
@@ -70,27 +68,30 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
     );
   }
 
+  /**
+   * Subscribes to real-time updates for one or many IRIs.
+   * Undefined/empty values are ignored.
+   */
   watch$(iri: Iri | Iri[]): Observable<T> {
-    if (Array.isArray(iri)) {
-      return this.subscribeAndSync(iri);
-    }
-    return this.subscribeAndSync([iri]);
+    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    return this.subscribeAndSync(iris);
   }
 
 
   unwatch(iri: Iri | Iri[]): void {
-    if (Array.isArray(iri)) {
-      this.realtime.unsubscribe(iri);
-      return;
-    }
-    this.realtime.unsubscribe([iri]);
+    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    this.realtime.unsubscribe(iris);
   }
 
+  /**
+   * Subscribes to updates of a related sub-resource published on the parent topic.
+   * Example: subscribe to Message events on a Conversation topic, filtering by `message.conversation`.
+   */
   watchSubResource$<R>(
     iri: Iri | Iri[],
     field: string
   ): Observable<R> {
-    const iris = Array.isArray(iri) ? iri : [iri];
+    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
     return this.realtime
       .subscribe$<R>(iris, {field: field})
       .pipe(
@@ -100,13 +101,13 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
       );
   }
 
-  protected subscribeAndSync(iris: Iri[]): Observable<T> {
+  protected subscribeAndSync(iris: string[]): Observable<T> {
     return this.realtime
       .subscribe$<T>(iris)
       .pipe(
         map(event => event.data),
         filter((data): data is T => data !== undefined),
         shareReplay({bufferSize: 1, refCount: true})
-      )
+      );
   }
 }

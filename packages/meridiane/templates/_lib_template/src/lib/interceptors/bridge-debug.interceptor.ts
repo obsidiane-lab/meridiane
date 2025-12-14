@@ -3,6 +3,10 @@ import {inject} from '@angular/core';
 import {BRIDGE_LOGGER} from '../tokens';
 import {catchError, finalize, tap, throwError} from 'rxjs';
 
+/**
+ * Lightweight request/response logging controlled by `provideBridge({debug: true})`.
+ * Logs are delegated to the injected `BRIDGE_LOGGER`.
+ */
 export const bridgeDebugInterceptor: HttpInterceptorFn = (req, next) => {
   const logger = inject(BRIDGE_LOGGER, {optional: true});
   if (!logger) return next(req);
@@ -26,4 +30,3 @@ export const bridgeDebugInterceptor: HttpInterceptorFn = (req, next) => {
     })
   );
 };
-

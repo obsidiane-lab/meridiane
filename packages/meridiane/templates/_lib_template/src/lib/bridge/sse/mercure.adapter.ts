@@ -1,4 +1,4 @@
-import {DOCUMENT, Inject, Injectable, OnDestroy, Optional, PLATFORM_ID} from '@angular/core';
+import {Inject, Injectable, OnDestroy, Optional, PLATFORM_ID} from '@angular/core';
 import {BehaviorSubject, defer, EMPTY, fromEvent, Observable, of, Subject} from 'rxjs';
 import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
 import {API_BASE_URL, BRIDGE_LOGGER, BridgeLogger, MERCURE_CONFIG, MERCURE_HUB_URL, MERCURE_TOPIC_MODE, MercureTopicMode} from '../../tokens';
@@ -34,7 +34,6 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   constructor(
     @Inject(API_BASE_URL) private readonly apiBase: string,
     @Inject(MERCURE_CONFIG) private readonly init: RequestInit,
-    @Inject(DOCUMENT) private readonly doc: Document,
     @Inject(PLATFORM_ID) private readonly platformId: object,
     @Optional() @Inject(MERCURE_HUB_URL) private readonly hubUrl?: string,
     @Optional() @Inject(MERCURE_TOPIC_MODE) topicMode?: MercureTopicMode,
@@ -42,6 +41,8 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   ) {
     this.urlBuilder = new MercureUrlBuilder();
     this.credentialsPolicy = new CredentialsPolicy(init);
+    // `topicMode` affects only the `topic=` query param sent to the hub.
+    // Payload IRIs are always matched using same-origin relative IRIs (`/api/...`) when possible.
     this.topicMapper = new MercureTopicMapper(apiBase, topicMode ?? 'url');
 
     this.rebuild$
@@ -81,7 +82,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
       // Canonicalise topics (ref-count + URL) to avoid duplicates like:
       // - "/api/conversations/1" and "http://localhost:8000/api/conversations/1"
-      const registeredTopics = inputIris.map((i) => this.topicMapper.toTopic(i));
+      const registeredTopics = Array.from(new Set(inputIris.map((i) => this.topicMapper.toTopic(i))));
 
       this.topicsRegistry.addAll(registeredTopics);
       this.scheduleRebuild();
@@ -118,7 +119,8 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   unsubscribe(iris: string[]): void {
     const inputIris = iris.filter((v): v is string => typeof v === 'string' && v.length > 0);
     if (inputIris.length === 0) return;
-    this.topicsRegistry.removeAll(inputIris.map((i) => this.topicMapper.toTopic(i)));
+    const topics = Array.from(new Set(inputIris.map((i) => this.topicMapper.toTopic(i))));
+    this.topicsRegistry.removeAll(topics);
     this.scheduleRebuild();
   }
 

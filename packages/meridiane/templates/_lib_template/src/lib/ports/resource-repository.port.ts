@@ -12,11 +12,11 @@ export type AnyQuery = Query | Record<string, QueryParamValue> | HttpParams;
 
 export interface Item {
   '@id'?: Iri;
-  '@context'?: string,
-  '@type'?: string
+  '@context'?: string;
+  '@type'?: string;
 }
 
-export interface View extends Item{
+export interface View extends Item {
   first?: Iri;
   last?: Iri;
   next?: Iri;

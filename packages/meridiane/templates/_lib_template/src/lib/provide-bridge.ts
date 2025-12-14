@@ -30,16 +30,28 @@ export interface BridgeMercureOptions {
 }
 
 export interface BridgeOptions {
+  /** Base URL of the API (e.g. `http://localhost:8000`). */
   baseUrl?: string;
+  /** @deprecated Legacy alias of `baseUrl`. */
   apiBaseUrl?: string;
+  /** Auth strategy used to attach an Authorization header. */
   auth?: BridgeAuth;
+  /**
+   * Mercure options. Can be either a full object, or a raw `RequestInit` (legacy).
+   * Use `topicMode` to control the `topic=` values sent to the hub.
+   */
   mercure?: BridgeMercureOptions | RequestInit;
+  /** @deprecated Legacy alias of `mercure.hubUrl`. */
   mercureHubUrl?: string;
+  /** Default HTTP behaviour (headers, timeout, retries). */
   defaults?: BridgeDefaults;
+  /** Enables debug logging via the debug interceptor and console logger. */
   debug?: boolean;
+  /** Extra `HttpInterceptorFn` applied after bridge interceptors. */
   extraInterceptors?: HttpInterceptorFn[];
 }
 
+/** Registers the bridge HTTP client, interceptors, Mercure realtime adapter and configuration tokens. */
 export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
   const {
     baseUrl,
@@ -58,7 +70,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
   }
 
   const resolvedMercure: BridgeMercureOptions =
-    mercure && typeof mercure === 'object' && ('hubUrl' in (mercure as any) || 'init' in (mercure as any))
+    mercure && typeof mercure === 'object' && mercure !== null && ('hubUrl' in mercure || 'init' in mercure || 'topicMode' in mercure)
       ? (mercure as BridgeMercureOptions)
       : {init: mercure as RequestInit | undefined};
 

@@ -1,9 +1,12 @@
 export class CredentialsPolicy {
-  constructor(private readonly init: unknown) {
+  constructor(
+    private readonly init: RequestInit | {withCredentials?: boolean} | undefined,
+  ) {
   }
 
   withCredentials(): boolean {
-    const c = this.init as any;
-    return c?.withCredentials === true || c?.credentials === 'include';
+    if (!this.init) return false;
+    const c = this.init as RequestInit & {withCredentials?: boolean};
+    return c.withCredentials === true || c.credentials === 'include';
   }
 }

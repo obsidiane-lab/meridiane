@@ -14,7 +14,6 @@ import {
 import {CredentialsPolicy} from '../credentials.policy';
 import {resolveUrl} from '../../utils/url';
 
-
 export class ApiPlatformRestRepository<T extends Item> implements ResourceRepository<T> {
   private readonly credentialsPolicy: CredentialsPolicy;
 
@@ -22,7 +21,7 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
     private readonly http: HttpClient,
     private readonly apiBase: string,
     private readonly resourcePath: Iri,
-    readonly init: RequestInit,
+    init: RequestInit,
   ) {
     this.credentialsPolicy = new CredentialsPolicy(init);
   }
@@ -72,6 +71,7 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
   }
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
+    // Low-level escape hatch for non-standard endpoints (custom controllers, uploads, etc.).
     const {
       method,
       url,
@@ -80,29 +80,28 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
       headers,
       responseType,
       withCredentials,
-      options = {}
+      options = {},
     } = req;
 
-    const mergedOptions: any = {...options};
     const targetUrl = this.resolveUrl(url ?? this.resourcePath);
+    const mergedOptions: Record<string, unknown> = {...options};
 
-    const computedResponseType = responseType ?? mergedOptions.responseType ?? 'json';
-    mergedOptions.responseType = computedResponseType as any;
+    mergedOptions['responseType'] = (responseType ?? (mergedOptions['responseType'] as any) ?? 'json') as any;
 
-    const credentials = withCredentials ?? mergedOptions.withCredentials ?? this.credentialsPolicy.withCredentials();
-    mergedOptions.withCredentials = credentials;
+    mergedOptions['withCredentials'] =
+      withCredentials ?? (mergedOptions['withCredentials'] as any) ?? this.credentialsPolicy.withCredentials();
 
-    if (headers) mergedOptions.headers = headers;
-    if (query) mergedOptions.params = toHttpParams(query);
-    if (body !== undefined) mergedOptions.body = body;
+    if (headers) mergedOptions['headers'] = headers;
+    if (query) mergedOptions['params'] = toHttpParams(query);
+    if (body !== undefined) mergedOptions['body'] = body;
 
-    mergedOptions.observe = 'body';
-    return this.http.request<R>(method, targetUrl, mergedOptions as { observe: 'body' });
+    mergedOptions['observe'] = 'body';
+    return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
   }
 
   private resolveUrl(path?: Iri): string {
     const effectivePath = path ?? this.resourcePath;
-    if (!effectivePath) throw new Error('ApiPlatformRestRepository.resolveUrl: missing url and resourcePath');
+    if (!effectivePath) throw new Error('ApiPlatformRestRepository: missing url and resourcePath');
     return resolveUrl(this.apiBase, effectivePath);
   }
 }

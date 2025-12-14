@@ -1,11 +1,11 @@
-import {Injectable, Inject, runInInjectionContext, inject, EnvironmentInjector} from '@angular/core';
+import {EnvironmentInjector, inject, Injectable, runInInjectionContext} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {RealtimePort} from '../ports/realtime.port';
 import {Item, ResourceRepository} from '../ports/resource-repository.port';
-import {API_BASE_URL, MERCURE_CONFIG} from "../tokens";
-import {MercureRealtimeAdapter} from "../bridge/sse/mercure.adapter";
-import {ApiPlatformRestRepository} from "../bridge/rest/api-platform.adapter";
-import {ResourceFacade} from "./resource.facade";
+import {API_BASE_URL, MERCURE_CONFIG} from '../tokens';
+import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
+import {ApiPlatformRestRepository} from '../bridge/rest/api-platform.adapter';
+import {ResourceFacade} from './resource.facade';
 
 export type FacadeConfig<T> = {
   url: string;
@@ -16,21 +16,23 @@ export type FacadeConfig<T> = {
 
 @Injectable({providedIn: 'root'})
 export class FacadeFactory {
+  private readonly env = inject(EnvironmentInjector);
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = inject(API_BASE_URL);
+  private readonly init = inject(MERCURE_CONFIG);
+  private readonly mercure = inject(MercureRealtimeAdapter);
 
-  private env = inject(EnvironmentInjector);
-
-  constructor(
-    private readonly http: HttpClient,
-    @Inject(API_BASE_URL) private readonly baseUrl: string,
-    @Inject(MERCURE_CONFIG) private readonly init: RequestInit,
-    private readonly mercureAny: MercureRealtimeAdapter
-  ) {
-  }
-
+  /**
+   * Creates a `ResourceFacade<T>`.
+   *
+   * Important: `ResourceFacade` uses `toSignal()`, which requires an injection context.
+   * This factory ensures that by using `runInInjectionContext`.
+   */
   create<T extends Item>(config: FacadeConfig<T>): ResourceFacade<T> {
-    const path = config.url;
-    const repo = new ApiPlatformRestRepository<T>(this.http, this.baseUrl, path , this.init);
-    const realtime = this.mercureAny as MercureRealtimeAdapter;
-    return runInInjectionContext(this.env, () => new ResourceFacade<T>(repo, realtime, path));
+    const url = config.url;
+    const repo = config.repo ?? new ApiPlatformRestRepository<T>(this.http, this.baseUrl, url, this.init);
+    const realtime = config.realtime ?? this.mercure;
+
+    return runInInjectionContext(this.env, () => new ResourceFacade<T>(repo, realtime));
   }
 }

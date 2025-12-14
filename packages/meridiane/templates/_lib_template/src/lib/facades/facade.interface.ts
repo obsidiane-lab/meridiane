@@ -6,11 +6,10 @@ import {
   Item,
   HttpCallOptions,
   AnyQuery,
-} from "../ports/resource-repository.port";
-import {Observable} from "rxjs";
+} from '../ports/resource-repository.port';
+import {Observable} from 'rxjs';
 
 export interface Facade<T extends Item> {
-
   getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>>;
 
   get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T>;
@@ -25,7 +24,7 @@ export interface Facade<T extends Item> {
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R>;
 
-  watch$(iri: Iri|Iri[]): Observable<T>;
+  watch$(iri: Iri | Iri[]): Observable<T>;
 
-  unwatch(iri: Iri|Iri[]): void;
+  unwatch(iri: Iri | Iri[]): void;
 }

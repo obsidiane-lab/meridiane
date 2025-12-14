@@ -1,4 +1,8 @@
 export class MercureUrlBuilder {
+  /**
+   * Builds the Mercure hub URL with one `topic=` parameter per topic.
+   * The adapter is responsible for canonicalising topics beforehand.
+   */
   build(hubUrl: string, topics: ReadonlySet<string>, lastEventId?: string): string {
     const url = new URL(hubUrl);
     if (lastEventId) {

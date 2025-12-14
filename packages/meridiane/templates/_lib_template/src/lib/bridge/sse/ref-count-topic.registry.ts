@@ -1,43 +1,45 @@
 export class RefCountTopicRegistry {
-  private readonly iris = new Set<string>();
+  private readonly topics = new Set<string>();
   private readonly refCounts = new Map<string, number>();
 
-
-  addAll(iris: Iterable<string>): void {
-    for (const iri of iris) {
-      const next = (this.refCounts.get(iri) ?? 0) + 1;
-      this.refCounts.set(iri, next);
-      this.iris.add(iri);
+  /**
+   * Increments ref-count for each topic.
+   * Callers should pass unique topic strings (deduped).
+   */
+  addAll(topics: Iterable<string>): void {
+    for (const topic of topics) {
+      const next = (this.refCounts.get(topic) ?? 0) + 1;
+      this.refCounts.set(topic, next);
+      this.topics.add(topic);
     }
   }
 
-
-  removeAll(iris: Iterable<string>): void {
-    for (const iri of iris) {
-      const next = (this.refCounts.get(iri) ?? 0) - 1;
+  /**
+   * Decrements ref-count for each topic.
+   * Callers should pass unique topic strings (deduped).
+   */
+  removeAll(topics: Iterable<string>): void {
+    for (const topic of topics) {
+      const next = (this.refCounts.get(topic) ?? 0) - 1;
       if (next <= 0) {
-        this.refCounts.delete(iri);
-        this.iris.delete(iri);
+        this.refCounts.delete(topic);
+        this.topics.delete(topic);
       } else {
-        this.refCounts.set(iri, next);
+        this.refCounts.set(topic, next);
       }
     }
   }
 
-
   hasAny(): boolean {
-    return this.iris.size > 0;
+    return this.topics.size > 0;
   }
-
 
   snapshot(): ReadonlySet<string> {
-    return new Set(this.iris);
+    return new Set(this.topics);
   }
 
-
-
   computeKey(hubUrl: string, credentialsOn: boolean): string {
-    const topicsSorted = Array.from(this.iris).sort().join('|');
+    const topicsSorted = Array.from(this.topics).sort().join('|');
     return `${hubUrl}::${credentialsOn ? '1' : '0'}::${topicsSorted}`;
   }
 }

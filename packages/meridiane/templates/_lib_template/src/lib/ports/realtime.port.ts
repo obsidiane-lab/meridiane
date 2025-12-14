@@ -14,7 +14,6 @@ export interface SseOptions {
   listen?: string[];
 }
 
-
 export interface RealtimeEvent<T> {
   iri: string;
   data?: T;
@@ -24,8 +23,12 @@ export type SubscribeFilter = {
   field: string;
 };
 
-
 export interface RealtimePort {
+  /**
+   * Subscribes to Mercure events for the given topics.
+   *
+   * Note: topics must be stable strings. Undefined values are ignored by the adapter.
+   */
   subscribe$<T>(iris: Iri[], filter?: SubscribeFilter): Observable<RealtimeEvent<T>>;
 
   unsubscribe(iris: Iri[]): void;

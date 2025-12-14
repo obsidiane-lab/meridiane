@@ -10,8 +10,12 @@ import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequir
 import {SubscribeFilter} from '../ports/realtime.port';
 import {resolveUrl} from '../utils/url';
 
-
 @Injectable({providedIn: 'root'})
+/**
+ * High-level facade for ad-hoc HTTP calls and Mercure subscriptions.
+ *
+ * Prefer `FacadeFactory` + `ResourceFacade<T>` when you want a resource-oriented API.
+ */
 export class BridgeFacade {
   private readonly credentialsPolicy: CredentialsPolicy;
 
@@ -19,7 +23,7 @@ export class BridgeFacade {
     private readonly http: HttpClient,
     private readonly realtime: MercureRealtimeAdapter,
     @Inject(API_BASE_URL) private readonly apiBase: string,
-    @Inject(MERCURE_CONFIG) init: RequestInit
+    @Inject(MERCURE_CONFIG) init: RequestInit,
   ) {
     this.credentialsPolicy = new CredentialsPolicy(init);
   }
@@ -77,15 +81,16 @@ export class BridgeFacade {
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
     const {method, url, query, body, headers, responseType, withCredentials, options = {}} = req;
     const targetUrl = this.resolveUrl(url);
-    const mergedOptions: any = {...options};
 
-    if (headers) mergedOptions.headers = headers;
-    if (query) mergedOptions.params = toHttpParams(query);
-    if (body !== undefined) mergedOptions.body = body;
+    const mergedOptions: Record<string, unknown> = {...options};
+    if (headers) mergedOptions['headers'] = headers;
+    if (query) mergedOptions['params'] = toHttpParams(query);
+    if (body !== undefined) mergedOptions['body'] = body;
 
-    mergedOptions.responseType = (responseType ?? mergedOptions.responseType ?? 'json') as any;
-    mergedOptions.withCredentials = withCredentials ?? mergedOptions.withCredentials ?? this.credentialsPolicy.withCredentials();
-    mergedOptions.observe = 'body';
+    mergedOptions['responseType'] = (responseType ?? (mergedOptions['responseType'] as any) ?? 'json') as any;
+    mergedOptions['withCredentials'] =
+      withCredentials ?? (mergedOptions['withCredentials'] as any) ?? this.credentialsPolicy.withCredentials();
+    mergedOptions['observe'] = 'body';
 
     return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
   }

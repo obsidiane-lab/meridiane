@@ -5,6 +5,9 @@ import {retry, timeout, timer} from 'rxjs';
 
 const DEFAULT_RETRY_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
+/**
+ * Applies default headers, timeout and retry policy configured via `provideBridge({defaults: ...})`.
+ */
 export const bridgeDefaultsInterceptor: HttpInterceptorFn = (req, next) => {
   const defaults = inject(BRIDGE_DEFAULTS, {optional: true}) ?? {};
   const logger = inject(BRIDGE_LOGGER, {optional: true});
@@ -31,7 +34,8 @@ export const bridgeDefaultsInterceptor: HttpInterceptorFn = (req, next) => {
   if (retryCount && retryCount > 0) {
     const methods = (typeof retryCfg === 'object' && retryCfg.methods) ? retryCfg.methods : DEFAULT_RETRY_METHODS;
     const normalizedMethod = req.method.toUpperCase();
-    if (methods.map((m) => m.toUpperCase()).includes(normalizedMethod)) {
+    const methodAllowList = new Set(methods.map((m) => m.toUpperCase()));
+    if (methodAllowList.has(normalizedMethod)) {
       const delayMs = typeof retryCfg === 'object' ? (retryCfg.delayMs ?? 250) : 250;
       out$ = out$.pipe(
         retry({
