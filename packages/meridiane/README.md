@@ -31,7 +31,11 @@ Options :
 - `--debug` : active des logs supplémentaires (CLI).
 
 Bonnes pratiques :
-- utiliser `--preset=native` si vous voulez des modèles “entity-like” (sans variantes `.jsonld/.jsonMergePatch`)
+- utiliser `--preset=native` pour un mode “contract-driven” (LD+JSON) :
+  - modèles générés uniquement s’ils sont utilisés par les endpoints
+  - groups conservés
+  - pas de modèles `*.jsonMergePatch` (PATCH = `Partial<...>`)
+  - noms normalisés (pas de suffixe `.jsonld`)
 - utiliser `--no-models` si vous voulez uniquement le runtime (pas besoin de `--spec`)
 - laisser le registry à la CI (`.npmrc`, variables d’environnement, `npm publish --registry …`)
 

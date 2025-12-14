@@ -23,7 +23,8 @@ npx -y @obsidiane/meridiane@0.1.0 build @acme/backend-bridge \
 Artefacts : `dist/backend-bridge` + `.tgz` (via `npm pack`) dans `dist/backend-bridge`.
 
 Notes :
-- `--preset=native` produit des models “entity-like” (sans variantes `.jsonld/.jsonMergePatch`).
+- `--preset=native` est “contract-driven” (LD+JSON) : seuls les modèles réellement utilisés par les endpoints sont générés.
+- `PATCH` utilise `Partial<...>` : pas de modèles `*.jsonMergePatch`.
 - Meridiane ne publie pas : la CI garde le contrôle de `npm publish`.
 
 ## 2) Publier le package généré

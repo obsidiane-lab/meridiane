@@ -16,10 +16,13 @@ export function withNullable(ts, schema) {
  * @param {any} schema
  * @param {Set<string>} deps
  * @param {Map<string,string>} nameMap
+ * @param {{ requiredMode?: 'all-optional'|'spec', forceNullable?: boolean }} [cfg]
  * @returns {string}
  */
-export function tsTypeOf(schema, deps, nameMap) {
+export function tsTypeOf(schema, deps, nameMap, cfg) {
   if (!schema) return 'any';
+  const requiredMode = cfg?.requiredMode ?? 'all-optional';
+  const forceNullable = !!cfg?.forceNullable;
 
   if (schema.$ref) {
     const orig = schemaNameFromRef(schema.$ref);
@@ -49,9 +52,14 @@ export function tsTypeOf(schema, deps, nameMap) {
       else if (t === 'string') parts.add('string');
       else if (t === 'integer' || t === 'number') parts.add('number');
       else if (t === 'boolean') parts.add('boolean');
-      else if (t === 'array') parts.add(tsTypeOf({ type: 'array', items: schema.items }, deps, nameMap));
+      else if (t === 'array') parts.add(tsTypeOf({ type: 'array', items: schema.items }, deps, nameMap, cfg));
       else if (t === 'object') {
-        const objTs = tsTypeOf({ type: 'object', properties: schema.properties, required: schema.required, additionalProperties: schema.additionalProperties }, deps, nameMap);
+        const objTs = tsTypeOf(
+          { type: 'object', properties: schema.properties, required: schema.required, additionalProperties: schema.additionalProperties },
+          deps,
+          nameMap,
+          cfg
+        );
         parts.add(objTs);
       } else parts.add('any');
     }
@@ -60,13 +68,13 @@ export function tsTypeOf(schema, deps, nameMap) {
 
   if (schema.allOf) {
     // Aplatir au niveau buildModelsFromOpenAPI; ici on combine si nécessaire
-    return schema.allOf.map((s) => tsTypeOf(s, deps, nameMap)).join(' & ');
+    return schema.allOf.map((s) => tsTypeOf(s, deps, nameMap, cfg)).join(' & ');
   }
-  if (schema.oneOf) return schema.oneOf.map((s) => tsTypeOf(s, deps, nameMap)).join(' | ');
-  if (schema.anyOf) return schema.anyOf.map((s) => tsTypeOf(s, deps, nameMap)).join(' | ');
+  if (schema.oneOf) return schema.oneOf.map((s) => tsTypeOf(s, deps, nameMap, cfg)).join(' | ');
+  if (schema.anyOf) return schema.anyOf.map((s) => tsTypeOf(s, deps, nameMap, cfg)).join(' | ');
 
   if (schema.type === 'array') {
-    const it = tsTypeOf(schema.items || {}, deps, nameMap);
+    const it = tsTypeOf(schema.items || {}, deps, nameMap, cfg);
     return `${it}[]`;
   }
 
@@ -74,14 +82,15 @@ export function tsTypeOf(schema, deps, nameMap) {
     const props = schema.properties || {};
     const entries = Object.entries(props);
     const inline = entries.map(([k, v]) => {
-      const t = tsTypeOf(v, deps, nameMap);
-      const opt = (schema.required || []).includes(k) ? '' : '?';
-      const nullable = v?.nullable && !/\|\s*null\b/.test(t) ? ' | null' : '';
+      const t0 = tsTypeOf(v, deps, nameMap, cfg);
+      const opt = requiredMode === 'spec' ? ((schema.required || []).includes(k) ? '' : '?') : '?';
+      const wantsNull = forceNullable || v?.nullable;
+      const nullable = wantsNull && !/\|\s*null\b/.test(t0) ? ' | null' : '';
       const key = quoteKeyIfNeeded(k);
-      return `${key}${opt}: ${t}${nullable};`;
+      return `${key}${opt}: ${t0}${nullable};`;
     });
     if (schema.additionalProperties) {
-      const at = tsTypeOf(schema.additionalProperties, deps, nameMap);
+      const at = tsTypeOf(schema.additionalProperties, deps, nameMap, cfg);
       inline.push(`[key: string]: ${at};`);
     }
     return `{ ${inline.join(' ')} }`;
@@ -93,4 +102,3 @@ export function tsTypeOf(schema, deps, nameMap) {
 
   return 'any';
 }
-

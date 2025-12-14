@@ -50,8 +50,11 @@ Meridiane génère toujours des interfaces TypeScript qui **étendent `Item`**.
 
 - `--preset=all` : conserve toutes les variantes présentes dans la spec.
   - ex: `ConstraintViolation.jsonld` ⇒ `ConstraintViolationJsonld`
-- `--preset=native` : vise des types “entity-like”.
-  - ex: `ConstraintViolation.jsonld` / `ConstraintViolation` ⇒ `ConstraintViolation`
+- `--preset=native` : “contract-driven” (LD+JSON) + groups.
+  - ne génère que les modèles réellement utilisés par les endpoints (`paths`) en `application/ld+json`
+  - conserve les variantes de groupes (ex: `Account-user.read` ⇒ `AccountUserRead`)
+  - ne génère pas `*.jsonMergePatch` (PATCH = `Partial<...>`)
+  - normalise les noms (pas de suffixe `.jsonld`, ex: `Payment.jsonld` ⇒ `Payment`)
 
 ## Workflow CI/CD (pipeline backend)
 

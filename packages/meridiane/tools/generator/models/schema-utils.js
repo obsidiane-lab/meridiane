@@ -112,6 +112,9 @@ export function applySchemaNameFilters(schemaNames, cfg) {
   if (preset === 'native') {
     out = out
       .filter((n) => !/^Hydra/i.test(n))
+      // API Platform adds a technical "Multipart" schema for multipart/form-data request bodies (file uploads).
+      // It's not a resource model and tends to pollute the generated "native" model list.
+      .filter((n) => !/^Multipart(?:$|[.-])/i.test(n))
       .filter((n) => !/jsonMergePatch/i.test(n))
       .filter((n) => !/\.jsonld\b/i.test(n))
       .filter((n) => !/\.jsonapi\b/i.test(n));
