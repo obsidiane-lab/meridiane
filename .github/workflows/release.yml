@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*.*.*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag & publish
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create next tag
+        id: tag_version
+        if: github.ref_type != 'tag'
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ github.token }}
+          release_branches: master
+          tag_prefix: ""
+          default_bump: patch
+
+      - name: Resolve release tag
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "RELEASE_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=${{ steps.tag_version.outputs.new_tag }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Use Node.js 20.x
+        if: env.RELEASE_TAG != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      - name: Install dependencies
+        if: env.RELEASE_TAG != ''
+        run: npm ci
+
+      - name: Align package version with tag
+        if: env.RELEASE_TAG != ''
+        run: |
+          cd packages/meridiane
+          npm pkg set version="${RELEASE_TAG}"
+
+      - name: Pack check
+        if: env.RELEASE_TAG != ''
+        run: npm -w packages/meridiane run pack:check
+
+      - name: Publish to npm
+        if: env.RELEASE_TAG != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          cd packages/meridiane
+          npm publish --provenance --access public
+
+      - name: Show release info
+        if: env.RELEASE_TAG != ''
+        run: |
+          echo "Tag: ${RELEASE_TAG}"
+          echo "Release type: ${{ steps.tag_version.outputs.release_type }}"

@@ -6,10 +6,10 @@ Meridiane est versionné via des **tags git** au format **SemVer** : `MAJOR.MINO
 
 Deux chemins :
 
-- **Automatique (recommandé)** : à chaque push sur `master`, le workflow `Version & Tag` calcule un bump et pousse un nouveau tag.
-- **Manuel** : tu crées/pousses un tag `X.Y.Z` (utile pour une première `1.0.0` ou un cas exceptionnel).
+- **Automatique (recommandé)** : à chaque push sur `master`, le workflow `Release` calcule un bump, pousse un nouveau tag, puis publie sur npm.
+- **Manuel** : tu crées/pousses un tag `X.Y.Z` (utile pour une première `1.0.0` ou un cas exceptionnel) et le workflow `Release` publie sur npm.
 
-Quand un tag `*.*.*` est poussé, le workflow `Publish to npm` publie `@obsidiane/meridiane` avec exactement la même version (le tag **sans préfixe** `v`).
+Le publish npm utilise exactement la même version que le tag (le tag **sans préfixe** `v`).
 
 ## Convention de commits (bump MAJOR / MINOR / PATCH)
 
@@ -56,4 +56,3 @@ git pull origin master
 git tag -a 1.0.0 -m "Release 1.0.0"
 git push origin 1.0.0
 ```
-
