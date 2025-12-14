@@ -27,15 +27,18 @@ npm install -D @obsidiane/meridiane
 
 # 2) Générer le bridge + models (dev)
 # (installe le package localement dans node_modules)
-npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --preset=native
+npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/ld+json
 
 # 3) Build CI/CD (génère + build + npm pack)
-npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json --preset=native
+npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json --formats application/ld+json
 ```
 
 Le build produit `dist/<libName>` et un `.tgz` via `npm pack` (prêt à publier).
 
 Astuce : si vous ne voulez générer que la lib (sans models), utilisez `--no-models` (et `--spec` devient inutile).
+
+Formats :
+- `--formats` est répétable (ou liste `,`) et l’ordre est significatif (format primaire en premier), ex: `--formats application/ld+json,application/json`.
 
 ---
 

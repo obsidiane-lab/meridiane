@@ -36,7 +36,7 @@ fix(cli): improve OpenAPI error message
 ```
 
 ```text
-feat(models): add preset native schema collapsing
+feat(models): add contract-driven `--formats` generation
 ```
 
 ```text

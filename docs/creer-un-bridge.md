@@ -17,13 +17,16 @@ Dans la pipeline du backend (ou n’importe quel dossier de travail) :
 npx -y @obsidiane/meridiane@0.1.0 build @acme/backend-bridge \
   --version 1.2.3 \
   --spec https://staging.example/api/docs.json \
-  --preset=native
+  --formats application/ld+json
 ```
 
 Artefacts : `dist/backend-bridge` + `.tgz` (via `npm pack`) dans `dist/backend-bridge`.
 
 Notes :
-- `--preset=native` est “contract-driven” (LD+JSON) : seuls les modèles réellement utilisés par les endpoints sont générés.
+- `--formats` est “contract-driven” : seuls les modèles réellement utilisés par les endpoints (pour ces formats) sont générés.
+- `--formats` est multi-format : l’ordre est significatif (format primaire en premier), ex :
+  - `--formats application/ld+json,application/json`
+  - `--formats application/json,application/ld+json`
 - `PATCH` utilise `Partial<...>` : pas de modèles `*.jsonMergePatch`.
 - Meridiane ne publie pas : la CI garde le contrôle de `npm publish`.
 

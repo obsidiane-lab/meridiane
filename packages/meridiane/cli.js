@@ -8,16 +8,7 @@ import { createLogger } from './tools/core/logger.js';
 
 const program = new Command();
 
-program
-  .name('meridiane')
-  .description('Generate an Angular bridge + models from an API Platform OpenAPI spec.')
-  .showHelpAfterError()
-  .showSuggestionAfterError();
-
-function presetParser(value, previous) {
-  if (value === undefined && previous === undefined) return true; // `--preset` (no value) => native
-  return value ?? previous;
-}
+program.name('meridiane').description('Generate an Angular bridge + models from an API Platform OpenAPI spec.').showHelpAfterError().showSuggestionAfterError();
 
 function collect(value, previous = []) {
   return [...previous, value];
@@ -26,7 +17,12 @@ function collect(value, previous = []) {
 function commonOptions(cmd) {
   return cmd
     .option('--spec <urlOrFile>', 'OpenAPI spec source (URL or local JSON file)')
-    .option('--preset [mode]', 'Preset: native|all (default: all; `--preset` alone => native)', presetParser)
+    .option(
+      '--formats <mimeTypes>',
+      'Generate only selected media types (repeatable, supports commas). Enables contract-driven mode from paths.',
+      collect,
+      []
+    )
     .option('--include <substr>', 'Include schema names containing substring (repeatable, supports commas)', collect, [])
     .option('--exclude <substr>', 'Exclude schema names containing substring (repeatable, supports commas)', collect, [])
     .option('--no-models', 'Skip models generation (then --spec is not required)')

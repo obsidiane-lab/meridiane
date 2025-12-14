@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 import { deriveLibName } from './core/lib-name.js';
-import { normalizePreset, splitListArgs } from './core/paths.js';
+import { splitListArgs } from './core/paths.js';
 import { readOpenApiSpec } from './core/spec.js';
 import { createLogger } from './core/logger.js';
 import { generateBridgeWorkspace } from './core/generate.js';
@@ -139,12 +139,13 @@ export async function runDev(packageName, opts) {
   const libName = deriveLibName(effectivePackageName);
 
   const noModels = opts.models === false;
-  const preset = normalizePreset(useSandboxDefaults ? (opts.preset ?? 'native') : opts.preset);
+  const formats = splitListArgs(opts.formats);
   const include = splitListArgs(opts.include);
   const exclude = splitListArgs(opts.exclude);
 
   const version = '0.0.0-dev';
-  const requiredMode = 'all-optional';
+  const requiredMode = 'all';
+  const effectiveFormats = formats.length > 0 ? formats : ['application/ld+json'];
   const specSource = useSandboxDefaults ? (opts.spec ?? 'http://localhost:8000/api/docs.json') : opts.spec;
 
   log.title('dev — build standalone + install local');
@@ -153,7 +154,7 @@ export async function runDev(packageName, opts) {
   log.info(`lib: ${libName}`);
   if (useSandboxDefaults) log.info('defaults sandbox appliqués');
   if (noModels) log.info('models: désactivés (--no-models)');
-  else log.info(`spec: ${specSource} | preset: ${preset}`);
+  else log.info(`spec: ${specSource} | formats: ${effectiveFormats.join(', ')} | nullableMode: ${requiredMode}`);
 
   const { workspaceRoot, distRoot, npmCacheDir, requireFromWs } = await ensureStandaloneWorkspace({ repoRoot: appRoot, log });
   log.info(`workspace: ${workspaceRoot}`);
@@ -175,7 +176,7 @@ export async function runDev(packageName, opts) {
     noModels,
     spec,
     requiredMode,
-    preset,
+    formats: effectiveFormats,
     include,
     exclude,
     debug,

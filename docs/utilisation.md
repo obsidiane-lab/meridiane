@@ -11,10 +11,10 @@ Référence CLI (options, presets, sorties). Pour le workflow end-to-end : `docs
 
 ```bash
 # Dev (build + install local dans node_modules)
-meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --preset=native
+meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/ld+json
 
 # CI/CD (build + artefact npm publiable)
-meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --preset=native
+meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --formats application/ld+json
 ```
 
 ## Commandes
@@ -35,26 +35,60 @@ Build le bridge et produit un `.tgz` prêt à publier.
 ## Options
 
 - `--spec <url|file>` : source OpenAPI (URL ou JSON local). Requis sauf `--no-models`.
-- `--preset [native|all]` : sélection des schémas.
-  - absent ⇒ `all`
-  - `--preset` seul ⇒ `native`
+- `--formats <mimeTypes>` : formats (media types) à générer, basé sur les endpoints réels (`paths`) (répétable, support `,`).
+  - ex: `--formats application/ld+json`
+  - ex: `--formats application/ld+json,application/json`
 - `--include <substr>` : ne garde que les schémas dont le nom contient `<substr>` (répétable, support `,`).
 - `--exclude <substr>` : retire les schémas dont le nom contient `<substr>` (répétable, support `,`).
 - `--no-models` : ne génère pas les models (et `--spec` devient inutile).
 - `--debug` : logs détaillés.
 - `--version <semver>` : (build uniquement) version du package généré.
 
-## Presets (naming)
+## Formats (naming + runtime)
 
-Meridiane génère toujours des interfaces TypeScript qui **étendent `Item`**.
+Meridiane génère les modèles selon les formats demandés (contract-driven depuis `paths`).
 
-- `--preset=all` : conserve toutes les variantes présentes dans la spec.
-  - ex: `ConstraintViolation.jsonld` ⇒ `ConstraintViolationJsonld`
-- `--preset=native` : “contract-driven” (LD+JSON) + groups.
-  - ne génère que les modèles réellement utilisés par les endpoints (`paths`) en `application/ld+json`
-  - conserve les variantes de groupes (ex: `Account-user.read` ⇒ `AccountUserRead`)
-  - ne génère pas `*.jsonMergePatch` (PATCH = `Partial<...>`)
-  - normalise les noms (pas de suffixe `.jsonld`, ex: `Payment.jsonld` ⇒ `Payment`)
+- Pour `application/ld+json` :
+  - modèles `extends Item`
+  - les champs Hydra `@id/@type/@context` ne sont pas dupliqués dans les modèles (déjà dans `Item`)
+- Pour les autres formats (ex: `application/json`) :
+  - pas d’`extends Item` imposé (le schéma fait foi)
+
+Dans tous les cas :
+- groups conservés (ex: `Account-user.read` ⇒ `AccountUserRead`)
+- pas de modèles `*.jsonMergePatch` (PATCH = `Partial<...>`)
+- noms normalisés (pas de suffixe `.jsonld`, ex: `Payment.jsonld` ⇒ `Payment`)
+
+## Exemples `--formats`
+
+```bash
+# 1) JSON-LD uniquement (Hydra) — recommandé pour API Platform
+meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/ld+json
+
+# 2) JSON “pur” uniquement
+meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/json
+
+# 3) Multi-format (ordre = format primaire)
+# Ici, ld+json est primaire : les collisions seront suffixées côté JSON (ex: *Json)
+meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --formats application/ld+json,application/json
+
+# Ici, json est primaire : les collisions seront suffixées côté ld+json (ex: *LdJson)
+meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --formats application/json,application/ld+json
+
+# 4) multipart/form-data (DTO d’upload), sans `extends Item`
+meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats multipart/form-data
+```
+
+## Nullable mode (all vs spec)
+
+Le mode “nullable” est piloté par le paramètre interne `requiredMode` (valeurs : `all` ou `spec`) :
+
+- `dev` : `all` → toutes les props sont optionnelles et `| null`.
+- `build` : `spec` → respecte `required` et `nullable` du schéma.
+
+Exemple (schéma : `required: ['id']`, `opt` nullable) :
+- `spec` : `id: string`, `opt?: string | null`
+- `all` : `id?: string | null`, `opt?: string | null`
 
 ## Workflow CI/CD (pipeline backend)
 
@@ -62,7 +96,7 @@ Meridiane génère toujours des interfaces TypeScript qui **étendent `Item`**.
 npx -y @obsidiane/meridiane@0.1.0 build "$BRIDGE_PACKAGE_NAME" \
   --version "$BRIDGE_VERSION" \
   --spec "$OPENAPI_SPEC" \
-  --preset=native
+  --formats application/ld+json
 
 npm publish dist/<libName>
 ```

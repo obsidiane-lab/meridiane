@@ -1,9 +1,11 @@
+{{#if extendsItem}}
 import type { Item } from '../lib/ports/resource-repository.port';
+{{/if}}
 {{#each imports}}
 import type { {{this}} } from './{{this}}';
 {{/each}}
 
-export interface {{name}} extends Item{{#each extendsTypes}}, {{this}}{{/each}} {
+export interface {{name}}{{#if extendsItem}} extends Item{{#each extendsTypes}}, {{this}}{{/each}}{{else}}{{#each extendsTypes}}{{#if @first}} extends {{this}}{{else}}, {{this}}{{/if}}{{/each}}{{/if}} {
 {{#each props}}
   {{{tsKey}}}{{#if optional}}?{{/if}}: {{type}};
 {{/each}}

@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 import { deriveLibName } from './core/lib-name.js';
-import { normalizePreset, splitListArgs } from './core/paths.js';
+import { splitListArgs } from './core/paths.js';
 import { readOpenApiSpec } from './core/spec.js';
 import { createLogger } from './core/logger.js';
 import { generateBridgeWorkspace } from './core/generate.js';
@@ -30,20 +30,21 @@ export async function runBuild(packageName, opts) {
   if (!version) throw new Error('Missing --version');
 
   const noModels = opts.models === false;
-  const preset = normalizePreset(opts.preset);
+  const formats = splitListArgs(opts.formats);
   const include = splitListArgs(opts.include);
   const exclude = splitListArgs(opts.exclude);
 
   const libName = deriveLibName(packageName);
   const requiredMode = 'spec';
+  const effectiveFormats = formats.length > 0 ? formats : ['application/ld+json'];
 
-  // Standalone mode (native): works from any repo (backend pipeline or otherwise).
+  // Standalone mode: works from any repo (backend pipeline or otherwise).
   log.title('build — standalone');
   log.info(`repo: ${cwd}`);
   log.info(`package: ${packageName}@${version}`);
   log.info(`lib: ${libName}`);
   if (noModels) log.info('models: désactivés (--no-models)');
-  else log.info(`spec: ${opts.spec} | preset: ${preset}`);
+  else log.info(`spec: ${opts.spec} | formats: ${effectiveFormats.join(', ')} | nullableMode: ${requiredMode}`);
 
   const { workspaceRoot, distRoot, npmCacheDir, requireFromWs } = await ensureStandaloneWorkspace({ repoRoot: cwd, log });
   log.info(`workspace: ${workspaceRoot}`);
@@ -65,7 +66,7 @@ export async function runBuild(packageName, opts) {
     noModels,
     spec,
     requiredMode,
-    preset,
+    formats: effectiveFormats,
     include,
     exclude,
     debug,

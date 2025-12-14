@@ -52,18 +52,25 @@ async function generateLibrary({ cwd, libName, packageName, version, debug }) {
   // angular.json / workspace patching is intentionally not done here (Meridiane is standalone).
 }
 
-async function generateModels({ cwd, libName, spec, requiredMode, preset, include, exclude, debug }) {
+async function generateModels({ cwd, libName, spec, requiredMode, formats, include, exclude, debug }) {
   const outDir = path.resolve(cwd, 'projects', libName, 'src', 'models');
   const templatesDir = path.resolve(pkgRoot, 'tools', 'generator', 'models', 'templates');
 
-  if (debug) console.log('[meridiane] generate models', { outDir: path.relative(cwd, outDir), requiredMode, preset, includeCount: include.length, excludeCount: exclude.length });
+  if (debug)
+    console.log('[meridiane] generate models', {
+      outDir: path.relative(cwd, outDir),
+      requiredMode,
+      formats: Array.isArray(formats) ? formats : [],
+      includeCount: include.length,
+      excludeCount: exclude.length,
+    });
 
   await ensureCleanDir(outDir);
 
   // Write models + index.ts.
   const { models } = buildModelsFromOpenAPI(spec, {
     requiredMode,
-    preset,
+    formats: Array.isArray(formats) ? formats : [],
     includeSchemaNames: include,
     excludeSchemaNames: exclude,
   });
@@ -77,6 +84,7 @@ async function generateModels({ cwd, libName, spec, requiredMode, preset, includ
         props: m.props,
         imports: m.imports,
         extendsTypes: m.extendsTypes || [],
+        extendsItem: m.extendsItem === true,
       },
     });
   }
@@ -98,8 +106,8 @@ async function generateModels({ cwd, libName, spec, requiredMode, preset, includ
  *   version: string,
  *   noModels: boolean,
  *   spec?: any,
- *   requiredMode: 'all-optional'|'spec',
- *   preset: 'all'|'native',
+ *   requiredMode: 'all'|'spec',
+ *   formats?: string[],
  *   include: string[],
  *   exclude: string[],
  *   debug: boolean,
@@ -117,7 +125,7 @@ export async function generateBridgeWorkspace(params) {
     noModels,
     spec,
     requiredMode,
-    preset,
+    formats,
     include,
     exclude,
     debug,
@@ -147,6 +155,6 @@ export async function generateBridgeWorkspace(params) {
 
   if (!spec) throw new Error('Internal error: spec is required when noModels=false');
   log?.step?.('génération des models (OpenAPI)');
-  await generateModels({ cwd, libName, spec, requiredMode, preset, include, exclude, debug });
+  await generateModels({ cwd, libName, spec, requiredMode, formats, include, exclude, debug });
   log?.success?.('génération terminée');
 }

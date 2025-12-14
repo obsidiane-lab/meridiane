@@ -16,16 +16,19 @@ export function withNullable(ts, schema) {
  * @param {any} schema
  * @param {Set<string>} deps
  * @param {Map<string,string>} nameMap
- * @param {{ requiredMode?: 'all-optional'|'spec', forceNullable?: boolean }} [cfg]
+ * @param {{ requiredMode?: 'all'|'spec' }} [cfg]
  * @returns {string}
  */
 export function tsTypeOf(schema, deps, nameMap, cfg) {
   if (!schema) return 'any';
-  const requiredMode = cfg?.requiredMode ?? 'all-optional';
-  const forceNullable = !!cfg?.forceNullable;
+  const requiredMode = cfg?.requiredMode ?? 'all';
+  const forceNullable = requiredMode !== 'spec';
 
   if (schema.$ref) {
     const orig = schemaNameFromRef(schema.$ref);
+    if (!orig) return 'any';
+    if (/jsonMergePatch/i.test(orig)) return 'any';
+    if (/^Hydra/i.test(orig)) return 'any';
     const name = nameMap.get(orig) || orig;
     deps.add(name);
     return name;
