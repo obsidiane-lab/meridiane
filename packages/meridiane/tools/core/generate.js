@@ -1,12 +1,12 @@
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import {existsSync} from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {fileURLToPath} from 'node:url';
 
-import { readJson, writeJsonIfChanged } from './json.js';
-import { renderTemplateToFile } from '../generator/models/handlebars.js';
-import { ensureCleanDir } from '../generator/models/utils.js';
-import { buildModelsFromOpenAPI } from '../generator/models/openapi-to-models.js';
+import {readJson, writeJsonIfChanged} from './json.js';
+import {renderTemplateToFile} from '../generator/models/handlebars.js';
+import {ensureCleanDir} from '../generator/models/utils.js';
+import {buildModelsFromOpenAPI} from '../generator/models/openapi-to-models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 const pkgRoot = path.resolve(__dirname, '../..'); // packages/meridiane
 
 async function replacePlaceholdersInDir(dir, placeholders) {
-  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const entries = await fs.readdir(dir, {withFileTypes: true});
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -29,17 +29,25 @@ async function replacePlaceholdersInDir(dir, placeholders) {
   }
 }
 
-async function generateLibrary({ cwd, libName, packageName, version, debug }) {
+async function generateLibrary({cwd, libName, packageName, version, debug}) {
   const tplDir = path.resolve(pkgRoot, 'templates/_lib_template');
   const targetDir = path.resolve(cwd, 'projects', libName);
 
-  if (debug) console.log('[meridiane] generate lib', { libName, packageName, version, targetDir: path.relative(cwd, targetDir) });
+  if (debug) console.log('[meridiane] generate lib', {
+    libName,
+    packageName,
+    version,
+    targetDir: path.relative(cwd, targetDir)
+  });
 
-  await fs.rm(targetDir, { recursive: true, force: true });
-  await fs.mkdir(targetDir, { recursive: true });
-  await fs.cp(tplDir, targetDir, { recursive: true });
+  await fs.rm(targetDir, {recursive: true, force: true});
+  await fs.mkdir(targetDir, {recursive: true});
+  await fs.cp(tplDir, targetDir, {recursive: true});
 
-  await replacePlaceholdersInDir(targetDir, { '__LIB_NAME__': libName });
+  await replacePlaceholdersInDir(targetDir, {
+    '__LIB_NAME__': libName,
+    '__PACKAGE_NAME__': packageName,
+  });
 
   const libPackageJsonPath = path.join(targetDir, 'package.json');
   if (existsSync(libPackageJsonPath)) {
@@ -52,7 +60,7 @@ async function generateLibrary({ cwd, libName, packageName, version, debug }) {
   // angular.json / workspace patching is intentionally not done here (Meridiane is standalone).
 }
 
-async function generateModels({ cwd, libName, spec, requiredMode, formats, include, exclude, debug }) {
+async function generateModels({cwd, libName, spec, requiredMode, formats, include, exclude, debug}) {
   const outDir = path.resolve(cwd, 'projects', libName, 'src', 'models');
   const templatesDir = path.resolve(pkgRoot, 'tools', 'generator', 'models', 'templates');
 
@@ -68,7 +76,7 @@ async function generateModels({ cwd, libName, spec, requiredMode, formats, inclu
   await ensureCleanDir(outDir);
 
   // Write models + index.ts.
-  const { models } = buildModelsFromOpenAPI(spec, {
+  const {models} = buildModelsFromOpenAPI(spec, {
     requiredMode,
     formats: Array.isArray(formats) ? formats : [],
     includeSchemaNames: include,
@@ -92,7 +100,7 @@ async function generateModels({ cwd, libName, spec, requiredMode, formats, inclu
   await renderTemplateToFile({
     templatePath: path.join(templatesDir, 'index.hbs'),
     outPath: path.join(outDir, 'index.ts'),
-    ctx: { models: models.map((m) => ({ name: m.name })) },
+    ctx: {models: models.map((m) => ({name: m.name}))},
   });
 
   if (debug) console.log(`[meridiane] ${models.length} model(s) generated`);
@@ -134,7 +142,7 @@ export async function generateBridgeWorkspace(params) {
   } = params;
 
   log?.step?.(`génération de la librairie (projects/${libName})`);
-  await generateLibrary({ cwd, libName, packageName, version, debug });
+  await generateLibrary({cwd, libName, packageName, version, debug});
 
   // If a dist root is provided, force ng-packagr output to that directory.
   if (distRoot) {
@@ -144,7 +152,7 @@ export async function generateBridgeWorkspace(params) {
     const projectDir = path.dirname(ngPackagePath);
     ngPkg.dest = path.relative(projectDir, desiredDestAbs).split(path.sep).join('/');
     await writeJsonIfChanged(ngPackagePath, ngPkg);
-    log?.debug?.('ng-package.json dest overridden', { dest: ngPkg.dest });
+    log?.debug?.('ng-package.json dest overridden', {dest: ngPkg.dest});
   }
 
   if (noModels) {
@@ -155,6 +163,6 @@ export async function generateBridgeWorkspace(params) {
 
   if (!spec) throw new Error('Internal error: spec is required when noModels=false');
   log?.step?.('génération des models (OpenAPI)');
-  await generateModels({ cwd, libName, spec, requiredMode, formats, include, exclude, debug });
+  await generateModels({cwd, libName, spec, requiredMode, formats, include, exclude, debug});
   log?.success?.('génération terminée');
 }

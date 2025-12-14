@@ -8,6 +8,7 @@ Meridiane est **standalone** : pas de config persistante, pas de patch de worksp
 
 - Workflow recommandé (générer → publier → consommer) : `docs/creer-un-bridge.md`
 - Référence CLI (`dev`, `build`, options) : `docs/utilisation.md`
+- Consommer un bridge (côté app Angular) : `docs/consommer-un-bridge.md`
 
 ## Fonctionnalités du bridge généré
 

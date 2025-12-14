@@ -42,6 +42,32 @@ Formats :
 
 ---
 
+## ✅ Ce qui est pris en compte (et ce qui ne l’est pas)
+
+La génération de modèles est **contract-driven** : Meridiane ne génère que les modèles TypeScript **réellement utilisés par les endpoints** (`paths`) pour les formats sélectionnés via `--formats`.
+
+Pris en compte :
+- Parcours de `paths` (par format demandé) :
+  - `responses` **2xx** et `default` pour les `content-type` correspondants (paramètres `; charset=...` ignorés)
+  - `requestBody` pour les `content-type` correspondants (**sauf PATCH**)
+- Fermeture transitive : suivi des `$ref` dans les JSON Schemas vers `#/components/schemas/*`.
+- Multi-format : collisions désambiguïsées via un suffixe de format (ex: `*Json`, `*LdJson`).
+- Mode JSON-LD (`application/ld+json`) :
+  - modèles générés `extends Item`
+  - les champs Hydra `@id/@type/@context` ne sont pas dupliqués (déjà dans `Item`)
+- Stratégie de nullabilité (pilotée par `requiredMode`) :
+  - `all` : tout optionnel + `| null`
+  - `spec` : respecte `required` + `nullable`
+
+Non pris en compte / pas encore supporté :
+- Générer des modèles **non atteignables depuis `paths`** (i.e. `components.schemas` inutilisés).
+- Générer des types TS standalone pour des schémas racines non-objet (ex: `enum`, `string`, `number`) si utilisés comme racine de request/response.
+- Suivre des `$ref` vers d’autres emplacements que `#/components/schemas/*` (dans ce cas on retombe sur `any`).
+- Générer des modèles pour les schémas `*.jsonMergePatch*` (les PATCH sont destinés à être typés en `Partial<>`).
+- Sélection de modèle de `requestBody` pour les endpoints `PATCH` (merge-patch).
+
+---
+
 ## 🎯 Contexte (à garder en tête)
 
 Meridiane est optimisé pour ce workflow :
@@ -83,6 +109,7 @@ apps/
 
 - Index : `docs/index.md`
 - Créer un bridge (workflow CI/CD) : `docs/creer-un-bridge.md`
+- Consommer un bridge (côté app Angular) : `docs/consommer-un-bridge.md`
 - Versioning & releases : `docs/versioning.md`
 - Fonctionnalités HTTP : `docs/fonctionnalites/fonctionnalites-http.md`
 - Fonctionnalités Mercure/SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
