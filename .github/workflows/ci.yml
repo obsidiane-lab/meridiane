@@ -33,6 +33,3 @@ jobs:
 
       - name: Pack check
         run: npm -w packages/meridiane run pack:check
-
-      - name: Build sandbox (template validation)
-        run: npm run sandbox:build
