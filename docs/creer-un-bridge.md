@@ -1,42 +1,50 @@
-# Créer un bridge (workflow recommandé)
+# Créer un bridge (côté backend)
 
-Objectif : à chaque release du backend, générer un **package npm bridge** (sans repo dédié), puis le publier pour qu’il soit consommé par une ou plusieurs apps Angular.
+Ce guide s’adresse au **mainteneur** d’un backend (ex: Symfony / API Platform) qui veut publier un package npm “bridge” consommable par une ou plusieurs apps Angular.
+
+Le workflow recommandé est :
+- générer le bridge à partir de la spec OpenAPI ;
+- produire un artefact npm (`dist/<libName>` + `.tgz`) ;
+- publier sur un registry npm (public ou privé).
 
 ## Prérequis
 
-- Node.js ≥ 18
-- Une spec OpenAPI du backend :
-  - URL : `http(s)://…` (ex: `https://staging.example/api/docs.json`)
-  - ou fichier JSON local (ex: `./openapi.json`)
+- Node.js ≥ 18 (20+ recommandé)
+- Accès à la spec OpenAPI du backend (URL ou fichier JSON)
+- Droits de publication sur votre registry npm
 
-## 1) Générer le package
+## Génération (CI/CD)
 
-Dans la pipeline du backend (ou n’importe quel dossier de travail) :
+Le build peut être lancé depuis **n’importe quel répertoire** (un runner CI “vide” suffit). Meridiane crée `dist/` dans le répertoire courant.
 
 ```bash
-npx -y @obsidiane/meridiane@0.1.0 build @acme/backend-bridge \
+npx -y @obsidiane/meridiane@latest build @acme/backend-bridge \
   --version 1.2.3 \
   --spec https://staging.example/api/docs.json \
   --formats application/ld+json
 ```
 
-Artefacts : `dist/backend-bridge` + `.tgz` (via `npm pack`) dans `dist/backend-bridge`.
+Sorties :
+- `dist/backend-bridge/` (package npm prêt à publier)
+- `dist/backend-bridge/*.tgz` (tarball généré par `npm pack` pour inspection / artefact CI)
 
-Notes :
-- `--formats` est “contract-driven” : seuls les modèles réellement utilisés par les endpoints (pour ces formats) sont générés.
-- `--formats` est multi-format : l’ordre est significatif (format primaire en premier), ex :
-  - `--formats application/ld+json,application/json`
-  - `--formats application/json,application/ld+json`
-- `PATCH` utilise `Partial<...>` : pas de modèles `*.jsonMergePatch`.
-- Meridiane ne publie pas : la CI garde le contrôle de `npm publish`.
+Notes importantes :
+- génération “contract-driven” : les models sont générés à partir des endpoints réels (`paths`) et des formats demandés ;
+- multi-format : `--formats` est répétable (ou liste `,`) et l’ordre est significatif (format primaire en premier) ;
+- `PATCH` est typé en `Partial<T>` : pas de génération de modèles `*.jsonMergePatch` ;
+- Meridiane ne publie pas : la CI reste responsable de `npm publish`.
 
-## 2) Publier le package généré
+## Publication
+
+Publiez le dossier `dist/<libName>` (pas le `.tgz`) :
 
 ```bash
 npm publish dist/backend-bridge
 ```
 
-## 3) Consommer le bridge dans une app Angular
+## Consommation (côté app Angular)
+
+Une fois publié, le package est auto-documenté : le bridge contient son propre `README.md`.
 
 Installation :
 
@@ -44,53 +52,21 @@ Installation :
 npm i @acme/backend-bridge@1.2.3
 ```
 
-Configuration (Angular standalone) :
+Configuration (standalone) :
 
 ```ts
-import { bootstrapApplication } from '@angular/platform-browser';
-import { provideHttpClient } from '@angular/common/http';
-import { provideBridge } from '@acme/backend-bridge';
+import {bootstrapApplication} from '@angular/platform-browser';
+import {provideBridge} from '@acme/backend-bridge';
 
 bootstrapApplication(AppComponent, {
   providers: [
-    provideHttpClient(),
     provideBridge({
       baseUrl: 'https://api.example.com',
-      debug: false,
-      // auth: { type: 'bearer', getToken: () => localStorage.getItem('token') ?? undefined },
-      // mercure: { hubUrl: 'https://mercure.example/.well-known/mercure' },
+      // auth: {type: 'bearer', getToken: () => localStorage.getItem('token') ?? undefined},
+      // mercure: {hubUrl: 'https://api.example.com/.well-known/mercure'},
     }),
   ],
 });
 ```
 
-## 4) Utiliser les models et facades
-
-Models (générés depuis OpenAPI) :
-
-```ts
-import type { Conversation } from '@acme/backend-bridge';
-```
-
-Accès HTTP “ressource” (recommandé) :
-
-```ts
-import { inject } from '@angular/core';
-import { FacadeFactory } from '@acme/backend-bridge';
-import type { Conversation } from '@acme/backend-bridge';
-
-const factory = inject(FacadeFactory);
-const conversations = factory.create<Conversation>({ url: '/api/conversations' });
-```
-
-Accès HTTP “ad-hoc” :
-
-```ts
-import { inject } from '@angular/core';
-import { BridgeFacade } from '@acme/backend-bridge';
-
-const bridge = inject(BridgeFacade);
-bridge.get$('/api/auth/me').subscribe();
-```
-
-Référence : `docs/fonctionnalites/api-publique.md`.
+Référence complète : `docs/consommer-un-bridge.md`.

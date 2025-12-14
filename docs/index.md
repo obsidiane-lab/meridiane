@@ -1,22 +1,29 @@
 # Meridiane — Documentation
 
-Meridiane est un CLI qui génère un **package npm “bridge” Angular** (runtime + models TypeScript) à partir d’une spec **OpenAPI** (API Platform).
+Meridiane génère un **package npm Angular** (un “bridge”) à partir d’une spec **OpenAPI** (typé pour API Platform).
 
-Meridiane est **standalone** : pas de config persistante, pas de patch de workspace, tout sort sous `dist/` (workspace temporaire `dist/.meridiane-workspace`).
+Un bridge contient :
+- un runtime Angular (HTTP + helpers + facades) ;
+- des models TypeScript (optionnel, générés depuis OpenAPI) ;
+- une documentation d’utilisation embarquée (`README.md`) directement dans le package publié.
+
+Meridiane est **standalone** : il ne modifie pas votre workspace Angular. Tout est généré sous `dist/` via un workspace temporaire `dist/.meridiane-workspace`.
 
 ## Démarrer
 
-- Workflow recommandé (générer → publier → consommer) : `docs/creer-un-bridge.md`
-- Référence CLI (`dev`, `build`, options) : `docs/utilisation.md`
-- Consommer un bridge (côté app Angular) : `docs/consommer-un-bridge.md`
+Si vous maintenez un backend et que vous voulez produire un package npm réutilisable par plusieurs apps Angular : `docs/creer-un-bridge.md`.
 
-## Fonctionnalités du bridge généré
+Si vous consommez déjà un package bridge dans une app Angular : `docs/consommer-un-bridge.md`.
 
-- API publique (entrée unique) : `docs/fonctionnalites/api-publique.md`
-- HTTP (API Platform / Hydra) : `docs/fonctionnalites/fonctionnalites-http.md`
-- Mercure / SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`
-- FAQ / limites : `docs/fonctionnalites/faq.md`
+Référence CLI (commandes, options, sorties) : `docs/utilisation.md`.
 
-## Maintien du projet
+## Référence (bridge généré)
 
-- Versioning & releases : `docs/versioning.md`
+API publique : `docs/fonctionnalites/api-publique.md`  
+HTTP / Hydra : `docs/fonctionnalites/fonctionnalites-http.md`  
+Mercure / SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`  
+FAQ / limites : `docs/fonctionnalites/faq.md`
+
+## Projet Meridiane
+
+Versioning & releases : `docs/versioning.md`

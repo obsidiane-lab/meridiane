@@ -4,10 +4,10 @@ Meridiane est versionné via des **tags git** au format **SemVer** : `MAJOR.MINO
 
 ## Comment une version est créée
 
-Deux chemins :
+Deux chemins sont possibles :
 
 - **Automatique (recommandé)** : à chaque push sur `master`, le workflow `Release` calcule un bump, pousse un nouveau tag, puis publie sur npm.
-- **Manuel** : tu crées/pousses un tag `X.Y.Z` (utile pour une première `1.0.0` ou un cas exceptionnel) et le workflow `Release` publie sur npm.
+- **Manuel** : vous créez/poussez un tag `X.Y.Z` (utile pour une première `1.0.0` ou un cas exceptionnel) et le workflow `Release` publie sur npm.
 
 Le publish npm utilise exactement la même version que le tag (le tag **sans préfixe** `v`).
 
@@ -47,7 +47,7 @@ BREAKING CHANGE: rename `mercure.init` to `mercure.requestInit`
 
 ## Créer `1.0.0` en tag (manuel)
 
-Important : tes workflows attendent un tag **sans `v`**.
+Important : les workflows attendent un tag **sans `v`**.
 
 ```bash
 git checkout master

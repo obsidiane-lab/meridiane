@@ -1,10 +1,11 @@
 # Consommer un bridge (package npm généré)
 
-Cette page s’adresse au **consommateur** d’un bridge généré par Meridiane.
+Cette page s’adresse au **consommateur** d’un package bridge généré par Meridiane (ex: `@acme/backend-bridge`).
 
-Le bridge est un package npm Angular (runtime + models TypeScript) qui simplifie :
-- les appels HTTP vers une API Platform (Hydra/JSON-LD) ;
-- les mises à jour temps réel via Mercure/SSE (optionnel).
+Un bridge contient :
+- un runtime Angular (HTTP + facades) ;
+- des models TypeScript (optionnel) ;
+- un `README.md` embarqué dans le package (pratique pour les usages au quotidien).
 
 ## Installer le package
 
@@ -16,7 +17,7 @@ Le bridge déclare `@angular/*` et `rxjs` en `peerDependencies` : il doit être 
 
 ## Configurer le bridge
 
-Le point d’entrée est `provideBridge()`. Il configure `HttpClient` (fetch + interceptors du bridge) et fournit les tokens internes (base URL, defaults, Mercure, logger).
+Le point d’entrée est `provideBridge()`. Il configure `HttpClient` (fetch + interceptors) et fournit les tokens internes (base URL, defaults, Mercure, logger).
 
 ### Cookies / `withCredentials`
 
@@ -70,7 +71,7 @@ export class AppModule {}
 
 ### Auth (Bearer)
 
-`auth` accepte une string, un objet Bearer, ou un `HttpInterceptorFn` custom.
+`auth` accepte une string, un objet Bearer (token ou `getToken()`), ou un `HttpInterceptorFn` custom.
 
 ```ts
 import {provideBridge} from '@acme/backend-bridge';
@@ -150,6 +151,24 @@ Le realtime est inactif tant que `mercure.hubUrl` n’est pas fourni à `provide
 - `url` (défaut) : topic absolu (`https://api.example.com/api/...`)
 - `iri` : topic relatif (`/api/...`)
 
+### Concurrence
+
+Le bridge maintient **une seule connexion SSE** (une seule requête/connexion `EventSource`) et gère les topics en ref-count :
+- si plusieurs parties de l’app “watch” la même ressource, le topic est partagé (pas de doublon de connexion) ;
+- vous ne pouvez pas avoir plusieurs connexions SSE concurrentes “pour la même chose” : c’est volontairement mutualisé.
+
+À côté HTTP, le runtime déduplique les requêtes identiques **tant qu’elles sont en cours** (single-flight, activé par défaut) :
+- `GET` / `HEAD` / `OPTIONS` : deux appels identiques partagent le même appel réseau et reçoivent la même réponse ;
+- les méthodes avec body (`POST`/`PUT`/`PATCH`/`DELETE`) ne sont pas dédupliquées.
+
+Ce mécanisme n’est pas un cache : une fois la requête terminée, un nouvel appel identique relance un nouvel appel réseau.
+
+Vous pouvez le désactiver si nécessaire :
+
+```ts
+provideBridge({baseUrl: 'https://api.example.com', singleFlight: false});
+```
+
 API :
 - `ResourceFacade<T>.watch$(iri | iri[])` / `unwatch(iri | iri[])`
 - `ResourceFacade<T>.watchSubResource$(iri | iri[], 'field.path')`
@@ -165,3 +184,9 @@ import type {Item} from '@acme/backend-bridge';
 ```
 
 En JSON-LD (`application/ld+json`), l’IRI se trouve typiquement dans `model['@id']`.
+
+## Aller plus loin
+
+- API publique du bridge : `docs/fonctionnalites/api-publique.md`
+- HTTP / Hydra : `docs/fonctionnalites/fonctionnalites-http.md`
+- Mercure / SSE : `docs/fonctionnalites/fonctionnalites-mercure-sse.md`

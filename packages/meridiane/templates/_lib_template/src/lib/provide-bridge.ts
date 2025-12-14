@@ -13,6 +13,7 @@ import {contentTypeInterceptor} from './interceptors/content-type.interceptor';
 import {bridgeDefaultsInterceptor} from './interceptors/bridge-defaults.interceptor';
 import {bridgeDebugInterceptor} from './interceptors/bridge-debug.interceptor';
 import {from, switchMap} from 'rxjs';
+import {createSingleFlightInterceptor} from './interceptors/singleflight.interceptor';
 
 export type BridgeAuth =
   | string
@@ -37,6 +38,13 @@ export interface BridgeOptions {
   mercure?: BridgeMercureOptions;
   /** Default HTTP behaviour (headers, timeout, retries). */
   defaults?: BridgeDefaults;
+  /**
+   * De-duplicates in-flight HTTP requests.
+   *
+   * - `true` (default): single-flight for safe methods (`GET/HEAD/OPTIONS`)
+   * - `false`: disabled (each call triggers a new request)
+   */
+  singleFlight?: boolean;
   /** Enables debug logging via the debug interceptor and console logger. */
   debug?: boolean;
   /** Extra `HttpInterceptorFn` applied after bridge interceptors. */
@@ -50,6 +58,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
     auth,
     mercure,
     defaults,
+    singleFlight = true,
     debug = false,
     extraInterceptors = [],
   } = opts;
@@ -69,6 +78,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
     contentTypeInterceptor,
     bridgeDefaultsInterceptor,
     ...createAuthInterceptors(auth),
+    ...(singleFlight ? [createSingleFlightInterceptor('safe')] : [createSingleFlightInterceptor('off')]),
     ...(debug ? [bridgeDebugInterceptor] : []),
     ...extraInterceptors,
   ];

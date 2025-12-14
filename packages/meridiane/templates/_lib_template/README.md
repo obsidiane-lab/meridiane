@@ -2,7 +2,7 @@
 
 Bridge Angular (runtime + models TypeScript) pour une API Platform (Hydra/JSON-LD), avec support Mercure/SSE optionnel.
 
-Le package expose une API Angular minimaliste :
+Le package expose une API Angular volontairement minimaliste :
 - `provideBridge()` pour configurer le bridge (HTTP + tokens + Mercure) ;
 - `FacadeFactory` / `ResourceFacade<T>` pour une API orientée ressource ;
 - `BridgeFacade` pour des appels ad-hoc.
@@ -22,7 +22,7 @@ Le bridge est conçu pour être installé dans une application Angular. Les dép
 
 ## Démarrage rapide
 
-Configurez le bridge au démarrage de l’application avec `provideBridge()`.
+Configurez le bridge au démarrage de l’application avec `provideBridge()` (requis).
 
 ### Application standalone (recommandé)
 
@@ -56,6 +56,15 @@ export class AppModule {}
 ```
 
 ## Configuration
+
+`provideBridge({ ... })` accepte notamment :
+- `baseUrl` (requis) ;
+- `auth` (Bearer ou interceptor custom) ;
+- `mercure` (hubUrl + options SSE) ;
+- `defaults` (headers/timeout/retries) ;
+- `singleFlight` (déduplication “in-flight” des requêtes HTTP identiques `GET/HEAD/OPTIONS`) ;
+- `debug` (logs runtime) ;
+- `extraInterceptors` (interceptors Angular additionnels).
 
 ### Cookies / `withCredentials`
 
@@ -173,6 +182,24 @@ provideBridge({
   baseUrl: 'https://api.example.com',
   mercure: {hubUrl: 'https://api.example.com/.well-known/mercure', topicMode: 'url'},
 });
+```
+
+### Concurrence
+
+Le bridge maintient une seule connexion SSE (une seule `EventSource`) et mutualise les topics :
+- regarder plusieurs fois la même ressource ne crée pas plusieurs connexions ;
+- un même topic est dédoublonné et géré par ref-count (unsubscribe effectif quand plus personne n’écoute).
+
+Côté HTTP, le bridge déduplique les requêtes identiques tant qu’elles sont en cours (single-flight, activé par défaut) :
+- `GET` / `HEAD` / `OPTIONS` : deux appels identiques partagent le même appel réseau et reçoivent la même réponse ;
+- les méthodes avec body (`POST`/`PUT`/`PATCH`/`DELETE`) ne sont pas dédupliquées.
+
+Ce n’est pas un cache : une fois la requête terminée, un nouvel appel identique relance un nouvel appel réseau.
+
+Pour désactiver :
+
+```ts
+provideBridge({baseUrl: 'https://api.example.com', singleFlight: false});
 ```
 
 API :

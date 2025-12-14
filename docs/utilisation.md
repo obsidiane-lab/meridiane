@@ -1,99 +1,111 @@
-# Utilisation
+# Utilisation (CLI)
 
-Référence CLI (options, presets, sorties). Pour le workflow end-to-end : `docs/creer-un-bridge.md`.
+Cette page documente le CLI Meridiane : commandes, options et artefacts.
+
+Pour un guide “end-to-end” (CI → publish → consommation) : `docs/creer-un-bridge.md`.  
+Pour l’usage côté app Angular : `docs/consommer-un-bridge.md`.
 
 ## Prérequis
 
-- Node.js ≥ 18 + npm
-- Spec OpenAPI : URL `http(s)://…` ou fichier JSON local
+- Node.js ≥ 18 (20+ recommandé)
+- npm
+- Une spec OpenAPI (URL `http(s)://…` ou fichier JSON local), sauf si vous utilisez `--no-models`
 
-## TL;DR
+## Installer le CLI
+
+Dans un projet :
 
 ```bash
-# Dev (build + install local dans node_modules)
-meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/ld+json
+npm i -D @obsidiane/meridiane
+```
 
-# CI/CD (build + artefact npm publiable)
-meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --formats application/ld+json
+Puis :
+
+```bash
+npx meridiane --help
 ```
 
 ## Commandes
 
 ### `meridiane dev [packageName]`
 
-Build le bridge et l’installe localement dans `node_modules` (copie offline depuis `dist/`).
+Génère et build le bridge dans `dist/`, puis l’installe localement dans `node_modules` (copie offline depuis `dist/`).
 
-- sorties : `dist/<libName>`, `dist/<libName>/*.tgz`, `node_modules/<packageName>`
-- dans ce repo : `meridiane dev` sans `packageName` cible `apps/sandbox` et `@obsidiane/bridge-sandbox`
+Ce mode est pratique pour développer une app Angular contre un backend en cours.
+
+Sorties :
+- `dist/<libName>/` + `dist/<libName>/*.tgz`
+- `node_modules/<packageName>/` (package copié tel quel depuis `dist/<libName>`)
+
+Dans ce repo, `meridiane dev` sans `packageName` cible l’app sandbox (`apps/sandbox`) et `@obsidiane/bridge-sandbox`.
 
 ### `meridiane build <packageName> --version <semver>`
 
-Build le bridge et produit un `.tgz` prêt à publier.
+Génère et build le bridge, puis produit un `.tgz` (via `npm pack`) prêt à être publié.
 
-- sorties : `dist/<libName>`, `dist/<libName>/*.tgz`
+Sorties :
+- `dist/<libName>/` (package npm publiable)
+- `dist/<libName>/*.tgz` (artefact packé)
 
 ## Options
 
-- `--spec <url|file>` : source OpenAPI (URL ou JSON local). Requis sauf `--no-models`.
-- `--formats <mimeTypes>` : formats (media types) à générer, basé sur les endpoints réels (`paths`) (répétable, support `,`).
-  - ex: `--formats application/ld+json`
-  - ex: `--formats application/ld+json,application/json`
-- `--include <substr>` : ne garde que les schémas dont le nom contient `<substr>` (répétable, support `,`).
-- `--exclude <substr>` : retire les schémas dont le nom contient `<substr>` (répétable, support `,`).
-- `--no-models` : ne génère pas les models (et `--spec` devient inutile).
-- `--debug` : logs détaillés.
-- `--version <semver>` : (build uniquement) version du package généré.
+### `--spec <url|file>`
 
-## Formats (naming + runtime)
+Source OpenAPI :
+- URL (ex: `https://staging.example/api/docs.json`)
+- ou fichier JSON local (ex: `./openapi.json`)
 
-Meridiane génère les modèles selon les formats demandés (contract-driven depuis `paths`).
+Requis sauf `--no-models`.
 
-- Pour `application/ld+json` :
-  - modèles `extends Item`
-  - les champs Hydra `@id/@type/@context` ne sont pas dupliqués dans les modèles (déjà dans `Item`)
-- Pour les autres formats (ex: `application/json`) :
-  - pas d’`extends Item` imposé (le schéma fait foi)
+### `--formats <mimeTypes>`
 
-Dans tous les cas :
-- groups conservés (ex: `Account-user.read` ⇒ `AccountUserRead`)
-- pas de modèles `*.jsonMergePatch` (PATCH = `Partial<...>`)
-- noms normalisés (pas de suffixe `.jsonld`, ex: `Payment.jsonld` ⇒ `Payment`)
+Liste des media types à générer. Option répétable et compatible avec une liste `,`.
 
-## Exemples `--formats`
+Exemples :
 
 ```bash
-# 1) JSON-LD uniquement (Hydra) — recommandé pour API Platform
-meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/ld+json
-
-# 2) JSON “pur” uniquement
-meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/json
-
-# 3) Multi-format (ordre = format primaire)
-# Ici, ld+json est primaire : les collisions seront suffixées côté JSON (ex: *Json)
-meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --formats application/ld+json,application/json
-
-# Ici, json est primaire : les collisions seront suffixées côté ld+json (ex: *LdJson)
-meridiane build @acme/backend-bridge --version 1.2.3 --spec ./openapi.json --formats application/json,application/ld+json
-
-# 4) multipart/form-data (DTO d’upload), sans `extends Item`
-meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats multipart/form-data
+--formats application/ld+json
+--formats application/ld+json,application/json
 ```
 
-## Nullable mode (all vs spec)
+Important : `--formats` active un mode “contract-driven” : Meridiane traverse les endpoints (`paths`) et ne génère que les modèles réellement utilisés par ces formats.
 
-Le mode “nullable” est piloté par le paramètre interne `requiredMode` (valeurs : `all` ou `spec`) :
+### `--include <substr>` / `--exclude <substr>`
 
-- `dev` : `all` → toutes les props sont optionnelles et `| null`.
-- `build` : `spec` → respecte `required` et `nullable` du schéma.
+Filtres sur les noms de schémas OpenAPI (répétables, supports `,`).
 
-Exemple (schéma : `required: ['id']`, `opt` nullable) :
-- `spec` : `id: string`, `opt?: string | null`
-- `all` : `id?: string | null`, `opt?: string | null`
+### `--no-models`
 
-## Workflow CI/CD (pipeline backend)
+Génère uniquement le runtime (pas de models). Dans ce cas, `--spec` n’est pas nécessaire.
+
+### `--version <semver>`
+
+Uniquement pour `build`. Cette valeur est écrite dans le `package.json` du bridge.
+
+### `--debug`
+
+Active des logs détaillés côté CLI.
+
+## Détails de génération des models
+
+### JSON-LD (`application/ld+json`)
+
+- Les models générés `extends Item`.
+- Les champs Hydra `@id/@type/@context` ne sont pas dupliqués (ils sont déjà dans `Item`).
+
+### Autres formats (ex: `application/json`)
+
+- Pas d’`extends Item` imposé : le schéma OpenAPI fait foi.
+
+### Règles communes
+
+- Les schemas “merge-patch” ne génèrent pas de modèle : `PATCH` est typé en `Partial<T>`.
+- Les noms sont normalisés (ex: `Payment.jsonld` ⇒ `Payment`).
+
+## Exemple CI/CD (backend)
 
 ```bash
-npx -y @obsidiane/meridiane@0.1.0 build "$BRIDGE_PACKAGE_NAME" \
+npx -y @obsidiane/meridiane@latest build "$BRIDGE_PACKAGE_NAME" \
   --version "$BRIDGE_VERSION" \
   --spec "$OPENAPI_SPEC" \
   --formats application/ld+json
@@ -102,13 +114,5 @@ npm publish dist/<libName>
 ```
 
 Notes :
-- `npx -y …` fonctionne aussi depuis un dossier “vide” : Meridiane crée `dist/` dans le répertoire courant.
-- `npm publish` est volontairement hors de Meridiane (le pipeline reste responsable).
-
-## Développement Meridiane (ce repo)
-
-- `npm run sandbox:bridge` : build + install bridge (models)
-- `npm run sandbox:dev` : sync + `ng serve`
-- `npm run sandbox:build` : sync bridge + build app
-
-Note : par défaut, `meridiane dev` (dans ce repo) lit la spec sur `http://localhost:8000/api/docs.json`.
+- `dist/` est créé dans le répertoire courant (aucun workspace Angular requis).
+- `npm publish` reste volontairement hors de Meridiane.
