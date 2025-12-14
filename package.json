@@ -1,5 +1,6 @@
 {
   "name": "@obsidiane/meridiane-workspace",
+
   "private": true,
   "workspaces": [
     "packages/*",
