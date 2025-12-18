@@ -77,6 +77,7 @@ jobs:
         run: |
           cd packages/meridiane
           npm publish --provenance --access public
+          echo ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: Show release info
         if: env.RELEASE_TAG != ''
