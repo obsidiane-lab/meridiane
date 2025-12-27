@@ -41,6 +41,7 @@ Bonnes pratiques :
   - pas de modèles `*.jsonMergePatch` (PATCH = `Partial<...>`)
   - noms normalisés (pas de suffixe `.jsonld`)
 - utiliser `--no-models` si vous voulez uniquement le runtime (pas besoin de `--spec`)
+- le `README.md` du projet (si présent à la racine) est ajouté à la fin du README du bridge
 - laisser le registry à la CI (`.npmrc`, variables d’environnement, `npm publish --registry …`)
 
 Note (repo Meridiane) :

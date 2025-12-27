@@ -134,6 +134,7 @@ export async function runDev(packageName, opts) {
 
   const useSandboxDefaults = packageName === undefined;
   const appRoot = useSandboxDefaults ? await resolveSandboxAppRoot(startCwd) : await resolveDevAppRoot(startCwd);
+  const projectReadmePath = path.join(appRoot, 'README.md');
 
   const effectivePackageName = packageName ?? '@obsidiane/bridge-sandbox';
   const libName = deriveLibName(effectivePackageName);
@@ -182,6 +183,7 @@ export async function runDev(packageName, opts) {
     debug,
     log,
     distRoot,
+    projectReadmePath,
   });
 
   const ngPackageJsonPath = path.join(workspaceRoot, 'projects', libName, 'ng-package.json');

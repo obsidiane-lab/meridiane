@@ -47,6 +47,8 @@ Sorties :
 - `dist/<libName>/` (package npm publiable)
 - `dist/<libName>/*.tgz` (artefact packé)
 
+Le `README.md` du projet (si présent à la racine) est ajouté à la fin du README du bridge.
+
 ## Options
 
 ### `--spec <url|file>`

@@ -25,6 +25,7 @@ export async function runBuild(packageName, opts) {
   const cwd = process.cwd();
   const debug = !!opts.debug;
   const log = createLogger({ debug });
+  const projectReadmePath = path.join(cwd, 'README.md');
 
   const version = opts.version || '0.0.0';
 
@@ -71,6 +72,7 @@ export async function runBuild(packageName, opts) {
     debug,
     log,
     distRoot,
+    projectReadmePath,
   });
 
   const ngPackageJsonPath = path.join(workspaceRoot, 'projects', libName, 'ng-package.json');

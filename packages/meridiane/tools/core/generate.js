@@ -13,6 +13,35 @@ const __dirname = path.dirname(__filename);
 
 const pkgRoot = path.resolve(__dirname, '../..'); // packages/meridiane
 
+async function readTextIfExists(filePath) {
+  try {
+    return await fs.readFile(filePath, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+async function appendProjectReadme({targetReadmePath, projectReadmePath, debug}) {
+  if (!projectReadmePath) return;
+
+  const projectReadme = await readTextIfExists(projectReadmePath);
+  if (!projectReadme || projectReadme.trim().length === 0) return;
+
+  const targetReadme = await readTextIfExists(targetReadmePath);
+  if (!targetReadme || targetReadme.trim().length === 0) {
+    await fs.writeFile(targetReadmePath, projectReadme);
+    if (debug) console.log('[meridiane] project README copied', {source: projectReadmePath});
+    return;
+  }
+
+  const combined =
+    `${targetReadme.trimEnd()}\n\n---\n\n` +
+    `## Documentation du projet\n\n` +
+    `${projectReadme.trimStart()}`;
+  await fs.writeFile(targetReadmePath, combined);
+  if (debug) console.log('[meridiane] project README appended', {source: projectReadmePath});
+}
+
 async function replacePlaceholdersInDir(dir, placeholders) {
   const entries = await fs.readdir(dir, {withFileTypes: true});
   for (const entry of entries) {
@@ -29,7 +58,7 @@ async function replacePlaceholdersInDir(dir, placeholders) {
   }
 }
 
-async function generateLibrary({cwd, libName, packageName, version, debug}) {
+async function generateLibrary({cwd, libName, packageName, version, debug, projectReadmePath}) {
   const tplDir = path.resolve(pkgRoot, 'templates/_lib_template');
   const targetDir = path.resolve(cwd, 'projects', libName);
 
@@ -56,6 +85,12 @@ async function generateLibrary({cwd, libName, packageName, version, debug}) {
     libPkg.version = version;
     await writeJsonIfChanged(libPackageJsonPath, libPkg);
   }
+
+  await appendProjectReadme({
+    targetReadmePath: path.join(targetDir, 'README.md'),
+    projectReadmePath,
+    debug,
+  });
 
   // angular.json / workspace patching is intentionally not done here (Meridiane is standalone).
 }
@@ -122,6 +157,7 @@ async function generateModels({cwd, libName, spec, requiredMode, formats, includ
  *   log?: { step?: (msg: string) => void, info?: (msg: string) => void, success?: (msg: string) => void, debug?: (msg: string, data?: any) => void },
  *   workspaceMode?: 'angular'|'standalone',
  *   distRoot?: string,
+ *   projectReadmePath?: string,
  * }} params
  */
 export async function generateBridgeWorkspace(params) {
@@ -139,10 +175,11 @@ export async function generateBridgeWorkspace(params) {
     debug,
     log,
     distRoot,
+    projectReadmePath,
   } = params;
 
   log?.step?.(`génération de la librairie (projects/${libName})`);
-  await generateLibrary({cwd, libName, packageName, version, debug});
+  await generateLibrary({cwd, libName, packageName, version, debug, projectReadmePath});
 
   // If a dist root is provided, force ng-packagr output to that directory.
   if (distRoot) {
