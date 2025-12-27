@@ -39,7 +39,7 @@ Sorties :
 
 Dans ce repo, `meridiane dev` sans `packageName` cible l’app sandbox (`apps/sandbox`) et `@obsidiane/bridge-sandbox`.
 
-### `meridiane build <packageName> --version <semver>`
+### `meridiane build <packageName> [--version <semver>]`
 
 Génère et build le bridge, puis produit un `.tgz` (via `npm pack`) prêt à être publié.
 
@@ -81,6 +81,7 @@ Génère uniquement le runtime (pas de models). Dans ce cas, `--spec` n’est pa
 ### `--version <semver>`
 
 Uniquement pour `build`. Cette valeur est écrite dans le `package.json` du bridge.
+Si omise, Meridiane utilise `0.0.0` par défaut (pratique en local, déconseillé pour publier).
 
 ### `--debug`
 

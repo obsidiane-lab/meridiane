@@ -26,8 +26,7 @@ export async function runBuild(packageName, opts) {
   const debug = !!opts.debug;
   const log = createLogger({ debug });
 
-  const version = opts.version;
-  if (!version) throw new Error('Missing --version');
+  const version = opts.version || '0.0.0';
 
   const noModels = opts.models === false;
   const formats = splitListArgs(opts.formats);

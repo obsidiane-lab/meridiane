@@ -42,6 +42,8 @@ npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.
 
 Le build produit `dist/<libName>` et un `.tgz` via `npm pack` (prêt à publier).
 
+Astuce : `--version` est optionnel ; si omis, Meridiane utilise `0.0.0` (déconseillé pour publier).
+
 Astuce : si vous ne voulez générer que la lib (sans models), utilisez `--no-models` (et `--spec` devient inutile).
 
 Formats :

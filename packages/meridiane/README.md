@@ -24,11 +24,12 @@ npm i -g @obsidiane/meridiane
 npx meridiane dev <packageName> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 
 # CI/CD: génère + build Angular + npm pack (artefact prêt à publier)
-npx meridiane build <packageName> --version <semver> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
+npx meridiane build <packageName> [--version <semver>] --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 ```
 
 Options :
 - `--debug` : active des logs supplémentaires (CLI).
+- `--version` : uniquement pour `build` ; par défaut `0.0.0` si omis (déconseillé pour publier).
 - `--formats` : peut être répété ou fourni en liste séparée par virgules :
   - `--formats application/ld+json`
   - `--formats application/ld+json,application/json`

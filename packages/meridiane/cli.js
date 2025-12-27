@@ -51,7 +51,7 @@ commonOptions(
   program
     .command('build')
     .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
-    .requiredOption('--version <semver>', 'Version to write in the generated bridge package.json (CI/CD)')
+    .option('--version <semver>', 'Version to write in the generated bridge package.json (CI/CD)')
     .action(async (packageName, opts) => {
       const log = createLogger({ debug: !!opts?.debug });
       try {
