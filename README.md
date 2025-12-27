@@ -34,6 +34,12 @@ Générer en local (développement d’app Angular) :
 npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/ld+json
 ```
 
+Générer uniquement les fichiers (monorepo) :
+
+```bash
+npx meridiane generate @acme/backend-bridge --spec ./openapi.json --formats application/ld+json
+```
+
 Générer en CI (artefact publiable) :
 
 ```bash

@@ -58,16 +58,16 @@ async function replacePlaceholdersInDir(dir, placeholders) {
   }
 }
 
-async function generateLibrary({cwd, libName, packageName, version, debug, log, projectReadmePath}) {
+async function generateLibrary({projectDir, libName, packageName, version, debug, log, projectReadmePath}) {
   const tplDir = path.resolve(pkgRoot, 'templates/_lib_template');
-  const targetDir = path.resolve(cwd, 'projects', libName);
+  const targetDir = projectDir;
 
   if (debug) {
     log?.debug?.('[meridiane] generate lib', {
       libName,
       packageName,
       version,
-      targetDir: path.relative(cwd, targetDir)
+      targetDir
     });
   }
 
@@ -95,16 +95,16 @@ async function generateLibrary({cwd, libName, packageName, version, debug, log, 
     log,
   });
 
-  // angular.json / workspace patching is intentionally not done here (Meridiane is standalone).
+  // angular.json / workspace patching is intentionally not done here.
 }
 
-async function generateModels({cwd, libName, spec, requiredMode, formats, include, exclude, debug, log}) {
-  const outDir = path.resolve(cwd, 'projects', libName, 'src', 'models');
+async function generateModels({projectDir, spec, requiredMode, formats, include, exclude, debug, log}) {
+  const outDir = path.resolve(projectDir, 'src', 'models');
   const templatesDir = path.resolve(pkgRoot, 'tools', 'generator', 'models', 'templates');
 
   if (debug) {
     log?.debug?.('[meridiane] generate models', {
-      outDir: path.relative(cwd, outDir),
+      outDir,
       requiredMode,
       formats: Array.isArray(formats) ? formats : [],
       includeCount: include.length,
@@ -161,6 +161,7 @@ async function generateModels({cwd, libName, spec, requiredMode, formats, includ
  *   log?: { step?: (msg: string) => void, info?: (msg: string) => void, success?: (msg: string) => void, debug?: (msg: string, data?: any) => void },
  *   workspaceMode?: 'angular'|'standalone',
  *   distRoot?: string,
+ *   projectDir?: string,
  *   projectReadmePath?: string,
  * }} params
  */
@@ -179,19 +180,21 @@ export async function generateBridgeWorkspace(params) {
     debug,
     log,
     distRoot,
+    projectDir: projectDirInput,
     projectReadmePath,
   } = params;
 
-  log?.step?.(`génération de la librairie (projects/${libName})`);
-  await generateLibrary({cwd, libName, packageName, version, debug, log, projectReadmePath});
+  const projectDir = projectDirInput ?? path.resolve(cwd, 'projects', libName);
+  log?.step?.(`génération de la librairie (${path.relative(cwd, projectDir)})`);
+  await generateLibrary({projectDir, libName, packageName, version, debug, log, projectReadmePath});
 
   // If a dist root is provided, force ng-packagr output to that directory.
   if (distRoot) {
-    const ngPackagePath = path.resolve(cwd, 'projects', libName, 'ng-package.json');
+    const ngPackagePath = path.resolve(projectDir, 'ng-package.json');
     const ngPkg = await readJson(ngPackagePath);
     const desiredDestAbs = path.resolve(distRoot, libName);
-    const projectDir = path.dirname(ngPackagePath);
-    ngPkg.dest = path.relative(projectDir, desiredDestAbs).split(path.sep).join('/');
+    const projectRoot = path.dirname(ngPackagePath);
+    ngPkg.dest = path.relative(projectRoot, desiredDestAbs).split(path.sep).join('/');
     await writeJsonIfChanged(ngPackagePath, ngPkg);
     log?.debug?.('ng-package.json dest overridden', {dest: ngPkg.dest});
   }
@@ -204,6 +207,6 @@ export async function generateBridgeWorkspace(params) {
 
   if (!spec) throw new Error('Internal error: spec is required when noModels=false');
   log?.step?.('génération des models (OpenAPI)');
-  await generateModels({cwd, libName, spec, requiredMode, formats, include, exclude, debug, log});
+  await generateModels({projectDir, spec, requiredMode, formats, include, exclude, debug, log});
   log?.success?.('génération terminée');
 }

@@ -23,13 +23,17 @@ npm i -g @obsidiane/meridiane
 # (build standalone + install local dans node_modules)
 npx meridiane dev <packageName> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 
+# Monorepo: génère uniquement les fichiers (pas de npm pack)
+npx meridiane generate <packageName> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--out <dir>] [--debug]
+
 # CI/CD: génère + build Angular + npm pack (artefact prêt à publier)
 npx meridiane build <packageName> [--version <semver>] --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 ```
 
 Options :
 - `--debug` : active des logs supplémentaires (CLI).
-- `--version` : uniquement pour `build` ; par défaut `0.0.0` si omis (déconseillé pour publier).
+- `--version` : pour `build` et `generate` ; par défaut `0.0.0` si omis (déconseillé pour publier).
+- `--out` : uniquement pour `generate` ; répertoire de sortie (défaut `projects/<libName>`).
 - `--formats` : peut être répété ou fourni en liste séparée par virgules :
   - `--formats application/ld+json`
   - `--formats application/ld+json,application/json`

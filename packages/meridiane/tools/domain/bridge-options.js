@@ -42,6 +42,28 @@ export function normalizeBuildOptions(packageName, opts) {
   };
 }
 
+export function normalizeGenerateOptions(packageName, opts) {
+  const common = normalizeCommonOptions(opts);
+  const normalizedPackageName = String(packageName || '').trim();
+  if (!normalizedPackageName) throw new Error('Missing packageName');
+
+  const outDir = typeof opts?.out === 'string' ? opts.out.trim() : '';
+
+  return {
+    mode: 'generate',
+    packageName: normalizedPackageName,
+    libName: deriveLibName(normalizedPackageName),
+    version: normalizeVersion(opts?.version),
+    requiredMode: 'spec',
+    formats: normalizeFormats(common.formats),
+    include: common.include,
+    exclude: common.exclude,
+    noModels: common.noModels,
+    debug: common.debug,
+    outDir,
+  };
+}
+
 export function normalizeDevOptions(packageName, opts) {
   const common = normalizeCommonOptions(opts);
   const useSandboxDefaults = packageName === undefined;
