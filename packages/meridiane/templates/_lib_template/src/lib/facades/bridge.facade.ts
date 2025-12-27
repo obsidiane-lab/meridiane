@@ -3,6 +3,7 @@ import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {filter, map, share} from 'rxjs/operators';
 import {toHttpParams} from '../bridge/rest/query-builder';
+import {buildHttpRequestOptions} from '../bridge/rest/http-request.options';
 import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
 import {API_BASE_URL, BRIDGE_WITH_CREDENTIALS} from '../tokens';
 import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequired, Item} from '../ports/resource-repository.port';
@@ -75,19 +76,10 @@ export class BridgeFacade {
   }
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
-    const {method, url, query, body, headers, responseType, withCredentials, options = {}} = req;
+    const {method, url} = req;
     const targetUrl = this.resolveUrl(url);
 
-    const mergedOptions: Record<string, unknown> = {...options};
-    if (headers) mergedOptions['headers'] = headers;
-    if (query) mergedOptions['params'] = toHttpParams(query);
-    if (body !== undefined) mergedOptions['body'] = body;
-
-    mergedOptions['responseType'] = (responseType ?? (mergedOptions['responseType'] as any) ?? 'json') as any;
-    mergedOptions['withCredentials'] =
-      withCredentials ?? (mergedOptions['withCredentials'] as any) ?? this.withCredentialsDefault;
-    mergedOptions['observe'] = 'body';
-
+    const mergedOptions = buildHttpRequestOptions(req, {withCredentialsDefault: this.withCredentialsDefault});
     return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
   }
 

@@ -4,7 +4,7 @@ import { Command } from 'commander';
 
 import { runDev } from './tools/dev.js';
 import { runBuild } from './tools/build.js';
-import { createLogger } from './tools/core/logger.js';
+import { createLogger } from './tools/infra/logger.js';
 
 const program = new Command();
 
@@ -39,10 +39,12 @@ commonOptions(
     .action(async (packageName, opts) => {
       const log = createLogger({ debug: !!opts?.debug });
       try {
-        await runDev(packageName, opts);
+        const exitCode = await runDev(packageName, opts);
+        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
       } catch (err) {
         log.error(err);
-        process.exit(1);
+        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
+        process.exit(exitCode);
       }
     })
 );
@@ -55,10 +57,12 @@ commonOptions(
     .action(async (packageName, opts) => {
       const log = createLogger({ debug: !!opts?.debug });
       try {
-        await runBuild(packageName, opts);
+        const exitCode = await runBuild(packageName, opts);
+        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
       } catch (err) {
         log.error(err);
-        process.exit(1);
+        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
+        process.exit(exitCode);
       }
     })
 );

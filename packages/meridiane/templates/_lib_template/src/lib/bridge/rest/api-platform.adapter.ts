@@ -1,6 +1,7 @@
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {toHttpParams} from './query-builder';
+import {buildHttpRequestOptions} from './http-request.options';
 import {
   Collection,
   HttpCallOptions,
@@ -68,29 +69,10 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
     // Low-level escape hatch for non-standard endpoints (custom controllers, uploads, etc.).
-    const {
-      method,
-      url,
-      query,
-      body,
-      headers,
-      responseType,
-      withCredentials,
-      options = {},
-    } = req;
+    const {method, url} = req;
 
     const targetUrl = this.resolveUrl(url ?? this.resourcePath);
-    const mergedOptions: Record<string, unknown> = {...options};
-
-    mergedOptions['responseType'] = (responseType ?? (mergedOptions['responseType'] as any) ?? 'json') as any;
-
-    mergedOptions['withCredentials'] = withCredentials ?? (mergedOptions['withCredentials'] as any) ?? this.withCredentialsDefault;
-
-    if (headers) mergedOptions['headers'] = headers;
-    if (query) mergedOptions['params'] = toHttpParams(query);
-    if (body !== undefined) mergedOptions['body'] = body;
-
-    mergedOptions['observe'] = 'body';
+    const mergedOptions = buildHttpRequestOptions(req, {withCredentialsDefault: this.withCredentialsDefault});
     return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
   }
 

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
+import { runCommand } from './exec.js';
 import { writeJsonIfChanged } from './json.js';
 
 async function ensureDir(p) {
@@ -62,7 +63,8 @@ export async function ensureStandaloneWorkspace({ repoRoot, log }) {
   await ensureDir(distRoot);
   await ensureDir(workspaceRoot);
 
-  const angularVersion = '20.1.7';
+  const angularVersion = (await detectAngularVersion(repoRoot)) ?? '20.1.7';
+  log?.debug?.('[meridiane] angular version', { angularVersion });
   await writeJsonIfChanged(path.join(workspaceRoot, 'package.json'), toolchainPackageJson({ angularVersion }));
   await writeJsonIfChanged(path.join(workspaceRoot, 'tsconfig.json'), rootTsconfigJson());
 
@@ -72,6 +74,21 @@ export async function ensureStandaloneWorkspace({ repoRoot, log }) {
   const requireFromWs = createRequire(path.join(workspaceRoot, 'package.json'));
 
   return { workspaceRoot, distRoot, npmCacheDir, requireFromWs };
+}
+
+async function detectAngularVersion(repoRoot) {
+  const pkgPath = path.join(repoRoot, 'package.json');
+  try {
+    const raw = await fs.readFile(pkgPath, 'utf8');
+    const parsed = JSON.parse(raw);
+    const deps = parsed?.dependencies || {};
+    const devDeps = parsed?.devDependencies || {};
+    const peerDeps = parsed?.peerDependencies || {};
+    const v = deps['@angular/core'] ?? devDeps['@angular/core'] ?? peerDeps['@angular/core'];
+    return typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function ensureToolchainInstalled({ workspaceRoot, requireFromWs, npmCacheDir, log }) {
@@ -101,12 +118,7 @@ export async function ensureToolchainInstalled({ workspaceRoot, requireFromWs, n
   // We avoid generating a lockfile in the backend repo by keeping everything under dist/.
   const npmCmd = 'npm';
   const args = ['install', '--silent', '--no-progress'];
-  const { spawn } = await import('node:child_process');
-
-  const code = await new Promise((resolve) => {
-    const child = spawn(npmCmd, args, { cwd: workspaceRoot, stdio: 'inherit', env });
-    child.on('exit', (c) => resolve(c ?? 0));
-  });
+  const code = await runCommand(npmCmd, args, { cwd: workspaceRoot, env });
 
   if (code !== 0) throw new Error(`Toolchain install failed (npm exit ${code})`);
   if (!(await exists(path.join(workspaceRoot, 'node_modules')))) {
@@ -114,4 +126,3 @@ export async function ensureToolchainInstalled({ workspaceRoot, requireFromWs, n
   }
   return true;
 }
-

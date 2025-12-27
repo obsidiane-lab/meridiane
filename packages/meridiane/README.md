@@ -55,3 +55,11 @@ npm publish dist/backend-bridge
 ```
 
 Note : Meridiane installe le toolchain (`ng-packagr`, `@angular/*`, …) dans `dist/.meridiane-workspace` si nécessaire.
+
+## Structure interne (mainteneurs)
+
+- `tools/app/` : orchestration des commandes (use-cases).
+- `tools/domain/` : logique pure (options, naming).
+- `tools/infra/` : I/O (spec, workspace, exec, logs) + génération.
+- `tools/generator/` : génération des modèles TypeScript.
+- `templates/_lib_template/` : runtime Angular du bridge.
