@@ -1,8 +1,8 @@
 # @obsidiane/meridiane
 
-CLI pour générer une librairie Angular “bridge” (Symfony / API Platform / Mercure) et générer des modèles TypeScript depuis une spec OpenAPI.
+CLI pour générer un bridge Angular (API Platform + Mercure) depuis une spec OpenAPI.
 
-Documentation détaillée (repo) : `docs/index.md`.
+Documentation complète (repo) : `docs/guide-bridge.md`.
 
 ## Installation
 
@@ -16,54 +16,58 @@ Ou en global :
 npm i -g @obsidiane/meridiane
 ```
 
-## Usage
+## Commandes
+
+### `meridiane generate <packageName>`
+
+Génère uniquement les fichiers du bridge dans le workspace courant (pas de build, pas de `npm pack`).
 
 ```bash
-# Dev: génère le bridge (+ models par défaut)
-# (build standalone + install local dans node_modules)
-npx meridiane dev <packageName> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
-
-# Monorepo: génère uniquement les fichiers (pas de npm pack)
-npx meridiane generate <packageName> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--out <dir>] [--debug]
-
-# CI/CD: génère + build Angular + npm pack (artefact prêt à publier)
-npx meridiane build <packageName> [--version <semver>] --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
+npx meridiane generate @acme/backend-bridge --spec ./openapi.json
 ```
 
-Options :
-- `--debug` : active des logs supplémentaires (CLI).
-- `--version` : pour `build` et `generate` ; par défaut `0.0.0` si omis (déconseillé pour publier).
-- `--out` : uniquement pour `generate` ; répertoire de sortie (défaut `projects/<libName>`).
-- `--formats` : peut être répété ou fourni en liste séparée par virgules :
-  - `--formats application/ld+json`
-  - `--formats application/ld+json,application/json`
+Sortie par défaut : `projects/<libName>/` (modifiable via `--out`).
 
-Bonnes pratiques :
-- utiliser `--formats application/ld+json` (ou plusieurs formats) pour un mode “contract-driven” :
-  - modèles générés uniquement s’ils sont utilisés par les endpoints (pour ces formats)
-  - groups conservés
-  - pas de modèles `*.jsonMergePatch` (PATCH = `Partial<...>`)
-  - noms normalisés (pas de suffixe `.jsonld`)
-- utiliser `--no-models` si vous voulez uniquement le runtime (pas besoin de `--spec`)
-- le `README.md` du projet (si présent à la racine) est ajouté à la fin du README du bridge
-- laisser le registry à la CI (`.npmrc`, variables d’environnement, `npm publish --registry …`)
+### `meridiane dev [packageName]`
 
-Note (repo Meridiane) :
-- dans le repo Meridiane, `meridiane dev` peut être exécutée sans `packageName` et se préconfigure pour `apps/sandbox` (`@obsidiane/bridge-sandbox`).
-
-## Exemple CI (générer + build + publish)
+Build standalone + installation locale dans `node_modules`.
 
 ```bash
-npx -y @obsidiane/meridiane@0.1.0 build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json --formats application/ld+json
-npm publish dist/backend-bridge
+npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json
 ```
 
-Note : Meridiane installe le toolchain (`ng-packagr`, `@angular/*`, …) dans `dist/.meridiane-workspace` si nécessaire.
+Sorties :
+- `dist/<libName>/` + `dist/<libName>/*.tgz`
+- `node_modules/<packageName>/`
 
-## Structure interne (mainteneurs)
+### `meridiane build <packageName>`
 
-- `tools/app/` : orchestration des commandes (use-cases).
-- `tools/domain/` : logique pure (options, naming).
-- `tools/infra/` : I/O (spec, workspace, exec, logs) + génération.
-- `tools/generator/` : génération des modèles TypeScript.
-- `templates/_lib_template/` : runtime Angular du bridge.
+Build standalone + `npm pack` (artefact publiable).
+
+```bash
+npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json
+```
+
+Sorties :
+- `dist/<libName>/`
+- `dist/<libName>/*.tgz`
+
+## Options
+
+- `--spec <url|file>` : source OpenAPI (URL ou fichier JSON local) ; requis sauf `--no-models`.
+- `--formats <mimeTypes>` : répétable ou liste `,` (ordre significatif). Active le mode contract-driven.
+- `--include/--exclude <substr>` : filtrer des noms de schémas OpenAPI.
+- `--no-models` : ne génère que le runtime (pas de models).
+- `--version <semver>` : version écrite dans le `package.json` (`build` + `generate`).
+- `--out <dir>` : répertoire de sortie pour `generate` (défaut `projects/<libName>`).
+- `--debug` : logs détaillés.
+
+## Notes importantes
+
+- `--formats` active un mode contract-driven : seuls les schemas réellement utilisés par les endpoints/paths sont générés.
+- Les modèles `*.jsonMergePatch` ne sont jamais générés (`PATCH` est typé en `Partial<T>`).
+- Meridiane **ne publie pas** : utilisez `npm publish` côté CI.
+
+## Note (repo Meridiane)
+
+Dans ce repo, `meridiane dev` peut être exécutée sans `packageName` et cible l’app sandbox (`apps/sandbox`).
