@@ -39,13 +39,24 @@ Sorties :
 
 Dans ce repo, `meridiane dev` sans `packageName` cible l’app sandbox (`apps/sandbox`) et `@obsidiane/bridge-sandbox`.
 
-### `meridiane build <packageName> --version <semver>`
+### `meridiane generate <packageName> [--out <dir>]`
+
+Génère uniquement les fichiers du bridge dans le workspace courant (pas de `npm pack`, pas de workspace standalone).
+
+Sorties :
+- `projects/<libName>/` (par défaut) ou le chemin fourni par `--out`
+
+Ce mode est destiné aux monorepos qui veulent consommer le bridge comme des sources locales.
+
+### `meridiane build <packageName> [--version <semver>]`
 
 Génère et build le bridge, puis produit un `.tgz` (via `npm pack`) prêt à être publié.
 
 Sorties :
 - `dist/<libName>/` (package npm publiable)
 - `dist/<libName>/*.tgz` (artefact packé)
+
+Le `README.md` du projet (si présent à la racine) est ajouté à la fin du README du bridge.
 
 ## Options
 
@@ -80,7 +91,12 @@ Génère uniquement le runtime (pas de models). Dans ce cas, `--spec` n’est pa
 
 ### `--version <semver>`
 
-Uniquement pour `build`. Cette valeur est écrite dans le `package.json` du bridge.
+Pour `build` et `generate`. Cette valeur est écrite dans le `package.json` du bridge.
+Si omise, Meridiane utilise `0.0.0` par défaut (pratique en local, déconseillé pour publier).
+
+### `--out <dir>`
+
+Uniquement pour `generate`. Répertoire de sortie du bridge (défaut `projects/<libName>`).
 
 ### `--debug`
 

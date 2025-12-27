@@ -4,7 +4,8 @@ import { Command } from 'commander';
 
 import { runDev } from './tools/dev.js';
 import { runBuild } from './tools/build.js';
-import { createLogger } from './tools/core/logger.js';
+import { runGenerate } from './tools/generate.js';
+import { createLogger } from './tools/infra/logger.js';
 
 const program = new Command();
 
@@ -39,10 +40,12 @@ commonOptions(
     .action(async (packageName, opts) => {
       const log = createLogger({ debug: !!opts?.debug });
       try {
-        await runDev(packageName, opts);
+        const exitCode = await runDev(packageName, opts);
+        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
       } catch (err) {
         log.error(err);
-        process.exit(1);
+        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
+        process.exit(exitCode);
       }
     })
 );
@@ -51,14 +54,35 @@ commonOptions(
   program
     .command('build')
     .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
-    .requiredOption('--version <semver>', 'Version to write in the generated bridge package.json (CI/CD)')
+    .option('--version <semver>', 'Version to write in the generated bridge package.json (CI/CD)')
     .action(async (packageName, opts) => {
       const log = createLogger({ debug: !!opts?.debug });
       try {
-        await runBuild(packageName, opts);
+        const exitCode = await runBuild(packageName, opts);
+        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
       } catch (err) {
         log.error(err);
-        process.exit(1);
+        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
+        process.exit(exitCode);
+      }
+    })
+);
+
+commonOptions(
+  program
+    .command('generate')
+    .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
+    .option('--version <semver>', 'Version to write in the generated bridge package.json')
+    .option('--out <dir>', 'Output directory (default: projects/<libName>)')
+    .action(async (packageName, opts) => {
+      const log = createLogger({ debug: !!opts?.debug });
+      try {
+        const exitCode = await runGenerate(packageName, opts);
+        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
+      } catch (err) {
+        log.error(err);
+        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
+        process.exit(exitCode);
       }
     })
 );

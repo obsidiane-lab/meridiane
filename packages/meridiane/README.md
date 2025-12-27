@@ -23,12 +23,17 @@ npm i -g @obsidiane/meridiane
 # (build standalone + install local dans node_modules)
 npx meridiane dev <packageName> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 
+# Monorepo: génère uniquement les fichiers (pas de npm pack)
+npx meridiane generate <packageName> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--out <dir>] [--debug]
+
 # CI/CD: génère + build Angular + npm pack (artefact prêt à publier)
-npx meridiane build <packageName> --version <semver> --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
+npx meridiane build <packageName> [--version <semver>] --spec <url|file> [--formats <mimeTypes>]... [--include <substr>]... [--exclude <substr>]... [--no-models] [--debug]
 ```
 
 Options :
 - `--debug` : active des logs supplémentaires (CLI).
+- `--version` : pour `build` et `generate` ; par défaut `0.0.0` si omis (déconseillé pour publier).
+- `--out` : uniquement pour `generate` ; répertoire de sortie (défaut `projects/<libName>`).
 - `--formats` : peut être répété ou fourni en liste séparée par virgules :
   - `--formats application/ld+json`
   - `--formats application/ld+json,application/json`
@@ -40,6 +45,7 @@ Bonnes pratiques :
   - pas de modèles `*.jsonMergePatch` (PATCH = `Partial<...>`)
   - noms normalisés (pas de suffixe `.jsonld`)
 - utiliser `--no-models` si vous voulez uniquement le runtime (pas besoin de `--spec`)
+- le `README.md` du projet (si présent à la racine) est ajouté à la fin du README du bridge
 - laisser le registry à la CI (`.npmrc`, variables d’environnement, `npm publish --registry …`)
 
 Note (repo Meridiane) :
@@ -53,3 +59,11 @@ npm publish dist/backend-bridge
 ```
 
 Note : Meridiane installe le toolchain (`ng-packagr`, `@angular/*`, …) dans `dist/.meridiane-workspace` si nécessaire.
+
+## Structure interne (mainteneurs)
+
+- `tools/app/` : orchestration des commandes (use-cases).
+- `tools/domain/` : logique pure (options, naming).
+- `tools/infra/` : I/O (spec, workspace, exec, logs) + génération.
+- `tools/generator/` : génération des modèles TypeScript.
+- `templates/_lib_template/` : runtime Angular du bridge.

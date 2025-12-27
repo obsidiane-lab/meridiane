@@ -34,6 +34,12 @@ Générer en local (développement d’app Angular) :
 npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --formats application/ld+json
 ```
 
+Générer uniquement les fichiers (monorepo) :
+
+```bash
+npx meridiane generate @acme/backend-bridge --spec ./openapi.json --formats application/ld+json
+```
+
 Générer en CI (artefact publiable) :
 
 ```bash
@@ -41,6 +47,8 @@ npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.
 ```
 
 Le build produit `dist/<libName>` et un `.tgz` via `npm pack` (prêt à publier).
+
+Astuce : `--version` est optionnel ; si omis, Meridiane utilise `0.0.0` (déconseillé pour publier).
 
 Astuce : si vous ne voulez générer que la lib (sans models), utilisez `--no-models` (et `--spec` devient inutile).
 

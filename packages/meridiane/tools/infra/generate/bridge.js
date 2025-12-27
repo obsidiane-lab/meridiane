@@ -3,15 +3,44 @@ import {existsSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-import {readJson, writeJsonIfChanged} from './json.js';
-import {renderTemplateToFile} from '../generator/models/handlebars.js';
-import {ensureCleanDir} from '../generator/models/utils.js';
-import {buildModelsFromOpenAPI} from '../generator/models/openapi-to-models.js';
+import {readJson, writeJsonIfChanged} from '../json.js';
+import {renderTemplateToFile} from '../../generator/models/handlebars.js';
+import {ensureCleanDir} from '../../generator/models/utils.js';
+import {buildModelsFromOpenAPI} from '../../generator/models/openapi-to-models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const pkgRoot = path.resolve(__dirname, '../..'); // packages/meridiane
+const pkgRoot = path.resolve(__dirname, '../../..'); // packages/meridiane
+
+async function readTextIfExists(filePath) {
+  try {
+    return await fs.readFile(filePath, 'utf8');
+  } catch {
+    return undefined;
+  }
+}
+
+async function appendProjectReadme({targetReadmePath, projectReadmePath, debug, log}) {
+  if (!projectReadmePath) return;
+
+  const projectReadme = await readTextIfExists(projectReadmePath);
+  if (!projectReadme || projectReadme.trim().length === 0) return;
+
+  const targetReadme = await readTextIfExists(targetReadmePath);
+  if (!targetReadme || targetReadme.trim().length === 0) {
+    await fs.writeFile(targetReadmePath, projectReadme);
+    if (debug) log?.debug?.('[meridiane] project README copied', {source: projectReadmePath});
+    return;
+  }
+
+  const combined =
+    `${targetReadme.trimEnd()}\n\n---\n\n` +
+    `## Documentation du projet\n\n` +
+    `${projectReadme.trimStart()}`;
+  await fs.writeFile(targetReadmePath, combined);
+  if (debug) log?.debug?.('[meridiane] project README appended', {source: projectReadmePath});
+}
 
 async function replacePlaceholdersInDir(dir, placeholders) {
   const entries = await fs.readdir(dir, {withFileTypes: true});
@@ -29,16 +58,18 @@ async function replacePlaceholdersInDir(dir, placeholders) {
   }
 }
 
-async function generateLibrary({cwd, libName, packageName, version, debug}) {
+async function generateLibrary({projectDir, libName, packageName, version, debug, log, projectReadmePath}) {
   const tplDir = path.resolve(pkgRoot, 'templates/_lib_template');
-  const targetDir = path.resolve(cwd, 'projects', libName);
+  const targetDir = projectDir;
 
-  if (debug) console.log('[meridiane] generate lib', {
-    libName,
-    packageName,
-    version,
-    targetDir: path.relative(cwd, targetDir)
-  });
+  if (debug) {
+    log?.debug?.('[meridiane] generate lib', {
+      libName,
+      packageName,
+      version,
+      targetDir
+    });
+  }
 
   await fs.rm(targetDir, {recursive: true, force: true});
   await fs.mkdir(targetDir, {recursive: true});
@@ -57,21 +88,29 @@ async function generateLibrary({cwd, libName, packageName, version, debug}) {
     await writeJsonIfChanged(libPackageJsonPath, libPkg);
   }
 
-  // angular.json / workspace patching is intentionally not done here (Meridiane is standalone).
+  await appendProjectReadme({
+    targetReadmePath: path.join(targetDir, 'README.md'),
+    projectReadmePath,
+    debug,
+    log,
+  });
+
+  // angular.json / workspace patching is intentionally not done here.
 }
 
-async function generateModels({cwd, libName, spec, requiredMode, formats, include, exclude, debug}) {
-  const outDir = path.resolve(cwd, 'projects', libName, 'src', 'models');
+async function generateModels({projectDir, spec, requiredMode, formats, include, exclude, debug, log}) {
+  const outDir = path.resolve(projectDir, 'src', 'models');
   const templatesDir = path.resolve(pkgRoot, 'tools', 'generator', 'models', 'templates');
 
-  if (debug)
-    console.log('[meridiane] generate models', {
-      outDir: path.relative(cwd, outDir),
+  if (debug) {
+    log?.debug?.('[meridiane] generate models', {
+      outDir,
       requiredMode,
       formats: Array.isArray(formats) ? formats : [],
       includeCount: include.length,
       excludeCount: exclude.length,
     });
+  }
 
   await ensureCleanDir(outDir);
 
@@ -103,7 +142,7 @@ async function generateModels({cwd, libName, spec, requiredMode, formats, includ
     ctx: {models: models.map((m) => ({name: m.name}))},
   });
 
-  if (debug) console.log(`[meridiane] ${models.length} model(s) generated`);
+  if (debug) log?.debug?.(`[meridiane] ${models.length} model(s) generated`);
 }
 
 /**
@@ -122,6 +161,8 @@ async function generateModels({cwd, libName, spec, requiredMode, formats, includ
  *   log?: { step?: (msg: string) => void, info?: (msg: string) => void, success?: (msg: string) => void, debug?: (msg: string, data?: any) => void },
  *   workspaceMode?: 'angular'|'standalone',
  *   distRoot?: string,
+ *   projectDir?: string,
+ *   projectReadmePath?: string,
  * }} params
  */
 export async function generateBridgeWorkspace(params) {
@@ -139,30 +180,33 @@ export async function generateBridgeWorkspace(params) {
     debug,
     log,
     distRoot,
+    projectDir: projectDirInput,
+    projectReadmePath,
   } = params;
 
-  log?.step?.(`génération de la librairie (projects/${libName})`);
-  await generateLibrary({cwd, libName, packageName, version, debug});
+  const projectDir = projectDirInput ?? path.resolve(cwd, 'projects', libName);
+  log?.step?.(`génération de la librairie (${path.relative(cwd, projectDir)})`);
+  await generateLibrary({projectDir, libName, packageName, version, debug, log, projectReadmePath});
 
   // If a dist root is provided, force ng-packagr output to that directory.
   if (distRoot) {
-    const ngPackagePath = path.resolve(cwd, 'projects', libName, 'ng-package.json');
+    const ngPackagePath = path.resolve(projectDir, 'ng-package.json');
     const ngPkg = await readJson(ngPackagePath);
     const desiredDestAbs = path.resolve(distRoot, libName);
-    const projectDir = path.dirname(ngPackagePath);
-    ngPkg.dest = path.relative(projectDir, desiredDestAbs).split(path.sep).join('/');
+    const projectRoot = path.dirname(ngPackagePath);
+    ngPkg.dest = path.relative(projectRoot, desiredDestAbs).split(path.sep).join('/');
     await writeJsonIfChanged(ngPackagePath, ngPkg);
     log?.debug?.('ng-package.json dest overridden', {dest: ngPkg.dest});
   }
 
   if (noModels) {
     log?.info?.('models ignorés (--no-models)');
-    if (debug) console.log('[meridiane] --no-models enabled, skipping models generation');
+    if (debug) log?.debug?.('[meridiane] --no-models enabled, skipping models generation');
     return;
   }
 
   if (!spec) throw new Error('Internal error: spec is required when noModels=false');
   log?.step?.('génération des models (OpenAPI)');
-  await generateModels({cwd, libName, spec, requiredMode, formats, include, exclude, debug});
+  await generateModels({projectDir, spec, requiredMode, formats, include, exclude, debug, log});
   log?.success?.('génération terminée');
 }
