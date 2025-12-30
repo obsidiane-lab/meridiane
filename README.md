@@ -1,7 +1,7 @@
 # Meridiane
 
-Un CLI pour générer un bridge Angular depuis une spec OpenAPI (API Platform + Mercure).
-Le bridge embarque un runtime HTTP/SSE et, si besoin, des models TypeScript.
+Un CLI pour générer un bridge multi-target depuis une spec OpenAPI.
+Le bridge embarque un runtime HTTP (et SSE côté Angular) et des modèles générés.
 
 ![CI](https://github.com/obsidiane-lab/meridiane/actions/workflows/ci.yml/badge.svg)
 
@@ -12,13 +12,19 @@ Le bridge embarque un runtime HTTP/SSE et, si besoin, des models TypeScript.
 
 ```bash
 # Monorepo (sources locales)
-npx meridiane generate @acme/backend-bridge --spec ./openapi.json
+npx meridiane generate @acme/backend-bridge --spec ./openapi.json --target angular
 
 # Dév app Angular
-npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json
+npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --target angular
 
 # CI/CD (package npm)
-npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json
+npx meridiane build @acme/backend-bridge --version 0.1.0 --spec https://staging.example/api/docs.json --target angular
+```
+
+Symfony / PHP (bundle) :
+
+```bash
+npx meridiane generate acme/backend-bridge-php --spec ./openapi.json --target symfony
 ```
 
 3. Configurer l’app Angular :
@@ -33,7 +39,8 @@ provideBridge({baseUrl: 'https://api.example.com'});
 
 - Génération contract-driven (models basés sur les endpoints exposés)
 - Runtime Angular complet (interceptors, auth, retries, facades)
-- Mercure/SSE mono-connexion avec gestion des topics
+- Runtime Symfony/PHP (bundle) sans SSE
+- Mercure/SSE mono-connexion avec gestion des topics (Angular)
 - Single-flight HTTP pour déduplication in-flight
 - Mode monorepo ou package npm publiable
 - Build standalone (pas besoin d’un workspace Angular pour packager)

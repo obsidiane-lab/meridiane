@@ -1,4 +1,4 @@
-import { schemaNameFromRef } from './schema-utils.js';
+import { schemaNameFromRef } from '../../engine/openapi/schema-utils.js';
 import { quoteKeyIfNeeded } from './utils.js';
 
 /**

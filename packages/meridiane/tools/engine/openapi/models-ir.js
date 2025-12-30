@@ -1,40 +1,8 @@
-import { sanitizeTypeName, quoteKeyIfNeeded } from './utils.js';
-import { mergeAllOf, isObject, schemaNameFromRef } from '../../engine/openapi/schema-utils.js';
-import { tsTypeOf, withNullable } from './type-resolver.js';
-import { canonicalizeMediaType, collectUsedSchemasForMediaType, expandWithSchemaDependencies } from '../../engine/openapi/oas-contract.js';
-import { baseTsNameFromBasePath, formatSuffixToken, groupTsNameFromGroupPath, parseOpenApiSchemaName } from '../../engine/openapi/oas-schema-name.js';
-
-/**
- * @typedef {{
- *   requiredMode?: 'all'|'spec',
- *   formats?: string[],
- *   includeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
- *   excludeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
- * }} BuildOptions
- */
-
-/**
- * @typedef {{
- *   name: string,
- *   tsKey: string,
- *   type: string,
- *   optional: boolean,
- * }} ModelProp
- */
-
-/**
- * @typedef {{
- *   name: string,
- *   props: ModelProp[],
- *   imports: string[],
- *   extendsTypes: string[],
- *   extendsItem?: boolean,
- * }} ModelDefinition
- */
-
-function ensureNullable(ts) {
-  return /\|\s*null\b/.test(ts) ? ts : `${ts} | null`;
-}
+import { sanitizeTypeName } from '../../generator/models/utils.js';
+import { mergeAllOf, isObject, schemaNameFromRef } from './schema-utils.js';
+import { canonicalizeMediaType, collectUsedSchemasForMediaType, expandWithSchemaDependencies } from './oas-contract.js';
+import { baseTsNameFromBasePath, formatSuffixToken, groupTsNameFromGroupPath, parseOpenApiSchemaName } from './oas-schema-name.js';
+import { ensureNullableType, typeIrOf, withNullableType } from './type-ir.js';
 
 function normalizeRequiredMode(value) {
   const v = String(value ?? '').trim().toLowerCase();
@@ -44,23 +12,26 @@ function normalizeRequiredMode(value) {
   return 'all';
 }
 
+function ensureNullable(type) {
+  return ensureNullableType(type);
+}
+
 /**
- * Construit les définitions de modèles à partir d’une spec OpenAPI (components.schemas)
  * @param {any} spec
- * @param {BuildOptions} [options]
- * @returns {{ models: ModelDefinition[] }}
+ * @param {{
+ *   requiredMode?: 'all'|'spec',
+ *   formats?: string[],
+ *   includeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
+ *   excludeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
+ * }} [options]
  */
-export function buildModelsFromOpenAPI(spec, options) {
+export function buildModelsIR(spec, options) {
   const opts = { requiredMode: 'all', ...(options || {}) };
   const schemas = spec?.components?.schemas || {};
   const formatsOpt = Array.isArray(opts.formats) ? opts.formats : [];
   const formats = formatsOpt.length > 0 ? formatsOpt : ['application/ld+json'];
   const requiredMode = normalizeRequiredMode(opts.requiredMode);
 
-  /** @type {ModelDefinition[]} */
-  const models = [];
-
-  // Contract-driven (formats): keep only schemas used by selected media types in real endpoints.
   const normalizedFormats = [];
   for (const f of formats) {
     const canon = canonicalizeMediaType(f);
@@ -69,14 +40,11 @@ export function buildModelsFromOpenAPI(spec, options) {
   }
   if (normalizedFormats.length === 0) normalizedFormats.push('application/ld+json');
 
-  /** @type {Map<string, Set<string>>} */
-  const usedByFormat = new Map(); // formatLower -> Set<schemaName>
-
+  const usedByFormat = new Map();
   for (const fmt of normalizedFormats) {
     usedByFormat.set(fmt, collectUsedSchemasForMediaType(spec, { mediaType: fmt }));
   }
 
-  /** @type {Map<string, Set<string>>} */
   const schemaToFormats = new Map();
   for (const [fmt, names] of usedByFormat.entries()) {
     for (const name of names) {
@@ -111,7 +79,6 @@ export function buildModelsFromOpenAPI(spec, options) {
       return included && !excluded;
     });
 
-  // Ensure filters never break compilation: always keep transitive deps of selected schemas.
   const candidatesSet = include.length > 0 || exclude.length > 0 ? expandWithSchemaDependencies(allUsed, schemas) : new Set(allUsed);
 
   const candidates = [...candidatesSet]
@@ -119,7 +86,6 @@ export function buildModelsFromOpenAPI(spec, options) {
     .filter((n) => !/^Hydra/i.test(n))
     .sort((a, b) => a.localeCompare(b));
 
-  // Assign a preferred format to each schema (used for naming + JSON-LD behavior).
   const formatIndex = new Map(normalizedFormats.map((f, i) => [f, i]));
   const schemaEntries = candidates.map((schemaName) => {
     const fmts = schemaToFormats.get(schemaName) || new Set();
@@ -128,11 +94,10 @@ export function buildModelsFromOpenAPI(spec, options) {
   });
   const preferredFormatBySchema = new Map(schemaEntries.map((e) => [e.schemaName, e.preferredFormat]));
 
-  // Compute desired TS names (format-agnostic), then disambiguate collisions by preferred format.
-  const byDesired = new Map(); // desired -> entries[]
+  const byDesired = new Map();
   for (const e of schemaEntries) {
     const parsed = parseOpenApiSchemaName(e.schemaName);
-    if (parsed.isMergePatch) continue; // never generate patch models
+    if (parsed.isMergePatch) continue;
     const baseTs = baseTsNameFromBasePath(parsed.basePath);
     const groupTs = groupTsNameFromGroupPath(parsed.groupPath);
     const desired = `${baseTs}${groupTs}` || 'Model';
@@ -141,8 +106,7 @@ export function buildModelsFromOpenAPI(spec, options) {
     byDesired.set(desired, list);
   }
 
-  // Assign unique TS names and build schemaName -> tsName map.
-  const usedTsNames = new Set();
+  const usedNames = new Set();
   const nameMap = new Map();
   for (const [desired, list] of [...byDesired.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     list.sort((a, b) => {
@@ -154,11 +118,13 @@ export function buildModelsFromOpenAPI(spec, options) {
     for (let i = 0; i < list.length; i++) {
       const entry = list[i];
       const withFmt = i === 0 ? desired : `${desired}${formatSuffixToken(entry.preferredFormat)}`;
-      const tsName = sanitizeTypeName(withFmt, usedTsNames);
+      const tsName = sanitizeTypeName(withFmt, usedNames);
       nameMap.set(entry.schemaName, tsName);
     }
   }
   const allSanitizedNames = new Set([...nameMap.values()]);
+
+  const models = [];
 
   for (const schemaName of candidates) {
     const sanitized = nameMap.get(schemaName);
@@ -171,7 +137,6 @@ export function buildModelsFromOpenAPI(spec, options) {
     const isJsonLd = canonicalizeMediaType(preferredFormat) === 'application/ld+json';
     const forceNullable = requiredMode !== 'spec';
 
-    /** @type {string[]} */
     const extendsTypes = [];
     const deps = new Set();
 
@@ -181,7 +146,6 @@ export function buildModelsFromOpenAPI(spec, options) {
       if (merged) {
         effective = merged;
       } else {
-        // Non-flattenable allOf: keep inline object props + other model refs as extends.
         const props = {};
         const required = new Set();
         const ext = new Set();
@@ -218,11 +182,10 @@ export function buildModelsFromOpenAPI(spec, options) {
         return propName !== '@id' && propName !== '@type' && propName !== '@context';
       })
       .map(([propName, prop]) => {
-        const baseType = tsTypeOf(prop, deps, nameMap, { requiredMode });
-        const type = forceNullable ? ensureNullable(baseType) : withNullable(baseType, prop);
+        const baseType = typeIrOf(prop, deps, nameMap, { requiredMode });
+        const type = forceNullable ? ensureNullable(baseType) : withNullableType(baseType, prop);
         return {
           name: propName,
-          tsKey: quoteKeyIfNeeded(propName),
           type,
           optional: requiredMode === 'spec' ? !required.has(propName) : true,
         };
@@ -233,8 +196,14 @@ export function buildModelsFromOpenAPI(spec, options) {
       .filter((n) => allSanitizedNames.has(n))
       .sort((a, b) => a.localeCompare(b));
 
-    models.push({ name: sanitized, props, imports, extendsTypes, extendsItem: isJsonLd });
+    models.push({
+      name: sanitized,
+      props,
+      imports,
+      extends: extendsTypes,
+      extendsItem: isJsonLd,
+    });
   }
 
-  return { models };
+  return { models, nameMap, formats: normalizedFormats, requiredMode };
 }

@@ -17,6 +17,7 @@ function collect(value, previous = []) {
 
 function commonOptions(cmd) {
   return cmd
+    .option('--target <id>', 'Target runtime (angular, symfony)', 'angular')
     .option('--spec <urlOrFile>', 'OpenAPI spec source (URL or local JSON file)')
     .option(
       '--formats <mimeTypes>',

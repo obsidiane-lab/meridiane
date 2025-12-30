@@ -14,7 +14,13 @@ Référence des commandes Meridiane, options et sorties.
 Génère uniquement les fichiers du bridge dans le workspace courant (pas de build, pas de `npm pack`).
 
 ```bash
-npx meridiane generate @acme/backend-bridge --spec ./openapi.json
+npx meridiane generate @acme/backend-bridge --spec ./openapi.json --target angular
+```
+
+Symfony / PHP :
+
+```bash
+npx meridiane generate acme/backend-bridge-php --spec ./openapi.json --target symfony
 ```
 
 Sorties :
@@ -29,7 +35,7 @@ Build standalone + installation locale dans `node_modules` (copie offline depuis
 À lancer **depuis le répertoire de votre app Angular**.
 
 ```bash
-npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json
+npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json --target angular
 ```
 
 Sorties :
@@ -42,7 +48,7 @@ Build standalone + `npm pack` (artefact publiable).
 Ce mode peut être exécuté depuis **n’importe quel répertoire**.
 
 ```bash
-npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.example/api/docs.json
+npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.example/api/docs.json --target angular
 ```
 
 Sorties :
@@ -50,6 +56,11 @@ Sorties :
 - `dist/<libName>/*.tgz`
 
 ## Options
+
+### `--target <id>`
+
+Identifiant du target (ex. `angular`, `symfony`).
+Par défaut : `angular`.
 
 ### `--spec <url|file>`
 
@@ -98,3 +109,4 @@ Active des logs détaillés côté CLI.
 
 - Les schemas “merge-patch” ne génèrent pas de modèle : `PATCH` est typé en `Partial<T>`.
 - Les noms sont normalisés (ex: `Payment.jsonld` ⇒ `Payment`).
+- Le target `symfony` supporte uniquement `generate` (pas de `build`/`dev` pour l’instant).
