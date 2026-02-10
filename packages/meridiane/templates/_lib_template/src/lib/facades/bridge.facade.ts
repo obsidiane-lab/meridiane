@@ -10,6 +10,19 @@ import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequir
 import {SubscribeFilter} from '../ports/realtime.port';
 import {resolveUrl} from '../utils/url';
 
+export type TypedEvent<TType extends string = string, TPayload = unknown> = {
+  resourceType: TType;
+  payload: TPayload;
+};
+
+export type WatchTypesResult<R extends Record<string, any>> =
+  { [K in keyof R]: TypedEvent<K & string, R[K]> }[keyof R];
+
+export type WatchTypesConfig = {
+  /** Field name used as discriminator. Default: `@type` (JSON-LD). */
+  discriminator?: string;
+};
+
 /**
  * High-level facade for ad-hoc HTTP calls and Mercure subscriptions.
  *
@@ -96,6 +109,33 @@ export class BridgeFacade {
       );
   }
 
+  watchTypes$<R extends Record<string, any>>(
+    iri: Iri | Iri[],
+    resourceTypes: (keyof R & string)[],
+    cfg?: WatchTypesConfig
+  ): Observable<WatchTypesResult<R>> {
+    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    const discriminator = cfg?.discriminator ?? '@type';
+    const allowedTypes = new Set(resourceTypes.filter((v): v is string => typeof v === 'string' && v.length > 0));
+
+    return this.realtime
+      .subscribeAll$<unknown>(iris)
+      .pipe(
+        map((event): WatchTypesResult<R> | undefined => {
+          const raw = event.data;
+
+          const resolvedType = readDiscriminator(raw, discriminator);
+          if (typeof resolvedType !== 'string') return undefined;
+          if (!allowedTypes.has(resolvedType)) return undefined;
+
+          const key = resolvedType as keyof R & string;
+          return {resourceType: key, payload: raw as R[keyof R]} as WatchTypesResult<R>;
+        }),
+        filter((evt): evt is WatchTypesResult<R> => !!evt),
+        share()
+      );
+  }
+
   unwatch(iri: Iri | Iri[]): void {
     const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
     this.realtime.unsubscribe(iris);
@@ -105,4 +145,15 @@ export class BridgeFacade {
     if (!path) throw new Error('BridgeFacade: missing url');
     return resolveUrl(this.apiBase, path);
   }
+}
+
+function readDiscriminator(raw: unknown, discriminator: string): string | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = (raw as any)?.[discriminator];
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const first = value.find((v) => typeof v === 'string');
+    return typeof first === 'string' ? first : undefined;
+  }
+  return undefined;
 }

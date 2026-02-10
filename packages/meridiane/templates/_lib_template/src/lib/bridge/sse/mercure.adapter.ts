@@ -3,7 +3,7 @@ import {BehaviorSubject, defer, EMPTY, fromEvent, Observable, of, Subject} from 
 import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
 import {API_BASE_URL, BRIDGE_LOGGER, BRIDGE_WITH_CREDENTIALS, MERCURE_HUB_URL, MERCURE_TOPIC_MODE} from '../../tokens';
 import {BridgeLogger, MercureTopicMode} from '../../bridge.types';
-import {RealtimeEvent, RealtimePort, RealtimeStatus} from '../../ports/realtime.port';
+import {RealtimeEvent, RealtimePort, RealtimeStatus, SubscribeFilter} from '../../ports/realtime.port';
 import {EventSourceWrapper} from './eventsource-wrapper';
 import {Item} from '../../ports/resource-repository.port';
 import {isPlatformBrowser} from '@angular/common';
@@ -68,7 +68,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   }
 
 
-  subscribe$<T>(iris: string[], _filter?: { field?: string }): Observable<RealtimeEvent<T>> {
+  subscribe$<T>(iris: string[], subscribeFilter?: SubscribeFilter): Observable<RealtimeEvent<T>> {
     return defer(() => {
       const inputIris = iris.filter((v): v is string => typeof v === 'string' && v.length > 0);
       if (inputIris.length === 0) return EMPTY;
@@ -87,26 +87,51 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
       // Matching is done against the payload IRIs (typically "/api/...").
       const subscribed = inputIris.map((i) => normalizeIri(this.topicMapper.toPayloadIri(i)));
-      const fieldPath = _filter?.field;
+      const fieldPaths = buildFieldPaths(subscribeFilter);
+      const includeSelf = resolveIncludeSelf(subscribeFilter, {hasFields: fieldPaths.length > 0});
 
       return this.incoming$.pipe(
         map((evt) => this.safeParse(evt.data)),
-        filter((raw): raw is Item => !!raw),
+        filter((raw): raw is Item => !!raw && typeof raw === 'object' && !Array.isArray(raw)),
+        map((payload) => {
+          const topic = this.matchSubscribedTopic(payload, subscribed, {fieldPaths, includeSelf});
+          if (!topic) return undefined;
 
-        filter((raw: any) => {
-          if (fieldPath) {
-            const relIris = this.extractRelationIris(raw, fieldPath).map((i) => normalizeIri(this.topicMapper.toPayloadIri(i)));
-            return relIris.some((relIri) => matchesAnySubscribed(relIri, subscribed));
-          }
-          const rawId = raw?.['@id'];
-          const id = typeof rawId === 'string' ? normalizeIri(this.topicMapper.toPayloadIri(rawId)) : undefined;
-          return typeof id === 'string' && matchesAnySubscribed(id, subscribed);
+          const rawId = payload?.['@id'];
+          const iri = typeof rawId === 'string' ? rawId : topic;
+          return {topic, iri, data: payload as T} as RealtimeEvent<T>;
         }),
-        map((payload) => ({iri: payload['@id'] as string, data: payload as T})),
-        finalize(() => {
-          this.topicsRegistry.removeAll(registeredTopics);
-          this.scheduleRebuild();
+        filter((e): e is RealtimeEvent<T> => !!e),
+        finalize(() => this.unsubscribeRegisteredTopics(registeredTopics)),
+        share()
+      );
+    });
+  }
+
+  subscribeAll$<T>(iris: string[]): Observable<RealtimeEvent<T>> {
+    return defer(() => {
+      const inputIris = iris.filter((v): v is string => typeof v === 'string' && v.length > 0);
+      if (inputIris.length === 0) return EMPTY;
+
+      if (!this.hubUrl) {
+        this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
+        return EMPTY;
+      }
+
+      const registeredTopics = Array.from(new Set(inputIris.map((i) => this.topicMapper.toTopic(i))));
+
+      this.topicsRegistry.addAll(registeredTopics);
+      this.scheduleRebuild();
+
+      return this.incoming$.pipe(
+        map((evt) => this.safeParse(evt.data)),
+        filter((raw): raw is Item => !!raw && typeof raw === 'object' && !Array.isArray(raw)),
+        map((payload: any) => {
+          const rawId = payload?.['@id'];
+          const iri = typeof rawId === 'string' ? rawId : '';
+          return {iri, data: payload as T} as RealtimeEvent<T>;
         }),
+        finalize(() => this.unsubscribeRegisteredTopics(registeredTopics)),
         share()
       );
     });
@@ -227,6 +252,11 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     }
   }
 
+  private unsubscribeRegisteredTopics(topics: string[]): void {
+    this.topicsRegistry.removeAll(topics);
+    this.scheduleRebuild();
+  }
+
   private extractRelationIris(raw: any, path: string): string[] {
     const readPath = (obj: any, dotPath: string): any => {
       return dotPath
@@ -246,16 +276,53 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     return normalize(readPath(raw, path));
   }
 
+  private matchSubscribedTopic(
+    raw: any,
+    subscribed: string[],
+    opts: { fieldPaths: string[]; includeSelf: boolean }
+  ): string | undefined {
+    for (const fieldPath of opts.fieldPaths) {
+      const relIris = this.extractRelationIris(raw, fieldPath).map((i) => normalizeIri(this.topicMapper.toPayloadIri(i)));
+      for (const relIri of relIris) {
+        const match = findMatchingSubscribedTopic(relIri, subscribed);
+        if (match) return match;
+      }
+    }
+
+    if (opts.includeSelf) {
+      const rawId = raw?.['@id'];
+      const id = typeof rawId === 'string' ? normalizeIri(this.topicMapper.toPayloadIri(rawId)) : undefined;
+      if (typeof id === 'string') {
+        const match = findMatchingSubscribedTopic(id, subscribed);
+        if (match) return match;
+      }
+    }
+
+    return undefined;
+  }
+
 }
 
 function normalizeIri(iri: string): string {
   return iri.endsWith('/') ? iri.slice(0, -1) : iri;
 }
 
-function matchesAnySubscribed(candidate: string, subscribed: string[]): boolean {
+function findMatchingSubscribedTopic(candidate: string, subscribed: string[]): string | undefined {
+  let best: string | undefined;
   for (const iri of subscribed) {
-    if (candidate === iri) return true;
-    if (candidate.startsWith(`${iri}/`)) return true;
+    if (candidate !== iri && !candidate.startsWith(`${iri}/`)) continue;
+    if (!best || iri.length > best.length) best = iri;
   }
-  return false;
+  return best;
+}
+
+function buildFieldPaths(filter?: SubscribeFilter): string[] {
+  const fields = filter?.fields?.filter((f): f is string => typeof f === 'string' && f.length > 0) ?? [];
+  const field = typeof filter?.field === 'string' && filter.field.length > 0 ? [filter.field] : [];
+  return [...fields, ...field];
+}
+
+function resolveIncludeSelf(filter: SubscribeFilter | undefined, ctx: { hasFields: boolean }): boolean {
+  if (typeof filter?.includeSelf === 'boolean') return filter.includeSelf;
+  return !ctx.hasFields;
 }

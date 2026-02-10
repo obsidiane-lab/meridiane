@@ -136,6 +136,11 @@ provideBridge({
 });
 ```
 
+APIs utiles :
+- `ResourceFacade<T>.watch$()` : écouter une (ou plusieurs) ressources
+- `ResourceFacade<T>.watchSubResource$()` : écouter des sous-ressources via un champ relationnel
+- `BridgeFacade.watchTypes$()` : écouter un topic “multi-entités” et obtenir un flux discriminé par type
+
 ## Docs
 
 - CLI : `docs/cli.md`

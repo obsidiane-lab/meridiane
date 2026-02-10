@@ -5,7 +5,7 @@ import {Observable} from 'rxjs';
 import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
 import {BACKEND_BASE_URL} from '../../core/backend';
 
-import type {Message} from '@obsidiane/bridge-sandbox';
+import type {MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
 import {MessageStore} from '../stores/message.store';
 
 @Injectable({providedIn: 'root'})
@@ -60,7 +60,8 @@ export class MessageRepository {
 
   create$(conversationIri: IriRequired, originalText: string): Observable<Message> {
     return this.facade
-      .post$({conversation: conversationIri, originalText})
+      // The generated read model expects an embedded Conversation object, but the API accepts an IRI on write.
+      .post$({conversation: conversationIri, originalText} as any)
       .pipe(tap((m) => this.store.upsert(m)));
   }
 

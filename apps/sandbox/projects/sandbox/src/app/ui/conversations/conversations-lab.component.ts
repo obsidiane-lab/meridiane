@@ -13,7 +13,7 @@ import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router} from "@angular/router";
 import {BridgeFacade, Iri, IriRequired} from '@obsidiane/bridge-sandbox';
-import type {Conversation, Message} from '@obsidiane/bridge-sandbox';
+import type {ConversationConversationRead as Conversation, MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Subject, Subscription, takeUntil} from 'rxjs';
@@ -346,20 +346,50 @@ export class ConversationsLabComponent implements AfterViewInit {
 
   displayAuthor(m: Message): string {
     if (this.isMine(m)) return this.meIdentifier() ?? 'You';
-    const author = m.author ?? '';
+    const author = (m as any)?.author;
+
+    // API Platform can embed the author object in JSON-LD.
+    if (author && typeof author === 'object') {
+      const displayName = (author as any)?.displayName;
+      if (typeof displayName === 'string' && displayName.trim() !== '') return displayName;
+
+      const email = (author as any)?.email;
+      if (typeof email === 'string' && email.trim() !== '') return email;
+
+      const id = this.extractNumericId(author);
+      if (id) return `User #${id}`;
+      return 'Unknown';
+    }
+
     const id = this.extractNumericId(author);
     if (id) return `User #${id}`;
-    return author || 'Unknown';
+    return typeof author === 'string' && author.trim() !== '' ? author : 'Unknown';
   }
 
-  formatTime(iso?: string): string {
+  formatTime(iso?: string | null): string {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   }
 
-  private extractNumericId(iri?: string | null): number | null {
+  private extractNumericId(input?: unknown): number | null {
+    if (!input) return null;
+
+    if (typeof input === 'number') {
+      return Number.isFinite(input) ? input : null;
+    }
+
+    const iri =
+      typeof input === 'string'
+        ? input
+        : typeof (input as any)?.['@id'] === 'string'
+          ? (input as any)['@id']
+          : undefined;
+
+    const numericId = typeof (input as any)?.id === 'number' ? (input as any).id : undefined;
+    if (typeof numericId === 'number') return numericId;
+
     if (!iri) return null;
     const m = String(iri).match(/\/(\d+)(?:\/)?$/);
     if (!m?.[1]) return null;

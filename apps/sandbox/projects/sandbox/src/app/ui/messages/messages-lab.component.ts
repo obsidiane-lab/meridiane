@@ -3,7 +3,7 @@ import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from "@angular/router";
 
-import type {Message} from '@obsidiane/bridge-sandbox';
+import type {MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
 import {Iri, IriRequired} from "@obsidiane/bridge-sandbox";
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {ConversationRepository} from '../../data/repositories/conversation.repository';

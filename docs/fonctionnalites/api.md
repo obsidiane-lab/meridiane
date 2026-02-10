@@ -55,7 +55,18 @@ Note : utilisez `FacadeFactory` pour instancier les `ResourceFacade` (contexte d
 
 ## `BridgeFacade`
 
-Façade ad-hoc pour endpoints non Hydra + helpers SSE/Mercure (`watch$` / `unwatch`).
+Façade ad-hoc pour endpoints non Hydra + helpers SSE/Mercure :
+
+- `watch$(iri|iri[], filter?)` / `unwatch(iri|iri[])`
+- `watchTypes$(iri|iri[], resourceTypes, cfg?)` : topic “multi-entités” (union discriminée par type)
+
+`watchTypes$()` renvoie un flux d’events de la forme :
+- `{ resourceType, payload }` (union discriminée par `resourceType`)
+
+Options principales :
+- `resourceTypes` : liste des valeurs `@type` autorisées
+- `discriminator` : nom du champ type (défaut `@type`)
+- Seuls les `resourceType` demandés sont émis (le reste est ignoré)
 
 ## Types utiles
 

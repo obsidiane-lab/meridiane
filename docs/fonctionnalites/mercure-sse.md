@@ -35,6 +35,38 @@ resource.watchSubResource$<Message>('/api/conversations/1', 'conversation');
 
 Le champ filtré doit être une IRI (string) ou une liste d’IRIs (`string[]`).
 
+## Topics “multi-entités”
+
+Quand un même topic Mercure publie plusieurs types d’entités (Message, Conversation, ...),
+utilisez `BridgeFacade.watchTypes$()` pour obtenir un flux typé (union discriminée).
+
+Principe :
+- vous vous abonnez à un topic “libre” (ou une liste)
+- chaque event recu est discriminé par type (`@type` en JSON-LD)
+- seuls les `resourceType` explicitement demandés sont émis (le reste est ignoré)
+
+```ts
+import {inject} from '@angular/core';
+import {BridgeFacade} from '@acme/backend-bridge';
+import type {Item} from '@acme/backend-bridge';
+
+type Conversation = Item & {title?: string | null};
+type Message = Item & {conversation?: string | Item | null; originalText?: string | null};
+
+type Registry = {Conversation: Conversation; Message: Message};
+
+const bridge = inject(BridgeFacade);
+
+bridge.watchTypes$<Registry>(
+  '/api/events/me',
+  ['Conversation', 'Message'],
+  {discriminator: '@type'}
+);
+```
+
+Notes :
+- En sortie, chaque event inclut `resourceType` + `payload`.
+
 ## Credentials et cookies
 
 Le `withCredentials` par défaut est déduit de `mercure.init.credentials` :

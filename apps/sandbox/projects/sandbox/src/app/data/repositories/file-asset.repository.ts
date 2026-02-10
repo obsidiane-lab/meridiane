@@ -3,7 +3,7 @@ import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
 import {AnyQuery, BridgeFacade, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
-import type {FileAsset} from '@obsidiane/bridge-sandbox';
+import type {FileAssetFileRead as FileAsset} from '@obsidiane/bridge-sandbox';
 import {FileAssetStore} from '../stores/file-asset.store';
 
 @Injectable({providedIn: 'root'})

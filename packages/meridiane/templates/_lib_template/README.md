@@ -206,8 +206,56 @@ API :
 - `ResourceFacade<T>.watch$(iri | iri[])` / `unwatch(iri | iri[])`
 - `ResourceFacade<T>.watchSubResource$(iri | iri[], 'field.path')`
 - `BridgeFacade.watch$(iri | iri[])` / `unwatch(iri | iri[])`
+- `BridgeFacade.watchTypes$(iri | iri[], resourceTypes, cfg?)` (topics “multi-entités”)
 
 Note SSR : la connexion SSE ne s’ouvre que dans le navigateur.
+
+### Topic “multi-entités” (event-bus)
+
+Quand un même topic Mercure publie plusieurs types de payloads (sans lien entre eux),
+utilisez `BridgeFacade.watchTypes$()`.
+Le flux renvoie une union discriminée par `resourceType` (par défaut via `@type` en JSON-LD).
+
+Fonctionnement (résumé) :
+- le bridge s’abonne au(x) topic(s) Mercure (mono-connexion + ref-count)
+- chaque event JSON recu est testé sur le champ de discrimination (`@type` par défaut)
+- seuls les `resourceType` explicitement demandés sont émis
+- chaque event émis est `{ resourceType, payload }`
+
+Configuration :
+- `discriminator` : champ type (défaut `@type`)
+- `resourceTypes` : liste de strings à accepter (`['Conversation', 'Message']`, etc.)
+
+```ts
+import {inject} from '@angular/core';
+import {BridgeFacade} from '__PACKAGE_NAME__';
+import type {Item} from '__PACKAGE_NAME__';
+
+type Conversation = Item & {title?: string | null};
+type Message = Item & {originalText?: string | null};
+
+type Registry = {
+  Conversation: Conversation;
+  Message: Message;
+};
+
+const bridge = inject(BridgeFacade);
+
+bridge.watchTypes$<Registry>(
+  '/api/events/me',
+  ['Conversation', 'Message'],
+  {discriminator: '@type'}
+).subscribe((evt) => {
+  switch (evt.resourceType) {
+    case 'Conversation':
+      // evt.payload: Conversation
+      break;
+    case 'Message':
+      // evt.payload: Message
+      break;
+  }
+});
+```
 
 ## Models TypeScript
 

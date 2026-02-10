@@ -1,0 +1,184 @@
+<section class="panel">
+  <header class="head">
+    <div>
+      <h1>WatchTypes Lab</h1>
+      <p class="muted">
+        Sandbox SSE multi-inscriptions. Chaque inscription ecoute un topic et une liste dynamique de types
+        (champ <code>@type</code> par defaut).
+      </p>
+    </div>
+
+    <div class="side">
+      <div class="meta">
+        @if (status() === 'connected') {
+          <span class="badge badge--good">connected</span>
+        } @else if (status() === 'connecting') {
+          <span class="badge badge--warn">connecting</span>
+        } @else {
+          <span class="badge">closed</span>
+        }
+        <span class="badge">{{ activeSubscriptionsCount() }} actifs</span>
+        <span class="badge">{{ totalEventCount() }} events</span>
+      </div>
+      <div class="actions">
+        <button class="btn btn--primary" type="button" (click)="startAll()">Start all</button>
+        <button class="btn" type="button" (click)="stopAll()">Stop all</button>
+        <button class="btn btn--ghost" type="button" (click)="clearEvents()">Clear events</button>
+      </div>
+    </div>
+  </header>
+
+  @if (err()) {
+    <div class="badge badge--bad" style="margin-top: 12px;">{{ err() }}</div>
+  }
+
+  <section class="card" style="margin-top: 12px;">
+    <h3 style="margin:0 0 10px;">Nouvelle inscription</h3>
+    <form class="grid grid--2" [formGroup]="addSubForm">
+      <label class="field">
+        <div class="muted">Nom</div>
+        <input type="text" formControlName="name" placeholder="ex: user-feed"/>
+      </label>
+
+      <label class="field">
+        <div class="muted">Discriminator</div>
+        <input type="text" formControlName="discriminator" placeholder="@type"/>
+      </label>
+
+      <label class="field">
+        <div class="muted">Topic</div>
+        <input type="text" formControlName="topic" placeholder="/api/events/me"/>
+        @if (addSubForm.controls.topic.touched && addSubForm.controls.topic.invalid) {
+          <div class="err">Topic requis</div>
+        }
+      </label>
+
+      <label class="field">
+        <div class="muted">Types (virgule ou retour ligne)</div>
+        <textarea rows="2" formControlName="types" placeholder="Message, Conversation"></textarea>
+        @if (addSubForm.controls.types.touched && addSubForm.controls.types.invalid) {
+          <div class="err">Au moins un type requis</div>
+        }
+      </label>
+    </form>
+    <div class="actions" style="margin-top: 10px;">
+      <button class="btn btn--primary" type="button" (click)="addSubscription()">Ajouter</button>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top: 12px;">
+    <h3 style="margin:0 0 10px;">Inscriptions</h3>
+    <div class="subs">
+      @for (sub of subscriptions(); track sub.id) {
+        <article class="sub">
+          <div class="sub__top">
+            <div class="sub__title">
+              <span class="badge">{{ sub.name }}</span>
+              @if (sub.running) {
+                <span class="badge badge--good">running</span>
+              } @else {
+                <span class="badge">stopped</span>
+              }
+            </div>
+            <div class="actions">
+              <button class="btn btn--small" type="button" (click)="useForPublish(sub.id)">Use for publish</button>
+              @if (!sub.running) {
+                <button class="btn btn--small btn--primary" type="button" (click)="startSubscription(sub.id)">Start</button>
+              } @else {
+                <button class="btn btn--small" type="button" (click)="stopSubscription(sub.id)">Stop</button>
+              }
+              <button class="btn btn--small btn--ghost" type="button" (click)="removeSubscription(sub.id)">Remove</button>
+            </div>
+          </div>
+
+          <div class="sub__meta">
+            <div><span class="muted">Topic:</span> <code>{{ sub.topic }}</code></div>
+            <div><span class="muted">Discriminator:</span> <code>{{ sub.discriminator }}</code></div>
+            <div><span class="muted">Events:</span> <strong>{{ sub.count }}</strong></div>
+            @if (sub.lastAt) {
+              <div><span class="muted">Dernier:</span> {{ sub.lastAt | date:'mediumTime' }} ({{ sub.lastType }})</div>
+            }
+          </div>
+
+          <div class="types">
+            @for (type of listTypes(sub.typesInput); track type) {
+              <span class="badge">{{ type }}</span>
+            }
+          </div>
+        </article>
+      } @empty {
+        <div class="muted">Aucune inscription. Ajoute une configuration ci-dessus.</div>
+      }
+    </div>
+  </section>
+
+  <section class="card" style="margin-top: 12px;">
+    <h3 style="margin:0 0 10px;">Publish typed event</h3>
+    <form class="grid grid--2" [formGroup]="publishForm">
+      <label class="field">
+        <div class="muted">Topic</div>
+        <input type="text" formControlName="topic" placeholder="/api/events/me"/>
+        @if (publishForm.controls.topic.touched && publishForm.controls.topic.invalid) {
+          <div class="err">Topic requis</div>
+        }
+      </label>
+
+      <label class="field">
+        <div class="muted">Type event</div>
+        <input type="text" formControlName="eventType" placeholder="Message"/>
+        @if (publishForm.controls.eventType.touched && publishForm.controls.eventType.invalid) {
+          <div class="err">Type requis</div>
+        }
+      </label>
+
+      <label class="field">
+        <div class="muted">IRI (optionnel)</div>
+        <input type="text" formControlName="iri" placeholder="/api/messages/1"/>
+      </label>
+
+      <label class="field">
+        <div class="muted">extraJson (objet JSON)</div>
+        <textarea rows="4" formControlName="extraJson" placeholder='{"conversation":"/api/conversations/1"}'></textarea>
+      </label>
+    </form>
+
+    <div class="actions" style="margin-top: 10px;">
+      <button class="btn" type="button" (click)="useEventsTopicForPublish()">Use /api/events/me</button>
+      <button class="btn btn--primary" type="button" (click)="publishTypedEvent()" [disabled]="publishing()">Publish</button>
+    </div>
+  </section>
+
+  <div class="grid grid--2" style="margin-top: 12px;">
+    <section class="card">
+      <h3 style="margin:0 0 10px;">Dernier event</h3>
+      @if (lastEvent(); as e) {
+        <div class="meta">
+          <span class="badge">{{ e.subscriptionName }}</span>
+          <span class="badge">{{ e.evt.resourceType }}</span>
+          <span class="muted">{{ e.t | date:'mediumTime' }}</span>
+        </div>
+        <div style="margin-top: 10px;">
+          <app-json-viewer [value]="e.evt" title="Event"></app-json-viewer>
+        </div>
+      } @else {
+        <div class="muted">Aucun event recu.</div>
+      }
+    </section>
+
+    <section class="card">
+      <h3 style="margin:0 0 10px;">Flux (max 400)</h3>
+      <div class="stream">
+        @for (e of events(); track e.id) {
+          <div class="row">
+            <span class="badge">{{ e.subscriptionName }}</span>
+            <span class="badge">{{ e.evt.resourceType }}</span>
+            <code class="iri">{{ payloadIri(e.evt) }}</code>
+            <span class="muted">{{ e.t | date:'mediumTime' }}</span>
+          </div>
+        } @empty {
+          <div class="muted">Pas encore d'event.</div>
+        }
+      </div>
+    </section>
+  </div>
+</section>
