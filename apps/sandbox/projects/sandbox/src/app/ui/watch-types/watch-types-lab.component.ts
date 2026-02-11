@@ -205,7 +205,6 @@ export class WatchTypesLabComponent implements OnDestroy {
       discriminator: value.discriminator,
       newConnection: value.newConnection,
       confirmLargeBatch: value.confirmLargeBatch,
-      existingTopics: new Set(this._subscriptions().map((entry) => entry.topic)),
       currentTotal: this._subscriptions().length,
       maxSubscriptions: MAX_SUBSCRIPTIONS,
       largeBatchThreshold: BULK_CONFIRM_THRESHOLD,
@@ -225,12 +224,7 @@ export class WatchTypesLabComponent implements OnDestroy {
       return next;
     });
 
-    const skipped = planned.skippedDuplicates;
-    this.notice.set(
-      skipped > 0
-        ? `${planned.entries.length} subscriptions ajoutees (${skipped} ignorees: topics deja presents).`
-        : `${planned.entries.length} subscriptions ajoutees.`
-    );
+    this.notice.set(`${planned.entries.length} subscriptions ajoutees.`);
     this.err.set(null);
     if (value.count > BULK_CONFIRM_THRESHOLD) {
       this.bulkAddForm.patchValue({confirmLargeBatch: false});

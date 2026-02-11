@@ -23,14 +23,13 @@ export type PlanBulkInput = {
   discriminator: string;
   newConnection: boolean;
   confirmLargeBatch: boolean;
-  existingTopics: Set<string>;
   currentTotal: number;
   maxSubscriptions: number;
   largeBatchThreshold: number;
 };
 
 export type PlanBulkResult =
-  | { ok: true; entries: NewWatchSubscription[]; skippedDuplicates: number }
+  | { ok: true; entries: NewWatchSubscription[] }
   | { ok: false; error: string };
 
 export type PlanSingleResult =
@@ -98,21 +97,15 @@ export function planBulkSubscriptions(input: PlanBulkInput): PlanBulkResult {
   }
 
   const entries: NewWatchSubscription[] = [];
-  let skippedDuplicates = 0;
-  const seenTopics = new Set(input.existingTopics);
 
   for (let i = 1; i <= count; i++) {
     if (entries.length >= maxAvailable) break;
 
     const topic = normalizeTopic(`${topicPrefix}${i}`);
-    if (!topic || seenTopics.has(topic)) {
-      skippedDuplicates += 1;
-      continue;
-    }
+    if (!topic) continue;
 
-    seenTopics.add(topic);
     entries.push({
-      name: `bulk-${i}`,
+      name: `bulk-${input.currentTotal + entries.length + 1}`,
       topic,
       typesInput: types.join(', '),
       discriminator,
@@ -121,8 +114,8 @@ export function planBulkSubscriptions(input: PlanBulkInput): PlanBulkResult {
   }
 
   if (entries.length === 0) {
-    return { ok: false, error: 'Aucune subscription ajoutee (topics deja existants ou limite atteinte).' };
+    return { ok: false, error: 'Aucune subscription ajoutee (limite atteinte ou donnees invalides).' };
   }
 
-  return { ok: true, entries, skippedDuplicates };
+  return { ok: true, entries };
 }

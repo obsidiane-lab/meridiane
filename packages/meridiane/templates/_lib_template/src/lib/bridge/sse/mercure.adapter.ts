@@ -41,6 +41,24 @@ type ManagedConnection = {
   status: RealtimeStatus;
 };
 
+type SharedSubscriptionClaim = {
+  id: string;
+  topics: string[];
+  topicsKey: string;
+  stop$: Subject<void>;
+  released: boolean;
+};
+
+type DedicatedSubscriptionClaim = {
+  id: string;
+  groupId: string;
+  topics: string[];
+  topicsKey: string;
+  incoming: Subject<IncomingMessage>;
+  stop$: Subject<void>;
+  released: boolean;
+};
+
 @Injectable({providedIn: 'root'})
 export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   private readonly connectionMode: MercureConnectionMode;
@@ -53,8 +71,11 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   private readonly sharedConnections = new Map<string, ManagedConnection>();
   private readonly connections = new Map<string, ManagedConnection>();
   private readonly dedicatedGroups = new Map<string, Set<string>>();
-  private readonly dedicatedGroupTopics = new Map<string, Set<string>>();
   private readonly lastEventIdByKey = new Map<string, string>();
+  private readonly sharedClaims = new Map<string, SharedSubscriptionClaim>();
+  private readonly sharedClaimQueueByTopicsKey = new Map<string, string[]>();
+  private readonly dedicatedClaims = new Map<string, DedicatedSubscriptionClaim>();
+  private readonly dedicatedClaimQueueByTopicsKey = new Map<string, string[]>();
 
   private readonly destroy$ = new Subject<void>();
   private readonly sharedRebuild$ = new Subject<void>();
@@ -182,10 +203,17 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     if (inputIris.length === 0) return;
 
     const topics = Array.from(new Set(inputIris.map((i) => this.topicMapper.toTopic(i))));
+    if (this.releaseOneClaimByTopics(topics)) return;
 
-    this.topicsRegistry.removeAll(topics);
-    this.scheduleSharedRebuild();
-    this.stopDedicatedGroupsByTopics(topics);
+    // Claims are the source of truth. Never drop shared topics blindly when claims still exist:
+    // it could disconnect another active consumer.
+    if (this.sharedClaims.size === 0 && this.dedicatedClaims.size === 0) {
+      this.topicsRegistry.removeAll(topics);
+      this.scheduleSharedRebuild();
+      return;
+    }
+
+    this.logger?.warn?.('[Mercure] unsubscribe ignored: no matching active claim for topics', {topics});
   }
 
   public shutdownBeforeExit(): void {
@@ -219,13 +247,14 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
   private subscribeViaSharedConnections$(topics: string[]): Observable<IncomingMessage> {
     return defer(() => {
-      this.topicsRegistry.addAll(topics);
-      this.scheduleSharedRebuild();
+      const uniqueTopics = Array.from(new Set(topics));
+      if (uniqueTopics.length === 0) return EMPTY;
+      const claim = this.createSharedClaim(uniqueTopics);
 
       return this.incoming$.pipe(
+        takeUntil(claim.stop$),
         finalize(() => {
-          this.topicsRegistry.removeAll(topics);
-          this.scheduleSharedRebuild();
+          this.releaseSharedClaim(claim.id);
         })
       );
     });
@@ -240,9 +269,9 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
       const groupId = `dedicated-${++this.sequence}`;
       const incoming = new Subject<IncomingMessage>();
+      const claim = this.createDedicatedClaim({groupId, topics: uniqueTopics, incoming});
 
       this.dedicatedGroups.set(groupId, new Set());
-      this.dedicatedGroupTopics.set(groupId, new Set(uniqueTopics));
 
       try {
         const shards = this.buildTopicShards(uniqueTopics, {allowSplit: this.connectionMode === 'auto'});
@@ -255,15 +284,14 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
         }
       } catch (err) {
         this.logger?.error?.('[Mercure] dedicated connection setup failed:', err);
-        this.closeDedicatedGroup(groupId);
-        incoming.complete();
+        this.releaseDedicatedClaim(claim.id);
         return EMPTY;
       }
 
       return incoming.asObservable().pipe(
+        takeUntil(claim.stop$),
         finalize(() => {
-          this.closeDedicatedGroup(groupId);
-          incoming.complete();
+          this.releaseDedicatedClaim(claim.id);
         })
       );
     });
@@ -382,18 +410,149 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     }
   }
 
-  private stopDedicatedGroupsByTopics(topics: string[]): void {
-    if (topics.length === 0) return;
+  private createSharedClaim(topics: string[]): SharedSubscriptionClaim {
+    const normalizedTopics = Array.from(new Set(topics));
+    const claim: SharedSubscriptionClaim = {
+      id: `shared-claim-${++this.sequence}`,
+      topics: normalizedTopics,
+      topicsKey: this.computeTopicsKey(normalizedTopics),
+      stop$: new Subject<void>(),
+      released: false,
+    };
 
-    const toStop: string[] = [];
-    for (const [groupId, groupTopics] of this.dedicatedGroupTopics.entries()) {
-      const hasOverlap = topics.some((topic) => groupTopics.has(topic));
-      if (hasOverlap) toStop.push(groupId);
+    this.sharedClaims.set(claim.id, claim);
+    this.queueClaim(this.sharedClaimQueueByTopicsKey, claim.topicsKey, claim.id);
+    this.topicsRegistry.addAll(claim.topics);
+    this.scheduleSharedRebuild();
+
+    return claim;
+  }
+
+  private createDedicatedClaim(params: {
+    groupId: string;
+    topics: string[];
+    incoming: Subject<IncomingMessage>;
+  }): DedicatedSubscriptionClaim {
+    const normalizedTopics = Array.from(new Set(params.topics));
+    const claim: DedicatedSubscriptionClaim = {
+      id: `dedicated-claim-${++this.sequence}`,
+      groupId: params.groupId,
+      topics: normalizedTopics,
+      topicsKey: this.computeTopicsKey(normalizedTopics),
+      incoming: params.incoming,
+      stop$: new Subject<void>(),
+      released: false,
+    };
+
+    this.dedicatedClaims.set(claim.id, claim);
+    this.queueClaim(this.dedicatedClaimQueueByTopicsKey, claim.topicsKey, claim.id);
+    return claim;
+  }
+
+  private releaseOneClaimByTopics(topics: string[]): boolean {
+    const topicsKey = this.computeTopicsKey(topics);
+    if (!topicsKey) return false;
+
+    if (this.connectionMode === 'single') {
+      return this.releaseOneDedicatedClaimByTopics(topicsKey) || this.releaseOneSharedClaimByTopics(topicsKey);
     }
 
-    for (const groupId of toStop) {
-      this.closeDedicatedGroup(groupId);
+    return this.releaseOneSharedClaimByTopics(topicsKey) || this.releaseOneDedicatedClaimByTopics(topicsKey);
+  }
+
+  private releaseOneSharedClaimByTopics(topicsKey: string): boolean {
+    const queue = this.sharedClaimQueueByTopicsKey.get(topicsKey);
+    if (!queue || queue.length === 0) return false;
+
+    while (queue.length > 0) {
+      const claimId = queue.shift();
+      if (!claimId) continue;
+      if (this.stopSharedClaim(claimId)) {
+        if (queue.length === 0) this.sharedClaimQueueByTopicsKey.delete(topicsKey);
+        return true;
+      }
     }
+
+    this.sharedClaimQueueByTopicsKey.delete(topicsKey);
+    return false;
+  }
+
+  private releaseOneDedicatedClaimByTopics(topicsKey: string): boolean {
+    const queue = this.dedicatedClaimQueueByTopicsKey.get(topicsKey);
+    if (!queue || queue.length === 0) return false;
+
+    while (queue.length > 0) {
+      const claimId = queue.shift();
+      if (!claimId) continue;
+      if (this.stopDedicatedClaim(claimId)) {
+        if (queue.length === 0) this.dedicatedClaimQueueByTopicsKey.delete(topicsKey);
+        return true;
+      }
+    }
+
+    this.dedicatedClaimQueueByTopicsKey.delete(topicsKey);
+    return false;
+  }
+
+  private stopSharedClaim(claimId: string): boolean {
+    const claim = this.sharedClaims.get(claimId);
+    if (!claim || claim.released) return false;
+    claim.stop$.next();
+    claim.stop$.complete();
+    return true;
+  }
+
+  private stopDedicatedClaim(claimId: string): boolean {
+    const claim = this.dedicatedClaims.get(claimId);
+    if (!claim || claim.released) return false;
+    claim.stop$.next();
+    claim.stop$.complete();
+    return true;
+  }
+
+  private releaseSharedClaim(claimId: string): void {
+    const claim = this.sharedClaims.get(claimId);
+    if (!claim || claim.released) return;
+
+    claim.released = true;
+    this.sharedClaims.delete(claim.id);
+    this.removeClaimFromQueue(this.sharedClaimQueueByTopicsKey, claim.topicsKey, claim.id);
+
+    this.topicsRegistry.removeAll(claim.topics);
+    this.scheduleSharedRebuild();
+  }
+
+  private releaseDedicatedClaim(claimId: string): void {
+    const claim = this.dedicatedClaims.get(claimId);
+    if (!claim || claim.released) return;
+
+    claim.released = true;
+    this.dedicatedClaims.delete(claim.id);
+    this.removeClaimFromQueue(this.dedicatedClaimQueueByTopicsKey, claim.topicsKey, claim.id);
+
+    this.closeDedicatedGroup(claim.groupId);
+    claim.incoming.complete();
+  }
+
+  private queueClaim(queueByKey: Map<string, string[]>, topicsKey: string, claimId: string): void {
+    const queue = queueByKey.get(topicsKey) ?? [];
+    queue.push(claimId);
+    queueByKey.set(topicsKey, queue);
+  }
+
+  private removeClaimFromQueue(queueByKey: Map<string, string[]>, topicsKey: string, claimId: string): void {
+    const queue = queueByKey.get(topicsKey);
+    if (!queue || queue.length === 0) return;
+    const next = queue.filter((id) => id !== claimId);
+    if (next.length === 0) {
+      queueByKey.delete(topicsKey);
+      return;
+    }
+    queueByKey.set(topicsKey, next);
+  }
+
+  private computeTopicsKey(topics: Iterable<string>): string {
+    return Array.from(new Set(topics)).sort().join('|');
   }
 
   private closeDedicatedGroup(groupId: string): void {
@@ -405,7 +564,6 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     }
 
     this.dedicatedGroups.delete(groupId);
-    this.dedicatedGroupTopics.delete(groupId);
   }
 
   private closeConnection(connectionId: string): void {
@@ -428,21 +586,31 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
       groupConnections?.delete(conn.id);
       if (groupConnections && groupConnections.size === 0) {
         this.dedicatedGroups.delete(conn.groupId);
-        this.dedicatedGroupTopics.delete(conn.groupId);
       }
+      this.lastEventIdByKey.delete(conn.key);
     }
 
     this.updateGlobalStatus();
   }
 
   private teardownAllConnections(): void {
+    for (const claimId of Array.from(this.sharedClaims.keys())) {
+      this.stopSharedClaim(claimId);
+    }
+    for (const claimId of Array.from(this.dedicatedClaims.keys())) {
+      this.stopDedicatedClaim(claimId);
+    }
+
     for (const conn of Array.from(this.connections.values())) {
       this.closeConnection(conn.id);
     }
 
+    this.sharedClaims.clear();
+    this.sharedClaimQueueByTopicsKey.clear();
+    this.dedicatedClaims.clear();
+    this.dedicatedClaimQueueByTopicsKey.clear();
     this.sharedConnections.clear();
     this.dedicatedGroups.clear();
-    this.dedicatedGroupTopics.clear();
     this.updateGlobalStatus();
   }
 

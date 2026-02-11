@@ -2,7 +2,7 @@
     <div class="toolbar" style="justify-content: space-between; gap: 12px;">
         <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
             <h1 style="margin:0; font-size: 18px;">Messages</h1>
-            <span class="badge">Conversation: #{{ conversationId }}</span>
+            <span class="badge">Conversation: #{{ conversationId() }}</span>
             <span class="badge"
                   [class.badge--good]="status() === 'connected'"
                   [class.badge--warn]="status() === 'connecting'"
@@ -28,7 +28,7 @@
 
 <section class="panel" style="margin-bottom: 12px;">
     <form class="toolbar" style="gap: 10px; flex-wrap: wrap;" [formGroup]="createForm" (ngSubmit)="create()">
-        <strong>Create (conversation #{{ conversationId }})</strong>
+        <strong>Create (conversation #{{ conversationId() }})</strong>
         <input formControlName="originalText" placeholder="originalText" style="min-width: 320px;"/>
         <button class="btn btn--primary" type="submit" [disabled]="loading()">Create</button>
     </form>

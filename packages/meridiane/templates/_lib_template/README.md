@@ -219,7 +219,7 @@ API :
 - `ResourceFacade<T>.watch$(iri | iri[], {newConnection?})` / `unwatch(iri | iri[])`
 - `ResourceFacade<T>.watchSubResource$(iri | iri[], 'field.path', {newConnection?})`
 - `BridgeFacade.watch$(iri | iri[], filter?, {newConnection?})` / `unwatch(iri | iri[])`
-- `BridgeFacade.watchTypes$(iri | iri[], resourceTypes, cfg?, {newConnection?})` (topics “multi-entités”)
+- `BridgeFacade.watchTypes$(iri | iri[], resourceTypes, cfg?, {newConnection?})` (topics “multi-entités”, filtrage par type)
 - `BridgeFacade.realtimeDiagnostics$()` (état courant des connexions SSE actives)
 
 Note SSR : la connexion SSE ne s’ouvre que dans le navigateur.
@@ -235,6 +235,12 @@ Fonctionnement (résumé) :
 - chaque event JSON recu est testé sur le champ de discrimination (`@type` par défaut)
 - seuls les `resourceType` explicitement demandés sont émis
 - chaque event émis est `{ resourceType, payload }`
+
+Important (provenance des events) :
+- `watchTypes$` filtre par type (`payload[discriminator]`), pas par provenance réseau du topic.
+- En mode mutualisé (`connectionMode: 'auto'` et sans `newConnection`), un event d’un autre topic partagé peut être émis s’il porte un type autorisé.
+- Si vous voulez ecouter strictement un seul topic, utilisez une connexion dédiée :
+  `watchTypes$(..., {newConnection: true})` (ou `connectionMode: 'single'` globalement).
 
 Configuration :
 - `discriminator` : champ type (défaut `@type`)
@@ -258,7 +264,8 @@ const bridge = inject(BridgeFacade);
 bridge.watchTypes$<Registry>(
   '/api/events/me',
   ['Conversation', 'Message'],
-  {discriminator: '@type'}
+  {discriminator: '@type'},
+  {newConnection: true} // isolation stricte du topic
 ).subscribe((evt) => {
   switch (evt.resourceType) {
     case 'Conversation':

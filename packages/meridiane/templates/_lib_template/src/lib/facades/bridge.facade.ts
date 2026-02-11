@@ -116,6 +116,18 @@ export class BridgeFacade {
       );
   }
 
+  /**
+   * Watches a "multi-entity" topic and emits only payloads whose discriminator matches `resourceTypes`.
+   *
+   * Important:
+   * - filtering is done on payload content (e.g. `@type`), not on network topic provenance.
+   * - in shared mode (`connectionMode: 'auto'` without `newConnection`), events from another shared topic
+   *   can be emitted if they carry an allowed discriminator.
+   *
+   * For strict single-topic isolation, use a dedicated connection:
+   * `watchTypes$(..., ..., ..., { newConnection: true })`
+   * (or `connectionMode: 'single'` globally).
+   */
   watchTypes$<R extends Record<string, any>>(
     iri: Iri | Iri[],
     resourceTypes: (keyof R & string)[],
