@@ -9,6 +9,7 @@ import {API_BASE_URL, BRIDGE_WITH_CREDENTIALS} from '../tokens';
 import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequired, Item} from '../ports/resource-repository.port';
 import {SubscribeFilter} from '../ports/realtime.port';
 import {resolveUrl} from '../utils/url';
+import {RealtimeDiagnostics, WatchConnectionOptions} from '../bridge.types';
 
 export type TypedEvent<TType extends string = string, TPayload = unknown> = {
   resourceType: TType;
@@ -22,6 +23,8 @@ export type WatchTypesConfig = {
   /** Field name used as discriminator. Default: `@type` (JSON-LD). */
   discriminator?: string;
 };
+
+export type WatchSubscriptionOptions = WatchConnectionOptions;
 
 /**
  * High-level facade for ad-hoc HTTP calls and Mercure subscriptions.
@@ -98,10 +101,14 @@ export class BridgeFacade {
 
   // ──────────────── SSE / Mercure ────────────────
 
-  watch$<T = Item>(iri: Iri | Iri[], subscribeFilter?: SubscribeFilter): Observable<T> {
+  watch$<T = Item>(
+    iri: Iri | Iri[],
+    subscribeFilter?: SubscribeFilter,
+    options?: WatchSubscriptionOptions
+  ): Observable<T> {
     const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
     return this.realtime
-      .subscribe$<T>(iris, subscribeFilter)
+      .subscribe$<T>(iris, subscribeFilter, options)
       .pipe(
         map((event) => event.data),
         filter((data): data is T => data !== undefined),
@@ -112,14 +119,15 @@ export class BridgeFacade {
   watchTypes$<R extends Record<string, any>>(
     iri: Iri | Iri[],
     resourceTypes: (keyof R & string)[],
-    cfg?: WatchTypesConfig
+    cfg?: WatchTypesConfig,
+    options?: WatchSubscriptionOptions
   ): Observable<WatchTypesResult<R>> {
     const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
     const discriminator = cfg?.discriminator ?? '@type';
     const allowedTypes = new Set(resourceTypes.filter((v): v is string => typeof v === 'string' && v.length > 0));
 
     return this.realtime
-      .subscribeAll$<unknown>(iris)
+      .subscribeAll$<unknown>(iris, options)
       .pipe(
         map((event): WatchTypesResult<R> | undefined => {
           const raw = event.data;
@@ -139,6 +147,10 @@ export class BridgeFacade {
   unwatch(iri: Iri | Iri[]): void {
     const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
     this.realtime.unsubscribe(iris);
+  }
+
+  realtimeDiagnostics$(): Observable<RealtimeDiagnostics> {
+    return this.realtime.diagnostics$();
   }
 
   private resolveUrl(path?: Iri): string {

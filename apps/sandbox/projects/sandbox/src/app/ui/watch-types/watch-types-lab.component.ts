@@ -1,11 +1,24 @@
 import {Component, computed, inject, OnDestroy, signal} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {BridgeFacade, Item, WatchTypesResult} from '@obsidiane/bridge-sandbox';
+import {toSignal} from '@angular/core/rxjs-interop';
+import {BridgeFacade, Item, RealtimeDiagnostics, WatchTypesResult} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {BACKEND_BASE_URL} from '../../core/backend';
 import {ConversationRepository} from '../../data/repositories/conversation.repository';
-import {Subscription} from 'rxjs';
+import {Observable, of, Subscription} from 'rxjs';
+import {
+  readSandboxRealtimeConfig,
+  resetSandboxRealtimeConfig,
+  saveSandboxRealtimeConfig,
+  SandboxRealtimeConfig
+} from '../../core/realtime-config';
+import {
+  normalizeTopic,
+  parseTypes,
+  planBulkSubscriptions,
+  planSingleSubscription
+} from './watch-types-lab.logic';
 
 type DynamicRegistry = Record<string, Item>;
 type TypedEvent = WatchTypesResult<DynamicRegistry>;
@@ -16,6 +29,7 @@ type WatchSubscriptionEntry = {
   topic: string;
   typesInput: string;
   discriminator: string;
+  newConnection: boolean;
   running: boolean;
   count: number;
   lastType?: string;
@@ -32,6 +46,9 @@ type EventEntry = {
   evt: TypedEvent;
 };
 
+const BULK_CONFIRM_THRESHOLD = 5;
+const MAX_SUBSCRIPTIONS = 300;
+
 @Component({
   selector: 'app-watch-types-lab',
   standalone: true,
@@ -46,13 +63,37 @@ export class WatchTypesLabComponent implements OnDestroy {
 
   readonly status = this.conversationsRepo.status;
   readonly err = signal<string | null>(null);
+  readonly notice = signal<string | null>(null);
   readonly publishing = signal(false);
+  readonly runtimeConfig = signal<SandboxRealtimeConfig>(readSandboxRealtimeConfig());
+  readonly bulkConfirmThreshold = BULK_CONFIRM_THRESHOLD;
+  readonly maxSubscriptions = MAX_SUBSCRIPTIONS;
+
+  readonly runtimeConfigForm = this.fb.nonNullable.group({
+    connectionMode: [this.runtimeConfig().connectionMode],
+    maxUrlLength: [this.runtimeConfig().maxUrlLength, [Validators.required, Validators.min(256)]],
+  });
+
+  readonly diagnostics = toSignal(
+    this.createDiagnosticsStream(),
+    {initialValue: emptyRealtimeDiagnostics(this.runtimeConfig())}
+  );
 
   readonly addSubForm = this.fb.nonNullable.group({
     name: ['events-me'],
     topic: ['/api/events/me', [Validators.required]],
     types: ['Message, Conversation', [Validators.required]],
     discriminator: ['@type', [Validators.required]],
+    newConnection: [false],
+  });
+
+  readonly bulkAddForm = this.fb.nonNullable.group({
+    topicPrefix: ['/api/events/topic-', [Validators.required]],
+    count: [1, [Validators.required, Validators.min(1), Validators.max(200)]],
+    types: ['Message, Conversation', [Validators.required]],
+    discriminator: ['@type', [Validators.required]],
+    newConnection: [false],
+    confirmLargeBatch: [false],
   });
 
   readonly publishForm = this.fb.nonNullable.group({
@@ -70,6 +111,7 @@ export class WatchTypesLabComponent implements OnDestroy {
 
   readonly activeSubscriptionsCount = computed(() => this._subscriptions().filter((s) => s.running).length);
   readonly totalEventCount = computed(() => this._events().length);
+  readonly activeConnectionsCount = computed(() => this.diagnostics().totalConnections);
   readonly lastEvent = computed(() => {
     const events = this._events();
     return events.length > 0 ? events[events.length - 1] : null;
@@ -86,6 +128,7 @@ export class WatchTypesLabComponent implements OnDestroy {
         topic: '/api/events/me',
         typesInput: 'Message, Conversation',
         discriminator: '@type',
+        newConnection: false,
       }),
     ]);
   }
@@ -94,34 +137,104 @@ export class WatchTypesLabComponent implements OnDestroy {
     this.stopAll();
   }
 
+  applyRuntimeConfig(): void {
+    if (this.runtimeConfigForm.invalid) {
+      this.runtimeConfigForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.runtimeConfigForm.getRawValue();
+    const saved = saveSandboxRealtimeConfig({
+      connectionMode: value.connectionMode,
+      maxUrlLength: value.maxUrlLength,
+    });
+    this.runtimeConfig.set(saved);
+    window.location.reload();
+  }
+
+  resetRuntimeConfig(): void {
+    const next = resetSandboxRealtimeConfig();
+    this.runtimeConfig.set(next);
+    window.location.reload();
+  }
+
   addSubscription(): void {
     if (this.addSubForm.invalid) {
       this.addSubForm.markAllAsTouched();
       return;
     }
 
-    const value = this.addSubForm.getRawValue();
-    const topic = value.topic.trim();
-    const typesInput = value.types.trim();
-    const discriminator = value.discriminator.trim() || '@type';
-    const name = value.name.trim() || `sub-${this.subSeq}`;
-    const types = parseTypes(typesInput);
-    if (!topic || types.length === 0) {
-      this.err.set('Subscription invalide: topic requis et au moins un type requis.');
+    if (this._subscriptions().length >= MAX_SUBSCRIPTIONS) {
+      this.err.set(`Limite atteinte (${MAX_SUBSCRIPTIONS} subscriptions max).`);
       return;
     }
 
-    this._subscriptions.update((list) => [
-      ...list,
-      this.createSubscription({
-        name,
-        topic,
-        typesInput: types.join(', '),
-        discriminator,
-      }),
-    ]);
+    const value = this.addSubForm.getRawValue();
+    const planned = planSingleSubscription({
+      name: value.name.trim() || `sub-${this.subSeq}`,
+      topic: value.topic,
+      typesInput: value.types,
+      discriminator: value.discriminator,
+      newConnection: value.newConnection,
+    });
 
+    if (!planned.ok) {
+      this.notice.set(null);
+      this.err.set(planned.error);
+      return;
+    }
+
+    const entry = planned.entries[0];
+    this._subscriptions.update((list) => [...list, this.createSubscription(entry)]);
+
+    this.notice.set('Subscription ajoutee.');
     this.err.set(null);
+  }
+
+  addBulkSubscriptions(): void {
+    if (this.bulkAddForm.invalid) {
+      this.bulkAddForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.bulkAddForm.getRawValue();
+    const planned = planBulkSubscriptions({
+      topicPrefix: value.topicPrefix,
+      count: value.count,
+      typesInput: value.types,
+      discriminator: value.discriminator,
+      newConnection: value.newConnection,
+      confirmLargeBatch: value.confirmLargeBatch,
+      existingTopics: new Set(this._subscriptions().map((entry) => entry.topic)),
+      currentTotal: this._subscriptions().length,
+      maxSubscriptions: MAX_SUBSCRIPTIONS,
+      largeBatchThreshold: BULK_CONFIRM_THRESHOLD,
+    });
+
+    if (!planned.ok) {
+      this.notice.set(null);
+      this.err.set(planned.error);
+      return;
+    }
+
+    this._subscriptions.update((list) => {
+      const next = [...list];
+      for (const entry of planned.entries) {
+        next.push(this.createSubscription(entry));
+      }
+      return next;
+    });
+
+    const skipped = planned.skippedDuplicates;
+    this.notice.set(
+      skipped > 0
+        ? `${planned.entries.length} subscriptions ajoutees (${skipped} ignorees: topics deja presents).`
+        : `${planned.entries.length} subscriptions ajoutees.`
+    );
+    this.err.set(null);
+    if (value.count > BULK_CONFIRM_THRESHOLD) {
+      this.bulkAddForm.patchValue({confirmLargeBatch: false});
+    }
   }
 
   removeSubscription(id: string): void {
@@ -144,7 +257,8 @@ export class WatchTypesLabComponent implements OnDestroy {
     const sub = this.bridge.watchTypes$<DynamicRegistry>(
       subConfig.topic,
       types,
-      {discriminator: subConfig.discriminator || '@type'}
+      {discriminator: subConfig.discriminator || '@type'},
+      {newConnection: subConfig.newConnection}
     ).subscribe({
       next: (evt: TypedEvent) => this.pushEvent(subConfig, evt),
       error: (e: unknown) => {
@@ -257,18 +371,27 @@ export class WatchTypesLabComponent implements OnDestroy {
     return typeof iri === 'string' ? iri : '-';
   }
 
+  topicsPreview(topics: string[]): string {
+    const limit = 3;
+    if (topics.length <= limit) return topics.join(' | ');
+    const head = topics.slice(0, limit).join(' | ');
+    return `${head} | +${topics.length - limit}`;
+  }
+
   private createSubscription(input: {
     name: string;
     topic: string;
     typesInput: string;
     discriminator: string;
+    newConnection: boolean;
   }): WatchSubscriptionEntry {
     return {
       id: `sub-${this.subSeq++}`,
       name: input.name,
-      topic: input.topic,
+      topic: normalizeTopic(input.topic),
       typesInput: input.typesInput,
       discriminator: input.discriminator,
+      newConnection: input.newConnection,
       running: false,
       count: 0,
     };
@@ -327,17 +450,32 @@ export class WatchTypesLabComponent implements OnDestroy {
       return iri;
     }
   }
+
+  private createDiagnosticsStream(): Observable<RealtimeDiagnostics> {
+    const bridgeRuntime = this.bridge as BridgeFacade & {
+      realtimeDiagnostics$?: () => Observable<RealtimeDiagnostics>;
+    };
+    if (typeof bridgeRuntime.realtimeDiagnostics$ === 'function') {
+      return bridgeRuntime.realtimeDiagnostics$();
+    }
+
+    this.err.set(
+      'Bridge runtime stale: realtimeDiagnostics$ absent. Relance `npm run sandbox:bridge` puis redemarre `npm run sandbox:dev`.'
+    );
+    return of(emptyRealtimeDiagnostics(this.runtimeConfig()));
+  }
+
 }
 
-function parseTypes(raw: string): string[] {
-  return Array.from(
-    new Set(
-      raw
-        .split(/[,\n]/g)
-        .map((v) => v.trim())
-        .filter((v) => v.length > 0)
-    )
-  );
+function emptyRealtimeDiagnostics(config: SandboxRealtimeConfig): RealtimeDiagnostics {
+  return {
+    mode: config.connectionMode,
+    maxUrlLength: config.maxUrlLength,
+    totalConnections: 0,
+    sharedConnections: 0,
+    dedicatedConnections: 0,
+    connections: [],
+  };
 }
 
 function parseJsonObject(raw: string): {ok: true; value: Record<string, unknown>} | {ok: false; error: string} {

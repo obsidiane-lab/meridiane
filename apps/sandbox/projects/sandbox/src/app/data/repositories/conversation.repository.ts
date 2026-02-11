@@ -2,7 +2,7 @@ import {inject, Injectable, Signal} from '@angular/core';
 import {tap} from 'rxjs/operators';
 import {Observable} from 'rxjs';
 
-import {AnyQuery, Collection, FacadeFactory, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
+import {AnyQuery, Collection, FacadeFactory, IriRequired, ResourceFacade, WatchConnectionOptions} from '@obsidiane/bridge-sandbox';
 
 import type {ConversationConversationRead as Conversation, MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
 import {BACKEND_BASE_URL} from '../../core/backend';
@@ -45,18 +45,18 @@ export class ConversationRepository {
     return this.facade.delete$(iri).pipe(tap(() => this.store.remove(iri)));
   }
 
-  watch$(iris: IriRequired | IriRequired[]): Observable<Conversation> {
-    return this.facade.watch$(iris).pipe(tap((c) => this.store.upsert(c)));
+  watch$(iris: IriRequired | IriRequired[], options?: WatchConnectionOptions): Observable<Conversation> {
+    return this.facade.watch$(iris, options).pipe(tap((c) => this.store.upsert(c)));
   }
 
   unwatch(iris: IriRequired | IriRequired[]): void {
     this.facade.unwatch(iris);
   }
 
-  watchMessages$(conversationIri: IriRequired): Observable<Message> {
+  watchMessages$(conversationIri: IriRequired, options?: WatchConnectionOptions): Observable<Message> {
     const topics = this.topicsForConversationIri(conversationIri);
     return this.facade
-      .watchSubResource$<Message>(topics, 'conversation')
+      .watchSubResource$<Message>(topics, 'conversation', options)
       .pipe(tap((m) => this.messageStore.upsert(m)));
   }
 

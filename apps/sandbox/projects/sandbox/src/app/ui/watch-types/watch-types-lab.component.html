@@ -18,6 +18,8 @@
           <span class="badge">closed</span>
         }
         <span class="badge">{{ activeSubscriptionsCount() }} actifs</span>
+        <span class="badge">mode: {{ diagnostics().mode }}</span>
+        <span class="badge">conn: {{ activeConnectionsCount() }}</span>
         <span class="badge">{{ totalEventCount() }} events</span>
       </div>
       <div class="actions">
@@ -31,6 +33,39 @@
   @if (err()) {
     <div class="badge badge--bad" style="margin-top: 12px;">{{ err() }}</div>
   }
+  @if (notice()) {
+    <div class="badge badge--good" style="margin-top: 12px;">{{ notice() }}</div>
+  }
+
+  <section class="card" style="margin-top: 12px;">
+    <h3 style="margin:0 0 10px;">Configuration runtime SSE (sandbox)</h3>
+    <p class="muted" style="margin:0 0 10px;">
+      Ces options pilotent <code>provideBridge(...mercure)</code>. Appliquer recharge automatiquement la page.
+    </p>
+
+    <form class="grid grid--2" [formGroup]="runtimeConfigForm">
+      <label class="field">
+        <div class="muted">connectionMode</div>
+        <select formControlName="connectionMode">
+          <option value="auto">auto</option>
+          <option value="single">single</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <div class="muted">maxUrlLength</div>
+        <input type="number" formControlName="maxUrlLength" min="256"/>
+        @if (runtimeConfigForm.controls.maxUrlLength.touched && runtimeConfigForm.controls.maxUrlLength.invalid) {
+          <div class="err">Valeur invalide (min 256)</div>
+        }
+      </label>
+    </form>
+
+    <div class="actions" style="margin-top: 10px;">
+      <button class="btn btn--primary" type="button" (click)="applyRuntimeConfig()">Apply + reload</button>
+      <button class="btn" type="button" (click)="resetRuntimeConfig()">Reset defaults + reload</button>
+    </div>
+  </section>
 
   <section class="card" style="margin-top: 12px;">
     <h3 style="margin:0 0 10px;">Nouvelle inscription</h3>
@@ -44,6 +79,14 @@
         <div class="muted">Discriminator</div>
         <input type="text" formControlName="discriminator" placeholder="@type"/>
       </label>
+
+      <div class="field">
+        <div class="muted">Connexion SSE</div>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" formControlName="newConnection"/>
+          <span>Forcer une connexion dediee</span>
+        </label>
+      </div>
 
       <label class="field">
         <div class="muted">Topic</div>
@@ -63,6 +106,54 @@
     </form>
     <div class="actions" style="margin-top: 10px;">
       <button class="btn btn--primary" type="button" (click)="addSubscription()">Ajouter</button>
+    </div>
+
+    <h4 style="margin: 14px 0 10px;">Generation en lot (test sharding auto)</h4>
+    <p class="muted" style="margin: 0 0 10px;">
+      Lot securise: confirmation requise au-dela de {{ bulkConfirmThreshold }} elements. Limite globale: {{ maxSubscriptions }}.
+    </p>
+    <form class="grid grid--2" [formGroup]="bulkAddForm">
+      <label class="field">
+        <div class="muted">Topic prefix</div>
+        <input type="text" formControlName="topicPrefix" placeholder="/api/events/topic-"/>
+      </label>
+
+      <label class="field">
+        <div class="muted">Count</div>
+        <input type="number" formControlName="count" min="1" max="200"/>
+      </label>
+
+      <label class="field">
+        <div class="muted">Types</div>
+        <input type="text" formControlName="types" placeholder="Message, Conversation"/>
+      </label>
+
+      <label class="field">
+        <div class="muted">Discriminator</div>
+        <input type="text" formControlName="discriminator" placeholder="@type"/>
+      </label>
+
+      <div class="field">
+        <div class="muted">Connexion SSE</div>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" formControlName="newConnection"/>
+          <span>Forcer une connexion dediee</span>
+        </label>
+      </div>
+
+      <div class="field">
+        <div class="muted">Securite lot</div>
+        <label style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" formControlName="confirmLargeBatch"/>
+          <span>Confirmer lot > {{ bulkConfirmThreshold }}</span>
+        </label>
+      </div>
+    </form>
+
+    <div class="actions" style="margin-top: 10px;">
+      <button class="btn" type="button" (click)="addBulkSubscriptions()">
+        Ajouter lot (x{{ bulkAddForm.controls.count.value }})
+      </button>
     </div>
   </section>
 
@@ -94,6 +185,10 @@
           <div class="sub__meta">
             <div><span class="muted">Topic:</span> <code>{{ sub.topic }}</code></div>
             <div><span class="muted">Discriminator:</span> <code>{{ sub.discriminator }}</code></div>
+            <div>
+              <span class="muted">Connection:</span>
+              <code>{{ sub.newConnection ? 'new' : 'shared/auto' }}</code>
+            </div>
             <div><span class="muted">Events:</span> <strong>{{ sub.count }}</strong></div>
             @if (sub.lastAt) {
               <div><span class="muted">Dernier:</span> {{ sub.lastAt | date:'mediumTime' }} ({{ sub.lastType }})</div>
@@ -108,6 +203,31 @@
         </article>
       } @empty {
         <div class="muted">Aucune inscription. Ajoute une configuration ci-dessus.</div>
+      }
+    </div>
+  </section>
+
+  <section class="card" style="margin-top: 12px;">
+    <h3 style="margin:0 0 10px;">Diagnostics connexions SSE</h3>
+    <div class="meta">
+      <span class="badge">total: {{ diagnostics().totalConnections }}</span>
+      <span class="badge">shared: {{ diagnostics().sharedConnections }}</span>
+      <span class="badge">dedicated: {{ diagnostics().dedicatedConnections }}</span>
+      <span class="badge">maxUrlLength: {{ diagnostics().maxUrlLength }}</span>
+    </div>
+
+    <div class="stream" style="margin-top: 10px; max-height: 220px;">
+      @for (conn of diagnostics().connections; track conn.id) {
+        <div class="row row--diag">
+          <span class="badge">{{ conn.id }}</span>
+          <span class="badge">{{ conn.scope }}</span>
+          <span class="badge">{{ conn.status }}</span>
+          <span class="badge">topics: {{ conn.topicCount }}</span>
+          <span class="badge">url: {{ conn.urlLength }}</span>
+          <code class="iri">{{ topicsPreview(conn.topics) }}</code>
+        </div>
+      } @empty {
+        <div class="muted">Aucune connexion SSE active.</div>
       }
     </div>
   </section>

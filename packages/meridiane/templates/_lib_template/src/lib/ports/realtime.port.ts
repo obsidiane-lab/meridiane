@@ -1,5 +1,6 @@
 import {Observable} from 'rxjs';
 import {Iri} from './resource-repository.port';
+import {WatchConnectionOptions} from '../bridge.types';
 
 export type RealtimeStatus = 'connecting' | 'connected' | 'closed';
 
@@ -51,14 +52,14 @@ export interface RealtimePort {
    *
    * Note: topics must be stable strings. Undefined values are ignored by the adapter.
    */
-  subscribe$<T>(iris: Iri[], filter?: SubscribeFilter): Observable<RealtimeEvent<T>>;
+  subscribe$<T>(iris: Iri[], filter?: SubscribeFilter, options?: WatchConnectionOptions): Observable<RealtimeEvent<T>>;
 
   /**
    * Subscribes to all JSON payloads received on the given Mercure topics.
    *
    * No payload-to-topic matching is applied.
    */
-  subscribeAll$<T>(iris: Iri[]): Observable<RealtimeEvent<T>>;
+  subscribeAll$<T>(iris: Iri[], options?: WatchConnectionOptions): Observable<RealtimeEvent<T>>;
 
   unsubscribe(iris: Iri[]): void;
 

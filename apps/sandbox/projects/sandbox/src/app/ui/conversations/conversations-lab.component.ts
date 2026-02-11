@@ -5,6 +5,7 @@ import {
   DestroyRef,
   ElementRef,
   inject,
+  OnDestroy,
   signal,
   Signal,
   ViewChild,
@@ -12,7 +13,7 @@ import {
 import {CommonModule} from '@angular/common';
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router} from "@angular/router";
-import {BridgeFacade, Iri, IriRequired} from '@obsidiane/bridge-sandbox';
+import {BridgeFacade, Iri, IriRequired, WatchConnectionOptions} from '@obsidiane/bridge-sandbox';
 import type {ConversationConversationRead as Conversation, MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
@@ -42,7 +43,7 @@ type MeResponse = {
   templateUrl: './conversations-lab.component.html',
   styleUrls: ['./conversations-lab.component.css'],
 })
-export class ConversationsLabComponent implements AfterViewInit {
+export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   readonly messagesLoading = signal(false);
   readonly sending = signal(false);
 
@@ -72,6 +73,12 @@ export class ConversationsLabComponent implements AfterViewInit {
 
   readonly sendMessageForm = this.fb.nonNullable.group({
     text: ['', [Validators.required]],
+  });
+
+  readonly realtimeWatchForm = this.fb.nonNullable.group({
+    watchAllNewConnection: [false],
+    watchOneNewConnection: [false],
+    watchMessagesNewConnection: [false],
   });
 
   // Logs
@@ -138,6 +145,15 @@ export class ConversationsLabComponent implements AfterViewInit {
     this.scrollMessagesToBottom();
   }
 
+  ngOnDestroy(): void {
+    this.stopSelectedSse$.next();
+    this.stopSelectedSse$.complete();
+    this.watchAllSub?.unsubscribe();
+    this.watchAllSub = undefined;
+    this.watchOneSub?.unsubscribe();
+    this.watchOneSub = undefined;
+  }
+
   routing() {
     const iri = this.selectedId();
     const id = this.selected()?.id;
@@ -173,8 +189,9 @@ export class ConversationsLabComponent implements AfterViewInit {
     const iris = this.conversations()
       .map((c) => c['@id'])
       .filter((x): x is IriRequired => typeof x === 'string' && x.length > 0);
+    const options = this.watchOptions(this.realtimeWatchForm.controls.watchAllNewConnection.value);
 
-    this.watchAllSub = this.conversationsRepo.watch$(iris).subscribe(() => undefined);
+    this.watchAllSub = this.conversationsRepo.watch$(iris, options).subscribe(() => undefined);
   }
 
   unwatchAll() {
@@ -212,8 +229,9 @@ export class ConversationsLabComponent implements AfterViewInit {
       });
 
     // Listen to Message events published on Conversation topic
+    const watchMessagesOptions = this.watchOptions(this.realtimeWatchForm.controls.watchMessagesNewConnection.value);
     this.conversationsRepo
-      .watchMessages$(conversationIri)
+      .watchMessages$(conversationIri, watchMessagesOptions)
       .pipe(takeUntilDestroyed(this.destroyRef), takeUntil(this.stopSelectedSse$))
       .subscribe(() => {
         this.scrollMessagesToBottom();
@@ -227,7 +245,8 @@ export class ConversationsLabComponent implements AfterViewInit {
     const iri = this.selectedId();
     if (iri) {
       this.watchOneSub?.unsubscribe();
-      this.watchOneSub = this.conversationsRepo.watch$(iri as IriRequired).subscribe(() => undefined);
+      const options = this.watchOptions(this.realtimeWatchForm.controls.watchOneNewConnection.value);
+      this.watchOneSub = this.conversationsRepo.watch$(iri as IriRequired, options).subscribe(() => undefined);
     }
   }
 
@@ -411,5 +430,9 @@ export class ConversationsLabComponent implements AfterViewInit {
     const next = [...arr, entry];
     if (next.length > 200) next.splice(0, next.length - 200);
     this._logs.set(next);
+  }
+
+  private watchOptions(forceDedicatedConnection: boolean): WatchConnectionOptions | undefined {
+    return forceDedicatedConnection ? {newConnection: true} : undefined;
   }
 }
