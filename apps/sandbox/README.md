@@ -1,30 +1,73 @@
-# Sandbox (développement)
+# Sandbox Angular
 
-Cette app Angular sert à valider le template généré par `@obsidiane/meridiane`.
+Application Angular de démonstration pour valider le bridge généré par `@obsidiane/meridiane`.
 
-## Démarrage
+## Objectif
 
-Depuis la racine du repo :
+La sandbox vérifie en conditions réelles :
+- appels HTTP (Hydra + endpoints custom)
+- auth JWT
+- upload multipart
+- realtime Mercure (`watch$`, `watchSubResource$`, `watchTypes$`)
+- stratégies SSE (`connectionMode`, `newConnection`, diagnostics)
+
+## Pré-requis
+
+- backend disponible sur `http://localhost:8000`
+- endpoints docs OpenAPI accessibles (`/api/docs.json`)
+
+Démarrage backend (depuis la racine du repo) :
+
+```bash
+cd apps/backend
+docker compose up -d --build
+docker compose exec php php bin/console app:dev:reset --no-interaction
+cd ../..
+```
+
+## Démarrage sandbox
+
+Depuis la racine :
 
 ```bash
 npm install
 npm run sandbox:dev
 ```
 
-Ce que ça fait :
-- build le package `@obsidiane/bridge-sandbox` via le CLI local (standalone)
-- installe le package dans `apps/sandbox/node_modules`
+Ce que fait `sandbox:dev` :
+- lance `bridge:sync` (`node ../../packages/meridiane/cli.js dev`)
+- génère/build le package `@obsidiane/bridge-sandbox`
+- l'installe dans `apps/sandbox/node_modules`
 - lance `ng serve sandbox`
 
-Pré-requis :
-- le backend doit exposer la spec OpenAPI sur `http://localhost:8000/api/docs.json` (valeurs par défaut de `meridiane dev` dans ce repo).
-  - alternative : vous pouvez passer une spec locale (JSON) : `npm -w apps/sandbox run bridge:sync -- --spec ./openapi.json`
+URL : `http://localhost:4200`
 
-## Build (CI / vérification)
+## Auth de dev
+
+Comptes fixtures :
+- `dev@meridiane.local` / `dev`
+- `admin@meridiane.local` / `admin`
+
+## Scripts utiles
+
+Dans `apps/sandbox` :
+
+- `npm run bridge:sync` : regénérer le bridge sandbox
+- `npm run dev` : bridge sync + `ng serve sandbox`
+- `npm run build` : bridge sync + build Angular
+- `npm run test` : tests Angular
+- `npm run lint` : lint
+
+## Forcer une spec locale
 
 ```bash
-npm run sandbox:build
+npm -w apps/sandbox run bridge:sync -- --spec ./openapi.json
 ```
 
-Notes :
-- l’artefact build est dans `apps/sandbox/dist/bridge-sandbox` (et un `.tgz` via `npm pack`)
+## Pages principales
+
+- `/login` : login JWT
+- `/conversations` : CRUD + watch conversation/messages
+- `/conversations/:id/messages` : vue dédiée messages
+- `/http` : lab HTTP (echo, delay, flaky, upload)
+- `/watch-types` : lab `watchTypes$` + diagnostics realtime

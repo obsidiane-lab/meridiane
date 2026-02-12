@@ -1,7 +1,6 @@
 # Mercure / SSE
 
-Le bridge propose une intégration Mercure/SSE pensée pour Angular :
-une seule connexion EventSource, gestion robuste des topics, API simple côté facades.
+Le bridge intègre Mercure avec gestion des subscriptions, mutualisation des connexions et diagnostics runtime.
 
 ## Activer Mercure
 
@@ -14,49 +13,53 @@ provideBridge({
 
 Sans `hubUrl`, le realtime est désactivé.
 
-## Mode de topics
+## Topic mode
 
 `topicMode` contrôle la forme envoyée au hub :
 
 - `url` (défaut) : topics absolus
 - `iri` : topics relatifs same-origin
 
-## Modèle de connexion
+## Modes de connexion
 
-- Une seule connexion SSE est maintenue.
-- Les topics sont gérés en ref-count (pas de doublons).
-- Les reconnections sont sérialisées.
+`mercure.connectionMode` :
 
-## Filtrer des événements (sous-ressources)
+- `auto` (défaut)
+  - mutualise les subscriptions sur des connexions partagées
+  - découpe automatiquement en plusieurs connexions si l'URL Mercure dépasse `mercure.maxUrlLength` (défaut `1900`)
+- `single`
+  - ouvre une connexion dédiée par abonnement
+
+Override ponctuel :
+
+```ts
+resource.watch$(iri, {newConnection: true});
+bridge.watchTypes$(topic, ['Message'], {discriminator: '@type'}, {newConnection: true});
+```
+
+## APIs realtime
+
+- `ResourceFacade.watch$(iri|iri[], {newConnection?})`
+- `ResourceFacade.watchSubResource$(iri|iri[], field, {newConnection?})`
+- `BridgeFacade.watch$(iri|iri[], filter?, {newConnection?})`
+- `BridgeFacade.watchTypes$(iri|iri[], resourceTypes, cfg?, {newConnection?})`
+- `BridgeFacade.realtimeDiagnostics$()`
+
+## `watchSubResource$`
+
+Permet de recevoir des événements d'une sous-ressource publiés sur un topic parent.
 
 ```ts
 resource.watchSubResource$<Message>('/api/conversations/1', 'conversation');
 ```
 
-Le champ filtré doit être une IRI (string) ou une liste d’IRIs (`string[]`).
+Le champ filtré peut être une IRI (`string`) ou une liste d'IRIs (`string[]`).
 
-## Topics “multi-entités”
+## `watchTypes$` (topic multi-entités)
 
-Quand un même topic Mercure publie plusieurs types d’entités (Message, Conversation, ...),
-utilisez `BridgeFacade.watchTypes$()` pour obtenir un flux typé (union discriminée).
-
-Principe :
-- vous vous abonnez à un topic “libre” (ou une liste)
-- chaque event recu est discriminé par type (`@type` en JSON-LD)
-- seuls les `resourceType` explicitement demandés sont émis (le reste est ignoré)
+Usage :
 
 ```ts
-import {inject} from '@angular/core';
-import {BridgeFacade} from '@acme/backend-bridge';
-import type {Item} from '@acme/backend-bridge';
-
-type Conversation = Item & {title?: string | null};
-type Message = Item & {conversation?: string | Item | null; originalText?: string | null};
-
-type Registry = {Conversation: Conversation; Message: Message};
-
-const bridge = inject(BridgeFacade);
-
 bridge.watchTypes$<Registry>(
   '/api/events/me',
   ['Conversation', 'Message'],
@@ -64,22 +67,44 @@ bridge.watchTypes$<Registry>(
 );
 ```
 
-Notes :
-- En sortie, chaque event inclut `resourceType` + `payload`.
+Sortie : événements `{ resourceType, payload }`.
 
-## Credentials et cookies
+Important :
+- le filtrage est fait sur le payload (`@type` par défaut), pas sur la provenance réseau stricte du topic
+- en mode mutualisé, un événement d'un autre topic partagé peut passer s'il matche le type demandé
 
-Le `withCredentials` par défaut est déduit de `mercure.init.credentials` :
-- `include` (défaut) → cookies envoyés
-- `omit` → cookies non envoyés
+Pour isolation stricte d'un topic :
+- `newConnection: true` sur l'appel, ou
+- `connectionMode: 'single'` global.
+
+## Diagnostics runtime
+
+`BridgeFacade.realtimeDiagnostics$()` expose :
+
+- mode courant (`auto`/`single`)
+- nombre total de connexions
+- répartition `shared` / `dedicated`
+- liste détaillée des connexions (status, topics, longueur d'URL)
+
+## Cookies / credentials
+
+Le `withCredentials` par défaut est déduit de `mercure.init` :
+
+- `credentials: 'include'` (défaut) : cookies envoyés
+- `credentials: 'omit'` : cookies non envoyés
+
+Exemple :
 
 ```ts
 provideBridge({
   baseUrl: 'https://api.example.com',
-  mercure: {hubUrl: 'https://api.example.com/.well-known/mercure', init: {credentials: 'include'}},
+  mercure: {
+    hubUrl: 'https://api.example.com/.well-known/mercure',
+    init: {credentials: 'omit'},
+  },
 });
 ```
 
-## SSR / navigateur
+## SSR
 
-Le bridge n’ouvre jamais d’EventSource côté serveur : la connexion SSE est activée uniquement dans le navigateur.
+Aucune connexion `EventSource` n'est ouverte côté serveur. SSE est actif uniquement dans le navigateur.

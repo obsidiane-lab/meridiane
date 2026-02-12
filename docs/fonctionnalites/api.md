@@ -1,75 +1,71 @@
 # API publique
 
-Surface publique exposée par le bridge généré (`public-api.ts`).
+Surface exposée par le bridge généré (`src/public-api.ts`).
 
 ## Exports principaux
 
-- `provideBridge()`
-- `BridgeOptions`, `BridgeDefaults`, `BridgeLogger`, `MercureTopicMode`
-- `FacadeFactory`, `ResourceFacade<T>`, `BridgeFacade`
-- Types HTTP : `Item`, `Iri`, `Collection<T>`, `Query`, `HttpRequestConfig`, `HttpCallOptions`
-- Utils : `joinUrl`, `resolveUrl`
+- Runtime/config : `provideBridge`, `BridgeOptions`, `BridgeAuth`, `BridgeMercureOptions`
+- Types bridge : `BridgeDefaults`, `BridgeLogger`, `MercureTopicMode`, `MercureConnectionMode`, `WatchConnectionOptions`, `RealtimeDiagnostics`
+- Facades : `FacadeFactory`, `ResourceFacade<T>`, `BridgeFacade`
+- Types utilitaires facades : `FacadeConfig<T>`, `TypedEvent`, `WatchTypesResult<R>`, `WatchTypesConfig`
+- Types HTTP/Hydra : `Item`, `Iri`, `Collection<T>`, `Query`, `AnyQuery`, `HttpCallOptions`, `HttpRequestConfig`, `HttpMethod`
+- Ports : `ResourceRepository<T>`
+- Utils URL : `joinUrl`, `resolveUrl`
+- Models générés : exports de `./models`
 
-## `provideBridge(...)`
+## `provideBridge(opts)`
 
-Configure le runtime HTTP/SSE et expose les tokens internes.
+`baseUrl` est requis.
 
-Options :
-
-- `baseUrl` : URL de base du backend (requis)
-- `auth` : Bearer token (string ou objet) ou `HttpInterceptorFn`
-- `mercure` : `{ hubUrl, init, topicMode? }` pour activer le realtime
-- `defaults` : headers/timeout/retries appliqués par défaut
-- `singleFlight` : déduplication des requêtes HTTP in-flight (par défaut `true`)
-- `debug` : logs runtime (HTTP + Mercure)
+Options notables :
+- `auth` : string bearer, objet bearer (token/getToken), ou `HttpInterceptorFn`
+- `mercure.hubUrl` : active le realtime
+- `mercure.topicMode` : `'url'` (défaut) ou `'iri'`
+- `mercure.connectionMode` : `'auto'` (défaut) ou `'single'`
+- `mercure.maxUrlLength` : seuil de découpage URL en mode `auto` (défaut `1900`)
+- `mercure.init` : options `EventSource` (notamment `credentials`)
+- `defaults` : headers/timeout/retries globaux
+- `singleFlight` : déduplication HTTP in-flight (`true` par défaut)
+- `debug` : logs runtime
 - `extraInterceptors` : interceptors Angular additionnels
-
-Exemple :
-
-```ts
-provideBridge({
-  baseUrl: 'https://api.example.com',
-  auth: {type: 'bearer', getToken: () => localStorage.getItem('token') ?? undefined},
-  mercure: {hubUrl: 'https://api.example.com/.well-known/mercure'},
-});
-```
 
 ## `FacadeFactory` + `ResourceFacade<T>`
 
-Crée une façade typée par ressource (repo REST + realtime) :
+Construction :
 
 ```ts
 const factory = inject(FacadeFactory);
 const books = factory.create<Book>({url: '/api/books'});
 ```
 
-API `ResourceFacade<T>` :
+API principale `ResourceFacade<T>` :
 - `getCollection$(query?, opts?)`, `get$(iri, opts?)`
 - `post$(payload, opts?)`, `patch$(iri, changes, opts?)`, `put$(iri, payload, opts?)`, `delete$(iri, opts?)`
-- `request$({ method, url?, query?, body?, headers?, responseType?, withCredentials?, options? })`
-- `watch$(iri|iri[])`, `unwatch(iri|iri[])`
-- `watchSubResource$(iri|iri[], field)`
-- `connectionStatus` : signal SSE (`connecting` | `connected` | `closed`)
+- `request$({method, url?, query?, body?, headers?, responseType?, withCredentials?, options?})`
+- `watch$(iri|iri[], options?)`, `unwatch(iri|iri[])`
+- `watchSubResource$(iri|iri[], field, options?)`
+- `connectionStatus` (`'connecting' | 'connected' | 'closed'`)
 
-Note : utilisez `FacadeFactory` pour instancier les `ResourceFacade` (contexte d’injection).
+`options` de watch = `WatchConnectionOptions` (`{ newConnection?: boolean }`).
 
 ## `BridgeFacade`
 
-Façade ad-hoc pour endpoints non Hydra + helpers SSE/Mercure :
+HTTP ad-hoc :
+- `get$`, `getCollection$`, `post$`, `patch$`, `put$`, `delete$`, `request$`
 
-- `watch$(iri|iri[], filter?)` / `unwatch(iri|iri[])`
-- `watchTypes$(iri|iri[], resourceTypes, cfg?)` : topic “multi-entités” (union discriminée par type)
+Realtime :
+- `watch$(iri|iri[], filter?, options?)`
+- `watchTypes$(iri|iri[], resourceTypes, cfg?, options?)`
+- `unwatch(iri|iri[])`
+- `realtimeDiagnostics$()`
 
-`watchTypes$()` renvoie un flux d’events de la forme :
-- `{ resourceType, payload }` (union discriminée par `resourceType`)
-
-Options principales :
-- `resourceTypes` : liste des valeurs `@type` autorisées
-- `discriminator` : nom du champ type (défaut `@type`)
-- Seuls les `resourceType` demandés sont émis (le reste est ignoré)
+`watchTypes$()` :
+- discrimine les événements sur `cfg.discriminator` (défaut `@type`)
+- renvoie des événements `{ resourceType, payload }`
 
 ## Types utiles
 
-- `Item`, `Iri`, `Collection<T>`, `Query`
-- `HttpRequestConfig`, `HttpCallOptions`
-- `BridgeDefaults`, `BridgeLogger`, `MercureTopicMode`
+- `Item` contient les champs Hydra/JSON-LD usuels (`@id`, `@type`, `@context`)
+- `Collection<T>` expose `member`, `totalItems`, `view`, `search`
+- `HttpRequestConfig` sert d'escape hatch pour les endpoints non standards
+- `RealtimeDiagnostics` expose l'état courant des connexions SSE (shared/dedicated)
