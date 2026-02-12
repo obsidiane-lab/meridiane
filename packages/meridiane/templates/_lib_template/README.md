@@ -17,7 +17,7 @@ Le bridge est conçu pour être installé dans une application Angular. Les dép
 
 ## Compatibilité
 
-- Angular `@angular/*` `^20.1.0`
+- Angular `@angular/*` `^20.0.0 || ^21.0.0`
 - RxJS `^7.8.0`
 
 ## Démarrage rapide

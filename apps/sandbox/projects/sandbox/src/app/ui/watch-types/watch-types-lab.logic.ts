@@ -1,22 +1,22 @@
-export type NewWatchSubscriptionInput = {
+export interface NewWatchSubscriptionInput {
   name: string;
   topic: string;
   typesInput: string;
   discriminator: string;
   newConnection: boolean;
-};
+}
 
-export type NewWatchSubscription = {
+export interface NewWatchSubscription {
   name: string;
   topic: string;
   typesInput: string;
   discriminator: string;
   newConnection: boolean;
-};
+}
 
 export type PlanSingleInput = NewWatchSubscriptionInput;
 
-export type PlanBulkInput = {
+export interface PlanBulkInput {
   topicPrefix: string;
   count: number;
   typesInput: string;
@@ -26,7 +26,7 @@ export type PlanBulkInput = {
   currentTotal: number;
   maxSubscriptions: number;
   largeBatchThreshold: number;
-};
+}
 
 export type PlanBulkResult =
   | { ok: true; entries: NewWatchSubscription[] }

@@ -1,21 +1,27 @@
 import {Component, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {HttpClient} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {BACKEND_BASE_URL} from '../../core/backend';
 import {AuthStateService} from '../../core/auth-state.service';
 
-type LoginResponse = {token: string};
+interface LoginResponse {
+  token: string;
+}
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.css'],
 })
 export class LoginComponent {
+  private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthStateService);
+  private readonly router = inject(Router);
+
   readonly backendBaseUrl = BACKEND_BASE_URL;
 
   private readonly fb = inject(FormBuilder);
@@ -26,13 +32,6 @@ export class LoginComponent {
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-
-  constructor(
-    private readonly http: HttpClient,
-    private readonly auth: AuthStateService,
-    private readonly router: Router,
-  ) {
-  }
 
   login(): void {
     if (this.form.invalid) {

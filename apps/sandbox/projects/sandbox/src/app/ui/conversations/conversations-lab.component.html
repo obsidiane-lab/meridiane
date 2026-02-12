@@ -62,7 +62,11 @@
     @for (c of filtered(); track c['@id']) {
       <div class="row"
            [class.active]="c['@id'] === selectedId()"
-           (click)="select(c)">
+           role="button"
+           tabindex="0"
+           (click)="select(c)"
+           (keydown.enter)="select(c)"
+           (keydown.space)="select(c); $event.preventDefault()">
         <div>
           <div><strong>#{{ c['@id'] }}</strong></div>
           <div style="font-size:12px;color:#374151">title: {{ c.title || '—' }}</div>

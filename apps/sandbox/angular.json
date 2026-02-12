@@ -85,8 +85,23 @@
               "projects/sandbox/src/styles.css"
             ]
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "projects/sandbox/**/*.ts",
+              "projects/sandbox/**/*.html"
+            ],
+            "eslintConfig": "projects/sandbox/eslint.config.js"
+          }
         }
       }
     }
+  },
+  "cli": {
+    "schematicCollections": [
+      "angular-eslint"
+    ]
   }
 }

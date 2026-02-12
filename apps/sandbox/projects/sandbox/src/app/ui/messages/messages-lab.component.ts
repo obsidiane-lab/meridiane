@@ -1,5 +1,5 @@
 import {Component, computed, inject, OnDestroy, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
@@ -21,11 +21,14 @@ interface LogEntry {
 @Component({
   selector: 'app-messages-lab',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, JsonViewerComponent],
+  imports: [ReactiveFormsModule, JsonViewerComponent],
   templateUrl: './messages-lab.component.html',
   styleUrls: ['./messages-lab.component.css'],
 })
 export class MessagesLabComponent implements OnDestroy {
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
   private readonly messagesRepo = inject(MessageRepository);
   private readonly conversationsRepo = inject(ConversationRepository);
 
@@ -75,10 +78,7 @@ export class MessagesLabComponent implements OnDestroy {
   private sseSub?: Subscription;
   private watchedConversationIri?: IriRequired;
 
-  constructor(
-    private readonly router: Router,
-    private readonly route: ActivatedRoute,
-  ) {
+  constructor() {
     this.pushLog({t: Date.now(), kind: 'init'});
 
     this.route.paramMap
@@ -102,7 +102,7 @@ export class MessagesLabComponent implements OnDestroy {
 
   routing() {
     this.disableSse();
-    this.router.navigate(["/conversations"]);
+    this.router.navigate(['/conversations']);
   }
 
   load() {

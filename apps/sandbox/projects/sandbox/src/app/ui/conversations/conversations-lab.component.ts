@@ -10,9 +10,9 @@ import {
   Signal,
   ViewChild,
 } from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {Router} from "@angular/router";
+import {Router} from '@angular/router';
 import {BridgeFacade, Iri, IriRequired, WatchConnectionOptions} from '@obsidiane/bridge-sandbox';
 import type {ConversationConversationRead as Conversation, MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
@@ -28,22 +28,32 @@ interface LogEntry {
   snapshot?: unknown;
 }
 
-type MeResponse = {
+interface MeResponse {
   user: {
     id: number | null;
     userIdentifier: string;
     roles: string[];
   } | null;
-};
+}
+
+interface AuthorLike {
+  id?: unknown;
+  ['@id']?: unknown;
+  displayName?: unknown;
+  email?: unknown;
+}
 
 @Component({
   selector: 'app-conversations-lab',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, JsonViewerComponent],
+  imports: [ReactiveFormsModule, JsonViewerComponent],
   templateUrl: './conversations-lab.component.html',
   styleUrls: ['./conversations-lab.component.css'],
 })
 export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
+  private router = inject(Router);
+  private readonly bridge = inject(BridgeFacade);
+
   readonly messagesLoading = signal(false);
   readonly sending = signal(false);
 
@@ -120,10 +130,7 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   @ViewChild('messagesViewport') private messagesViewport?: ElementRef<HTMLElement>;
   @ViewChild('composer') private composer?: ElementRef<HTMLTextAreaElement>;
 
-  constructor(
-    private router: Router,
-    private readonly bridge: BridgeFacade,
-  ) {
+  constructor() {
     this.status = this.conversationsRepo.status;
     this.conversations = this.conversationsRepo.conversations();
 
@@ -365,17 +372,18 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
 
   displayAuthor(m: Message): string {
     if (this.isMine(m)) return this.meIdentifier() ?? 'You';
-    const author = (m as any)?.author;
+    const author = this.readAuthor(m);
+    const authorRecord = this.asAuthorLike(author);
 
     // API Platform can embed the author object in JSON-LD.
-    if (author && typeof author === 'object') {
-      const displayName = (author as any)?.displayName;
+    if (authorRecord) {
+      const displayName = authorRecord.displayName;
       if (typeof displayName === 'string' && displayName.trim() !== '') return displayName;
 
-      const email = (author as any)?.email;
+      const email = authorRecord.email;
       if (typeof email === 'string' && email.trim() !== '') return email;
 
-      const id = this.extractNumericId(author);
+      const id = this.extractNumericId(authorRecord);
       if (id) return `User #${id}`;
       return 'Unknown';
     }
@@ -402,11 +410,11 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
     const iri =
       typeof input === 'string'
         ? input
-        : typeof (input as any)?.['@id'] === 'string'
-          ? (input as any)['@id']
+        : typeof this.asAuthorLike(input)?.['@id'] === 'string'
+          ? this.asAuthorLike(input)?.['@id']
           : undefined;
 
-    const numericId = typeof (input as any)?.id === 'number' ? (input as any).id : undefined;
+    const numericId = this.asAuthorLike(input)?.id;
     if (typeof numericId === 'number') return numericId;
 
     if (!iri) return null;
@@ -434,5 +442,13 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
 
   private watchOptions(forceDedicatedConnection: boolean): WatchConnectionOptions | undefined {
     return forceDedicatedConnection ? {newConnection: true} : undefined;
+  }
+
+  private readAuthor(message: Message): unknown {
+    return (message as unknown as {author?: unknown}).author;
+  }
+
+  private asAuthorLike(input: unknown): AuthorLike | undefined {
+    return input && typeof input === 'object' ? (input as AuthorLike) : undefined;
   }
 }

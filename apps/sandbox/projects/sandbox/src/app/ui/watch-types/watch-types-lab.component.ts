@@ -23,7 +23,7 @@ import {
 type DynamicRegistry = Record<string, Item>;
 type TypedEvent = WatchTypesResult<DynamicRegistry>;
 
-type WatchSubscriptionEntry = {
+interface WatchSubscriptionEntry {
   id: string;
   name: string;
   topic: string;
@@ -35,16 +35,16 @@ type WatchSubscriptionEntry = {
   lastType?: string;
   lastIri?: string;
   lastAt?: number;
-};
+}
 
-type EventEntry = {
+interface EventEntry {
   id: string;
   t: number;
   subscriptionId: string;
   subscriptionName: string;
   topic: string;
   evt: TypedEvent;
-};
+}
 
 const BULK_CONFIRM_THRESHOLD = 5;
 const MAX_SUBSCRIPTIONS = 300;
@@ -487,10 +487,16 @@ function parseJsonObject(raw: string): {ok: true; value: Record<string, unknown>
   }
 }
 
-function readHttpError(e: any): string {
-  const detail = e?.error?.detail;
-  const title = e?.error?.title;
-  const message = e?.message;
+function readHttpError(e: unknown): string {
+  if (!e || typeof e !== 'object') return 'Request failed';
+
+  const cast = e as {
+    error?: {detail?: unknown; title?: unknown};
+    message?: unknown;
+  };
+  const detail = cast.error?.detail;
+  const title = cast.error?.title;
+  const message = cast.message;
 
   if (typeof detail === 'string' && detail.length > 0) return detail;
   if (typeof title === 'string' && title.length > 0) return title;

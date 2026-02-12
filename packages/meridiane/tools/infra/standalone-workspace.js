@@ -18,7 +18,7 @@ async function exists(p) {
   }
 }
 
-function toolchainPackageJson({ angularVersion }) {
+function toolchainPackageJson({ angularVersion, ngPackagrVersion, typescriptVersion, rxjsVersion, tslibVersion }) {
   const v = angularVersion;
   return {
     name: 'meridiane-standalone-workspace',
@@ -29,10 +29,10 @@ function toolchainPackageJson({ angularVersion }) {
       '@angular/compiler': v,
       '@angular/compiler-cli': v,
       '@angular/core': v,
-      'ng-packagr': '20.1.0',
-      rxjs: '7.8.2',
-      tslib: '2.8.1',
-      typescript: '5.8.3',
+      'ng-packagr': ngPackagrVersion,
+      rxjs: rxjsVersion,
+      tslib: tslibVersion,
+      typescript: typescriptVersion,
     },
   };
 }
@@ -42,7 +42,9 @@ function rootTsconfigJson() {
     compilerOptions: {
       target: 'ES2022',
       module: 'ES2022',
-      moduleResolution: 'Node',
+      // Angular >=21 relies on modern package exports resolution for some subpaths
+      // (e.g. @angular/common/http, @angular/core/rxjs-interop).
+      moduleResolution: 'bundler',
       lib: ['ES2022', 'DOM'],
       strict: true,
       skipLibCheck: true,
@@ -63,9 +65,18 @@ export async function ensureStandaloneWorkspace({ repoRoot, log }) {
   await ensureDir(distRoot);
   await ensureDir(workspaceRoot);
 
-  const angularVersion = (await detectAngularVersion(repoRoot)) ?? '20.1.7';
+  const detected = await detectToolchainVersions(repoRoot);
+  const angularVersion = detected.angularVersion ?? '21.1.4';
+  const derived = deriveToolchainDefaultsFromAngular(angularVersion);
+  const ngPackagrVersion = detected.ngPackagrVersion ?? derived.ngPackagrVersion;
+  const typescriptVersion = detected.typescriptVersion ?? derived.typescriptVersion;
+  const rxjsVersion = detected.rxjsVersion ?? '7.8.2';
+  const tslibVersion = detected.tslibVersion ?? '2.8.1';
   log?.debug?.('[meridiane] angular version', { angularVersion });
-  await writeJsonIfChanged(path.join(workspaceRoot, 'package.json'), toolchainPackageJson({ angularVersion }));
+  await writeJsonIfChanged(
+    path.join(workspaceRoot, 'package.json'),
+    toolchainPackageJson({ angularVersion, ngPackagrVersion, typescriptVersion, rxjsVersion, tslibVersion })
+  );
   await writeJsonIfChanged(path.join(workspaceRoot, 'tsconfig.json'), rootTsconfigJson());
 
   const npmCacheDir = path.join(workspaceRoot, '.npm-cache');
@@ -76,19 +87,42 @@ export async function ensureStandaloneWorkspace({ repoRoot, log }) {
   return { workspaceRoot, distRoot, npmCacheDir, requireFromWs };
 }
 
-async function detectAngularVersion(repoRoot) {
+async function detectToolchainVersions(repoRoot) {
   const pkgPath = path.join(repoRoot, 'package.json');
   try {
     const raw = await fs.readFile(pkgPath, 'utf8');
     const parsed = JSON.parse(raw);
-    const deps = parsed?.dependencies || {};
-    const devDeps = parsed?.devDependencies || {};
-    const peerDeps = parsed?.peerDependencies || {};
-    const v = deps['@angular/core'] ?? devDeps['@angular/core'] ?? peerDeps['@angular/core'];
-    return typeof v === 'string' && v.trim().length > 0 ? v.trim() : undefined;
+    const angularVersion = readDependencyVersion(parsed, '@angular/core');
+    const ngPackagrVersion = readDependencyVersion(parsed, 'ng-packagr');
+    const typescriptVersion = readDependencyVersion(parsed, 'typescript');
+    const rxjsVersion = readDependencyVersion(parsed, 'rxjs');
+    const tslibVersion = readDependencyVersion(parsed, 'tslib');
+    return { angularVersion, ngPackagrVersion, typescriptVersion, rxjsVersion, tslibVersion };
   } catch {
-    return undefined;
+    return {};
   }
+}
+
+function readDependencyVersion(pkg, depName) {
+  const deps = pkg?.dependencies || {};
+  const devDeps = pkg?.devDependencies || {};
+  const peerDeps = pkg?.peerDependencies || {};
+  const value = deps[depName] ?? devDeps[depName] ?? peerDeps[depName];
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function deriveToolchainDefaultsFromAngular(angularVersion) {
+  const major = parseInt(String(angularVersion).match(/\d+/)?.[0] ?? '0', 10);
+  if (major >= 21) {
+    return {
+      ngPackagrVersion: '21.1.0',
+      typescriptVersion: '5.9.3',
+    };
+  }
+  return {
+    ngPackagrVersion: '20.1.0',
+    typescriptVersion: '5.8.3',
+  };
 }
 
 export async function ensureToolchainInstalled({ workspaceRoot, requireFromWs, npmCacheDir, log }) {

@@ -59,9 +59,13 @@ export class MessageRepository {
   }
 
   create$(conversationIri: IriRequired, originalText: string): Observable<Message> {
+    // The generated read model expects an embedded Conversation object, but the API accepts an IRI on write.
     return this.facade
-      // The generated read model expects an embedded Conversation object, but the API accepts an IRI on write.
-      .post$({conversation: conversationIri, originalText} as any)
+      .request$<Message, {conversation: IriRequired; originalText: string}>({
+        method: 'POST',
+        url: '/api/messages',
+        body: {conversation: conversationIri, originalText},
+      })
       .pipe(tap((m) => this.store.upsert(m)));
   }
 

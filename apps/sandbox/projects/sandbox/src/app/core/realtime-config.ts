@@ -1,9 +1,9 @@
 export type SandboxMercureConnectionMode = 'auto' | 'single';
 
-export type SandboxRealtimeConfig = {
+export interface SandboxRealtimeConfig {
   connectionMode: SandboxMercureConnectionMode;
   maxUrlLength: number;
-};
+}
 
 const MODE_KEY = 'MERIDIANE_SANDBOX_MERCURE_CONNECTION_MODE';
 const MAX_URL_LENGTH_KEY = 'MERIDIANE_SANDBOX_MERCURE_MAX_URL_LENGTH';

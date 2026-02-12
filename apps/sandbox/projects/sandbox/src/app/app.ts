@@ -1,4 +1,4 @@
-import {Component, computed, signal} from '@angular/core';
+import { Component, computed, signal, inject } from '@angular/core';
 import {RouterLink, RouterLinkActive, RouterOutlet} from '@angular/router';
 import {AuthStateService} from './core/auth-state.service';
 import {BACKEND_BASE_URL} from './core/backend';
@@ -10,11 +10,10 @@ import {BACKEND_BASE_URL} from './core/backend';
   styleUrl: './app.css'
 })
 export class App {
+  readonly auth = inject(AuthStateService);
+
   protected readonly title = signal('sandbox');
   readonly backendBaseUrl = BACKEND_BASE_URL;
-
-  constructor(readonly auth: AuthStateService) {
-  }
 
   readonly shortToken = computed(() => {
     const t = this.auth.token();
