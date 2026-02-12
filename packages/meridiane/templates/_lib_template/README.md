@@ -17,7 +17,7 @@ Le bridge est conçu pour être installé dans une application Angular. Les dép
 
 ## Compatibilité
 
-- Angular `@angular/*` `^20.1.0`
+- Angular `@angular/*` `^20.0.0 || ^21.0.0`
 - RxJS `^7.8.0`
 
 ## Démarrage rapide
@@ -60,7 +60,7 @@ export class AppModule {}
 `provideBridge({ ... })` accepte notamment :
 - `baseUrl` (requis) ;
 - `auth` (Bearer ou interceptor custom) ;
-- `mercure` (hubUrl + options SSE) ;
+- `mercure` (hubUrl + `topicMode` + stratégie de connexions SSE `connectionMode`/`maxUrlLength`) ;
 - `defaults` (headers/timeout/retries) ;
 - `singleFlight` (déduplication “in-flight” des requêtes HTTP identiques `GET/HEAD/OPTIONS`) ;
 - `debug` (logs runtime) ;
@@ -186,9 +186,22 @@ provideBridge({
 
 ### Concurrence
 
-Le bridge maintient une seule connexion SSE (une seule `EventSource`) et mutualise les topics :
-- regarder plusieurs fois la même ressource ne crée pas plusieurs connexions ;
-- un même topic est dédoublonné et géré par ref-count (unsubscribe effectif quand plus personne n’écoute).
+Le bridge propose 2 stratégies SSE configurables via `provideBridge({mercure: ...})` :
+- `connectionMode: 'single'` : chaque appel `watch*` ouvre sa propre connexion SSE ;
+- `connectionMode: 'auto'` (défaut) : les topics sont mutualisés, puis découpés automatiquement en plusieurs connexions si l’URL Mercure dépasse `maxUrlLength` (défaut `1900`).
+
+Vous pouvez forcer une connexion dédiée par appel avec `newConnection: true` sur `watch$`, `watchSubResource$` et `watchTypes$`.
+
+```ts
+provideBridge({
+  baseUrl: 'https://api.example.com',
+  mercure: {
+    hubUrl: 'https://api.example.com/.well-known/mercure',
+    connectionMode: 'auto',
+    maxUrlLength: 1900,
+  },
+});
+```
 
 Côté HTTP, le bridge déduplique les requêtes identiques tant qu’elles sont en cours (single-flight, activé par défaut) :
 - `GET` / `HEAD` / `OPTIONS` : deux appels identiques partagent le même appel réseau et reçoivent la même réponse ;
@@ -203,11 +216,67 @@ provideBridge({baseUrl: 'https://api.example.com', singleFlight: false});
 ```
 
 API :
-- `ResourceFacade<T>.watch$(iri | iri[])` / `unwatch(iri | iri[])`
-- `ResourceFacade<T>.watchSubResource$(iri | iri[], 'field.path')`
-- `BridgeFacade.watch$(iri | iri[])` / `unwatch(iri | iri[])`
+- `ResourceFacade<T>.watch$(iri | iri[], {newConnection?})` / `unwatch(iri | iri[])`
+- `ResourceFacade<T>.watchSubResource$(iri | iri[], 'field.path', {newConnection?})`
+- `BridgeFacade.watch$(iri | iri[], filter?, {newConnection?})` / `unwatch(iri | iri[])`
+- `BridgeFacade.watchTypes$(iri | iri[], resourceTypes, cfg?, {newConnection?})` (topics “multi-entités”, filtrage par type)
+- `BridgeFacade.realtimeDiagnostics$()` (état courant des connexions SSE actives)
 
 Note SSR : la connexion SSE ne s’ouvre que dans le navigateur.
+
+### Topic “multi-entités” (event-bus)
+
+Quand un même topic Mercure publie plusieurs types de payloads (sans lien entre eux),
+utilisez `BridgeFacade.watchTypes$()`.
+Le flux renvoie une union discriminée par `resourceType` (par défaut via `@type` en JSON-LD).
+
+Fonctionnement (résumé) :
+- le bridge s’abonne au(x) topic(s) Mercure (connexion dédiée ou mutualisée selon `connectionMode`)
+- chaque event JSON recu est testé sur le champ de discrimination (`@type` par défaut)
+- seuls les `resourceType` explicitement demandés sont émis
+- chaque event émis est `{ resourceType, payload }`
+
+Important (provenance des events) :
+- `watchTypes$` filtre par type (`payload[discriminator]`), pas par provenance réseau du topic.
+- En mode mutualisé (`connectionMode: 'auto'` et sans `newConnection`), un event d’un autre topic partagé peut être émis s’il porte un type autorisé.
+- Si vous voulez ecouter strictement un seul topic, utilisez une connexion dédiée :
+  `watchTypes$(..., {newConnection: true})` (ou `connectionMode: 'single'` globalement).
+
+Configuration :
+- `discriminator` : champ type (défaut `@type`)
+- `resourceTypes` : liste de strings à accepter (`['Conversation', 'Message']`, etc.)
+
+```ts
+import {inject} from '@angular/core';
+import {BridgeFacade} from '__PACKAGE_NAME__';
+import type {Item} from '__PACKAGE_NAME__';
+
+type Conversation = Item & {title?: string | null};
+type Message = Item & {originalText?: string | null};
+
+type Registry = {
+  Conversation: Conversation;
+  Message: Message;
+};
+
+const bridge = inject(BridgeFacade);
+
+bridge.watchTypes$<Registry>(
+  '/api/events/me',
+  ['Conversation', 'Message'],
+  {discriminator: '@type'},
+  {newConnection: true} // isolation stricte du topic
+).subscribe((evt) => {
+  switch (evt.resourceType) {
+    case 'Conversation':
+      // evt.payload: Conversation
+      break;
+    case 'Message':
+      // evt.payload: Message
+      break;
+  }
+});
+```
 
 ## Models TypeScript
 

@@ -1,5 +1,6 @@
 import process from 'node:process';
 import path from 'node:path';
+import fs from 'node:fs/promises';
 
 import { readOpenApiSpec } from '../infra/spec-loader.js';
 import { generateBridgeWorkspace } from '../infra/generate/bridge.js';
@@ -69,6 +70,7 @@ export async function runBridgeWorkflow({
   const distDir = path.join(distRoot, libName);
   const packRel = packRelativeTo ? path.relative(packRelativeTo, distDir) : distDir;
   log?.step?.(`npm pack (${packRel})`);
+  await cleanupPackedTarballs(distDir);
   const packCode = await runCommand('npm', ['pack'], {
     cwd: distDir,
     env: {
@@ -82,4 +84,10 @@ export async function runBridgeWorkflow({
   if (packCode !== 0) throw new ExitCodeError(`npm pack failed (exit ${packCode})`, packCode);
 
   return { workspaceRoot, distRoot, distDir, npmCacheDir };
+}
+
+async function cleanupPackedTarballs(distDir) {
+  const entries = await fs.readdir(distDir, {withFileTypes: true});
+  const tarballs = entries.filter((entry) => entry.isFile() && entry.name.endsWith('.tgz'));
+  await Promise.all(tarballs.map((entry) => fs.rm(path.join(distDir, entry.name), {force: true})));
 }

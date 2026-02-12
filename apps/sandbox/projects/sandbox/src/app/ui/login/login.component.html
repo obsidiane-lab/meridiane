@@ -7,12 +7,12 @@
   <section class="panel">
     <form [formGroup]="form" (ngSubmit)="login()">
       <div class="row">
-        <label>Email</label>
-        <input formControlName="email" placeholder="dev@meridiane.local"/>
+        <label for="login-email">Email</label>
+        <input id="login-email" formControlName="email" placeholder="dev@meridiane.local"/>
       </div>
       <div class="row">
-        <label>Password</label>
-        <input formControlName="password" type="password" placeholder="dev"/>
+        <label for="login-password">Password</label>
+        <input id="login-password" formControlName="password" type="password" placeholder="dev"/>
       </div>
 
       <div class="actions">

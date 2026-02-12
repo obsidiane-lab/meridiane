@@ -3,7 +3,7 @@ import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
 import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
-import type {KeyValueConfig} from '@obsidiane/bridge-sandbox';
+import type {KeyValueConfigKvRead as KeyValueConfig} from '@obsidiane/bridge-sandbox';
 import {KeyValueConfigStore} from '../stores/key-value-config.store';
 
 @Injectable({providedIn: 'root'})

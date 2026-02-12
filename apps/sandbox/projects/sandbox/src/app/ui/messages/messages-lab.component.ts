@@ -1,14 +1,15 @@
-import {Component, computed, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {ActivatedRoute, Router} from "@angular/router";
+import {Component, computed, inject, OnDestroy, signal} from '@angular/core';
 
-import type {Message} from '@obsidiane/bridge-sandbox';
-import {Iri, IriRequired} from "@obsidiane/bridge-sandbox";
+import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
+import {ActivatedRoute, Router} from '@angular/router';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+
+import type {MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
+import {Iri, IriRequired} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {ConversationRepository} from '../../data/repositories/conversation.repository';
 import {MessageRepository} from '../../data/repositories/message.repository';
-import {Subscription} from 'rxjs';
+import {distinctUntilChanged, map, Subscription} from 'rxjs';
 
 interface LogEntry {
   t: number;
@@ -20,17 +21,20 @@ interface LogEntry {
 @Component({
   selector: 'app-messages-lab',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, JsonViewerComponent],
+  imports: [ReactiveFormsModule, JsonViewerComponent],
   templateUrl: './messages-lab.component.html',
   styleUrls: ['./messages-lab.component.css'],
 })
-export class MessagesLabComponent {
+export class MessagesLabComponent implements OnDestroy {
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+
   private readonly messagesRepo = inject(MessageRepository);
   private readonly conversationsRepo = inject(ConversationRepository);
 
-  readonly conversationId: string;
-  readonly conversationIri: IriRequired;
-  readonly messages = computed(() => this.messagesRepo.messagesForConversation(this.conversationIri)());
+  readonly conversationId = signal<string>('1');
+  readonly conversationIri = computed<IriRequired>(() => `/api/conversations/${this.conversationId()}`);
+  readonly messages = computed(() => this.messagesRepo.messagesForConversation(this.conversationIri())());
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -72,29 +76,41 @@ export class MessagesLabComponent {
   });
 
   private sseSub?: Subscription;
+  private watchedConversationIri?: IriRequired;
 
-  constructor(
-    private readonly router: Router,
-    private readonly route: ActivatedRoute,
-  ) {
-    const id = this.route.snapshot.paramMap.get('id') ?? '1';
-    this.conversationId = id;
-    this.conversationIri = `/api/conversations/${id}`;
+  constructor() {
     this.pushLog({t: Date.now(), kind: 'init'});
-    this.load();
-    this.enableSse();
+
+    this.route.paramMap
+      .pipe(
+        map((params) => params.get('id') ?? '1'),
+        distinctUntilChanged(),
+        takeUntilDestroyed(),
+      )
+      .subscribe((id) => {
+        this.disableSse();
+        this.conversationId.set(id);
+        this.selectedId.set(undefined);
+        this.load();
+        this.enableSse();
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.disableSse();
   }
 
   routing() {
     this.disableSse();
-    this.router.navigate(["/conversations"]);
+    this.router.navigate(['/conversations']);
   }
 
   load() {
     this.loading.set(true);
     this.error.set(null);
+    const conversationIri = this.conversationIri();
     this.messagesRepo
-      .fetchByConversation$(this.conversationIri, {page: 1, itemsPerPage: 20})
+      .fetchByConversation$(conversationIri, {page: 1, itemsPerPage: 20})
       .subscribe({
         next: () => this.loading.set(false),
         error: (err) => {
@@ -113,9 +129,9 @@ export class MessagesLabComponent {
   }
 
   select(m: Message) {
-    this.selectedId.set(m["@id"]);
+    this.selectedId.set(m['@id']);
     this.editForm.setValue({originalText: m.originalText ?? ''});
-    this.pushLog({t: Date.now(), kind: 'select', iri: m["@id"], snapshot: m});
+    this.pushLog({t: Date.now(), kind: 'select', iri: m['@id'], snapshot: m});
   }
 
   watchOne() {
@@ -164,8 +180,9 @@ export class MessagesLabComponent {
     this.loading.set(true);
     this.error.set(null);
     const {originalText} = this.createForm.getRawValue();
+    const conversationIri = this.conversationIri();
 
-    this.messagesRepo.create$(this.conversationIri, originalText.trim()).subscribe({
+    this.messagesRepo.create$(conversationIri, originalText.trim()).subscribe({
       next: (res) => {
         const iri = res?.['@id'] as Iri | undefined;
         this.pushLog({t: Date.now(), kind: 'update', iri, snapshot: res});
@@ -181,13 +198,19 @@ export class MessagesLabComponent {
 
   private enableSse(): void {
     if (this.sseSub) return;
-    this.sseSub = this.conversationsRepo.watchMessages$(this.conversationIri).subscribe(() => undefined);
+    const conversationIri = this.conversationIri();
+    this.watchedConversationIri = conversationIri;
+    this.sseSub = this.conversationsRepo.watchMessages$(conversationIri).subscribe(() => undefined);
   }
 
   private disableSse(): void {
-    this.conversationsRepo.unwatchMessages(this.conversationIri);
+    const watchedConversationIri = this.watchedConversationIri;
+    if (watchedConversationIri) {
+      this.conversationsRepo.unwatchMessages(watchedConversationIri);
+    }
     this.sseSub?.unsubscribe();
     this.sseSub = undefined;
+    this.watchedConversationIri = undefined;
   }
 
   // utils logs

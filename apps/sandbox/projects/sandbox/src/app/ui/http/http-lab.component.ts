@@ -1,18 +1,21 @@
 import {Component, inject, signal} from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {BridgeFacade} from '@obsidiane/bridge-sandbox';
 import {HttpHeaders} from '@angular/common/http';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
+import {Observable} from 'rxjs';
 
 @Component({
   selector: 'app-http-lab',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, JsonViewerComponent],
+  imports: [ReactiveFormsModule, JsonViewerComponent],
   templateUrl: './http-lab.component.html',
   styleUrls: ['./http-lab.component.css'],
 })
 export class HttpLabComponent {
+  private readonly bridge = inject(BridgeFacade);
+
   readonly out = signal<unknown>(null);
   readonly err = signal<string | null>(null);
   readonly busy = signal(false);
@@ -23,11 +26,6 @@ export class HttpLabComponent {
     flakyFails: [1, [Validators.required, Validators.min(0), Validators.max(10)]],
     echoPayload: ['{"hello":"world"}', [Validators.required]],
   });
-
-  constructor(
-    private readonly bridge: BridgeFacade,
-  ) {
-  }
 
   me(): void {
     this.run(() => this.bridge.get$('/api/auth/me'));
@@ -42,7 +40,7 @@ export class HttpLabComponent {
     let body: unknown;
     try {
       body = JSON.parse(echoPayload);
-    } catch (e) {
+    } catch {
       this.err.set('Invalid JSON payload');
       return;
     }
@@ -80,7 +78,7 @@ export class HttpLabComponent {
     }));
   }
 
-  private run<T>(factory: () => any): void {
+  private run<T>(factory: () => Observable<T>): void {
     this.err.set(null);
     this.out.set(null);
     this.busy.set(true);
@@ -88,11 +86,19 @@ export class HttpLabComponent {
     factory()
       .subscribe({
         next: (v: T) => this.out.set(v),
-        error: (e: any) => {
-          this.err.set(e?.message || JSON.stringify(e));
+        error: (e: unknown) => {
+          this.err.set(this.readErrorMessage(e));
           this.busy.set(false);
         },
         complete: () => this.busy.set(false),
       });
+  }
+
+  private readErrorMessage(error: unknown): string {
+    if (error && typeof error === 'object') {
+      const candidate = (error as {message?: unknown}).message;
+      if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+    }
+    return JSON.stringify(error);
   }
 }

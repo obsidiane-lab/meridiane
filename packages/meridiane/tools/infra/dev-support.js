@@ -108,5 +108,82 @@ export async function installPackageFromDist({ packageName, distDir, appRoot, lo
     filter: (src) => !src.endsWith('.tgz'),
   });
 
+  await invalidateAngularViteDependencyCache({ appRoot, packageName, log });
+
   return pkgDir;
+}
+
+async function invalidateAngularViteDependencyCache({ appRoot, packageName, log }) {
+  const viteDepsRoots = await findAngularViteDepsRoots(appRoot);
+  if (viteDepsRoots.length === 0) return;
+
+  const cacheBase = packageNameToViteCacheBase(packageName);
+  let removed = 0;
+
+  for (const depsRoot of viteDepsRoots) {
+    const files = [
+      `${cacheBase}.js`,
+      `${cacheBase}.js.map`,
+      `${cacheBase}.mjs`,
+      `${cacheBase}.mjs.map`,
+    ];
+
+    for (const fileName of files) {
+      const p = path.join(depsRoot, fileName);
+      try {
+        await fs.rm(p, { force: true });
+        removed += 1;
+      } catch {
+        // ignore
+      }
+    }
+
+    // Metadata keeps dependency hashes/entries; remove it to force a clean re-optimization.
+    try {
+      await fs.rm(path.join(depsRoot, '_metadata.json'), { force: true });
+      removed += 1;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (removed > 0) {
+    log?.info?.(`cache Angular/Vite invalidé (${removed} fichier(s)) pour ${packageName}`);
+  }
+}
+
+function packageNameToViteCacheBase(packageName) {
+  const normalized = String(packageName || '').trim();
+  // Example: "@obsidiane/bridge-sandbox" -> "@obsidiane_bridge-sandbox"
+  return normalized.replace('/', '_');
+}
+
+async function findAngularViteDepsRoots(appRoot) {
+  const angularCacheRoot = path.join(appRoot, '.angular', 'cache');
+  const roots = [];
+
+  async function walk(dir, depth) {
+    if (depth > 8) return;
+
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    const hasDeps = entries.some((e) => e.isDirectory() && e.name === 'deps');
+    if (hasDeps && path.basename(dir) === 'vite') {
+      roots.push(path.join(dir, 'deps'));
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name === 'node_modules') continue;
+      await walk(path.join(dir, entry.name), depth + 1);
+    }
+  }
+
+  await walk(angularCacheRoot, 0);
+  return roots;
 }

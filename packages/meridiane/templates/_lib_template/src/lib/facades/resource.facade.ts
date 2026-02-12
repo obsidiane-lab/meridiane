@@ -13,6 +13,7 @@ import {RealtimePort, RealtimeStatus} from '../ports/realtime.port';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {filter, map, Observable, share} from 'rxjs';
 import {Facade} from './facade.interface';
+import {WatchConnectionOptions} from '../bridge.types';
 
 export class ResourceFacade<T extends Item> implements Facade<T> {
 
@@ -60,9 +61,9 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
    * Subscribes to real-time updates for one or many IRIs.
    * Undefined/empty values are ignored.
    */
-  watch$(iri: Iri | Iri[]): Observable<T> {
+  watch$(iri: Iri | Iri[], options?: WatchConnectionOptions): Observable<T> {
     const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
-    return this.subscribeAndSync(iris);
+    return this.subscribeAndSync(iris, options);
   }
 
 
@@ -77,11 +78,12 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
    */
   watchSubResource$<R>(
     iri: Iri | Iri[],
-    field: string
+    field: string,
+    options?: WatchConnectionOptions
   ): Observable<R> {
     const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
     return this.realtime
-      .subscribe$<R>(iris, {field: field})
+      .subscribe$<R>(iris, {field: field}, options)
       .pipe(
         map(e => e.data),
         filter((d): d is R => d !== undefined),
@@ -89,9 +91,9 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
       );
   }
 
-  protected subscribeAndSync(iris: string[]): Observable<T> {
+  protected subscribeAndSync(iris: string[], options?: WatchConnectionOptions): Observable<T> {
     return this.realtime
-      .subscribe$<T>(iris)
+      .subscribe$<T>(iris, undefined, options)
       .pipe(
         map(event => event.data),
         filter((data): data is T => data !== undefined),

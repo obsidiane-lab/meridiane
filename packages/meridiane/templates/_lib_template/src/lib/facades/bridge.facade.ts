@@ -9,6 +9,22 @@ import {API_BASE_URL, BRIDGE_WITH_CREDENTIALS} from '../tokens';
 import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequired, Item} from '../ports/resource-repository.port';
 import {SubscribeFilter} from '../ports/realtime.port';
 import {resolveUrl} from '../utils/url';
+import {RealtimeDiagnostics, WatchConnectionOptions} from '../bridge.types';
+
+export type TypedEvent<TType extends string = string, TPayload = unknown> = {
+  resourceType: TType;
+  payload: TPayload;
+};
+
+export type WatchTypesResult<R extends Record<string, any>> =
+  { [K in keyof R]: TypedEvent<K & string, R[K]> }[keyof R];
+
+export type WatchTypesConfig = {
+  /** Field name used as discriminator. Default: `@type` (JSON-LD). */
+  discriminator?: string;
+};
+
+export type WatchSubscriptionOptions = WatchConnectionOptions;
 
 /**
  * High-level facade for ad-hoc HTTP calls and Mercure subscriptions.
@@ -85,13 +101,57 @@ export class BridgeFacade {
 
   // ──────────────── SSE / Mercure ────────────────
 
-  watch$<T = Item>(iri: Iri | Iri[], subscribeFilter?: SubscribeFilter): Observable<T> {
+  watch$<T = Item>(
+    iri: Iri | Iri[],
+    subscribeFilter?: SubscribeFilter,
+    options?: WatchSubscriptionOptions
+  ): Observable<T> {
     const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
     return this.realtime
-      .subscribe$<T>(iris, subscribeFilter)
+      .subscribe$<T>(iris, subscribeFilter, options)
       .pipe(
         map((event) => event.data),
         filter((data): data is T => data !== undefined),
+        share()
+      );
+  }
+
+  /**
+   * Watches a "multi-entity" topic and emits only payloads whose discriminator matches `resourceTypes`.
+   *
+   * Important:
+   * - filtering is done on payload content (e.g. `@type`), not on network topic provenance.
+   * - in shared mode (`connectionMode: 'auto'` without `newConnection`), events from another shared topic
+   *   can be emitted if they carry an allowed discriminator.
+   *
+   * For strict single-topic isolation, use a dedicated connection:
+   * `watchTypes$(..., ..., ..., { newConnection: true })`
+   * (or `connectionMode: 'single'` globally).
+   */
+  watchTypes$<R extends Record<string, any>>(
+    iri: Iri | Iri[],
+    resourceTypes: (keyof R & string)[],
+    cfg?: WatchTypesConfig,
+    options?: WatchSubscriptionOptions
+  ): Observable<WatchTypesResult<R>> {
+    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    const discriminator = cfg?.discriminator ?? '@type';
+    const allowedTypes = new Set(resourceTypes.filter((v): v is string => typeof v === 'string' && v.length > 0));
+
+    return this.realtime
+      .subscribeAll$<unknown>(iris, options)
+      .pipe(
+        map((event): WatchTypesResult<R> | undefined => {
+          const raw = event.data;
+
+          const resolvedType = readDiscriminator(raw, discriminator);
+          if (typeof resolvedType !== 'string') return undefined;
+          if (!allowedTypes.has(resolvedType)) return undefined;
+
+          const key = resolvedType as keyof R & string;
+          return {resourceType: key, payload: raw as R[keyof R]} as WatchTypesResult<R>;
+        }),
+        filter((evt): evt is WatchTypesResult<R> => !!evt),
         share()
       );
   }
@@ -101,8 +161,23 @@ export class BridgeFacade {
     this.realtime.unsubscribe(iris);
   }
 
+  realtimeDiagnostics$(): Observable<RealtimeDiagnostics> {
+    return this.realtime.diagnostics$();
+  }
+
   private resolveUrl(path?: Iri): string {
     if (!path) throw new Error('BridgeFacade: missing url');
     return resolveUrl(this.apiBase, path);
   }
+}
+
+function readDiscriminator(raw: unknown, discriminator: string): string | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = (raw as any)?.[discriminator];
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const first = value.find((v) => typeof v === 'string');
+    return typeof first === 'string' ? first : undefined;
+  }
+  return undefined;
 }

@@ -8,6 +8,7 @@ import {
   AnyQuery,
 } from '../ports/resource-repository.port';
 import {Observable} from 'rxjs';
+import {WatchConnectionOptions} from '../bridge.types';
 
 export interface Facade<T extends Item> {
   getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>>;
@@ -24,7 +25,7 @@ export interface Facade<T extends Item> {
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R>;
 
-  watch$(iri: Iri | Iri[]): Observable<T>;
+  watch$(iri: Iri | Iri[], options?: WatchConnectionOptions): Observable<T>;
 
   unwatch(iri: Iri | Iri[]): void;
 }

@@ -23,6 +23,22 @@
     </div>
   </div>
 
+  <form class="toolbar" style="gap: 14px; margin-top: 10px; flex-wrap: wrap;" [formGroup]="realtimeWatchForm">
+    <strong>SSE watch options</strong>
+    <label style="display:flex; align-items:center; gap:6px;">
+      <input type="checkbox" formControlName="watchAllNewConnection"/>
+      <span>Watch all: force new connection</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:6px;">
+      <input type="checkbox" formControlName="watchOneNewConnection"/>
+      <span>Watch one: force new connection</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:6px;">
+      <input type="checkbox" formControlName="watchMessagesNewConnection"/>
+      <span>watchSubResource(messages): force new connection</span>
+    </label>
+  </form>
+
   @if (error()) {
     <div class="badge badge--bad" style="margin-top: 10px;">{{ error() }}</div>
   }
@@ -46,7 +62,11 @@
     @for (c of filtered(); track c['@id']) {
       <div class="row"
            [class.active]="c['@id'] === selectedId()"
-           (click)="select(c)">
+           role="button"
+           tabindex="0"
+           (click)="select(c)"
+           (keydown.enter)="select(c)"
+           (keydown.space)="select(c); $event.preventDefault()">
         <div>
           <div><strong>#{{ c['@id'] }}</strong></div>
           <div style="font-size:12px;color:#374151">title: {{ c.title || '—' }}</div>

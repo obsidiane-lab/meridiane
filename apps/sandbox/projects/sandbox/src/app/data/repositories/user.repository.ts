@@ -3,7 +3,7 @@ import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
 import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
-import type {User} from '@obsidiane/bridge-sandbox';
+import type {UserUserRead as User} from '@obsidiane/bridge-sandbox';
 import {UserStore} from '../stores/user.store';
 
 @Injectable({providedIn: 'root'})

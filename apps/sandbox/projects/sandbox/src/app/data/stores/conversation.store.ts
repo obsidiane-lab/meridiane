@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import type {Conversation} from '@obsidiane/bridge-sandbox';
+import type {ConversationConversationRead as Conversation} from '@obsidiane/bridge-sandbox';
 import {BaseEntityStore} from './base-entity.store';
 
 @Injectable({providedIn: 'root'})

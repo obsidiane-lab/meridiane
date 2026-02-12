@@ -1,5 +1,5 @@
 import {InjectionToken} from '@angular/core';
-import {BridgeDefaults, BridgeLogger, MercureTopicMode} from './bridge.types';
+import {BridgeDefaults, BridgeLogger, MercureConnectionMode, MercureTopicMode} from './bridge.types';
 
 /** Base URL of the API (e.g. `http://localhost:8000`). */
 export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL');
@@ -14,6 +14,10 @@ export const MERCURE_HUB_URL = new InjectionToken<string>('MERCURE_HUB_URL');
 export const BRIDGE_WITH_CREDENTIALS = new InjectionToken<boolean>('BRIDGE_WITH_CREDENTIALS');
 
 export const MERCURE_TOPIC_MODE = new InjectionToken<MercureTopicMode>('MERCURE_TOPIC_MODE');
+
+export const MERCURE_CONNECTION_MODE = new InjectionToken<MercureConnectionMode>('MERCURE_CONNECTION_MODE');
+
+export const MERCURE_MAX_URL_LENGTH = new InjectionToken<number>('MERCURE_MAX_URL_LENGTH');
 
 export const BRIDGE_LOGGER = new InjectionToken<BridgeLogger>('BRIDGE_LOGGER');
 

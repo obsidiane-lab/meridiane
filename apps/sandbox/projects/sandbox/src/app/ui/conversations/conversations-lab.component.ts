@@ -5,15 +5,16 @@ import {
   DestroyRef,
   ElementRef,
   inject,
+  OnDestroy,
   signal,
   Signal,
   ViewChild,
 } from '@angular/core';
-import {CommonModule} from '@angular/common';
+
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
-import {Router} from "@angular/router";
-import {BridgeFacade, Iri, IriRequired} from '@obsidiane/bridge-sandbox';
-import type {Conversation, Message} from '@obsidiane/bridge-sandbox';
+import {Router} from '@angular/router';
+import {BridgeFacade, Iri, IriRequired, WatchConnectionOptions} from '@obsidiane/bridge-sandbox';
+import type {ConversationConversationRead as Conversation, MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Subject, Subscription, takeUntil} from 'rxjs';
@@ -27,22 +28,32 @@ interface LogEntry {
   snapshot?: unknown;
 }
 
-type MeResponse = {
+interface MeResponse {
   user: {
     id: number | null;
     userIdentifier: string;
     roles: string[];
   } | null;
-};
+}
+
+interface AuthorLike {
+  id?: unknown;
+  ['@id']?: unknown;
+  displayName?: unknown;
+  email?: unknown;
+}
 
 @Component({
   selector: 'app-conversations-lab',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, JsonViewerComponent],
+  imports: [ReactiveFormsModule, JsonViewerComponent],
   templateUrl: './conversations-lab.component.html',
   styleUrls: ['./conversations-lab.component.css'],
 })
-export class ConversationsLabComponent implements AfterViewInit {
+export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
+  private router = inject(Router);
+  private readonly bridge = inject(BridgeFacade);
+
   readonly messagesLoading = signal(false);
   readonly sending = signal(false);
 
@@ -72,6 +83,12 @@ export class ConversationsLabComponent implements AfterViewInit {
 
   readonly sendMessageForm = this.fb.nonNullable.group({
     text: ['', [Validators.required]],
+  });
+
+  readonly realtimeWatchForm = this.fb.nonNullable.group({
+    watchAllNewConnection: [false],
+    watchOneNewConnection: [false],
+    watchMessagesNewConnection: [false],
   });
 
   // Logs
@@ -113,10 +130,7 @@ export class ConversationsLabComponent implements AfterViewInit {
   @ViewChild('messagesViewport') private messagesViewport?: ElementRef<HTMLElement>;
   @ViewChild('composer') private composer?: ElementRef<HTMLTextAreaElement>;
 
-  constructor(
-    private router: Router,
-    private readonly bridge: BridgeFacade,
-  ) {
+  constructor() {
     this.status = this.conversationsRepo.status;
     this.conversations = this.conversationsRepo.conversations();
 
@@ -136,6 +150,15 @@ export class ConversationsLabComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     this.scrollMessagesToBottom();
+  }
+
+  ngOnDestroy(): void {
+    this.stopSelectedSse$.next();
+    this.stopSelectedSse$.complete();
+    this.watchAllSub?.unsubscribe();
+    this.watchAllSub = undefined;
+    this.watchOneSub?.unsubscribe();
+    this.watchOneSub = undefined;
   }
 
   routing() {
@@ -173,8 +196,9 @@ export class ConversationsLabComponent implements AfterViewInit {
     const iris = this.conversations()
       .map((c) => c['@id'])
       .filter((x): x is IriRequired => typeof x === 'string' && x.length > 0);
+    const options = this.watchOptions(this.realtimeWatchForm.controls.watchAllNewConnection.value);
 
-    this.watchAllSub = this.conversationsRepo.watch$(iris).subscribe(() => undefined);
+    this.watchAllSub = this.conversationsRepo.watch$(iris, options).subscribe(() => undefined);
   }
 
   unwatchAll() {
@@ -212,8 +236,9 @@ export class ConversationsLabComponent implements AfterViewInit {
       });
 
     // Listen to Message events published on Conversation topic
+    const watchMessagesOptions = this.watchOptions(this.realtimeWatchForm.controls.watchMessagesNewConnection.value);
     this.conversationsRepo
-      .watchMessages$(conversationIri)
+      .watchMessages$(conversationIri, watchMessagesOptions)
       .pipe(takeUntilDestroyed(this.destroyRef), takeUntil(this.stopSelectedSse$))
       .subscribe(() => {
         this.scrollMessagesToBottom();
@@ -227,7 +252,8 @@ export class ConversationsLabComponent implements AfterViewInit {
     const iri = this.selectedId();
     if (iri) {
       this.watchOneSub?.unsubscribe();
-      this.watchOneSub = this.conversationsRepo.watch$(iri as IriRequired).subscribe(() => undefined);
+      const options = this.watchOptions(this.realtimeWatchForm.controls.watchOneNewConnection.value);
+      this.watchOneSub = this.conversationsRepo.watch$(iri as IriRequired, options).subscribe(() => undefined);
     }
   }
 
@@ -346,20 +372,51 @@ export class ConversationsLabComponent implements AfterViewInit {
 
   displayAuthor(m: Message): string {
     if (this.isMine(m)) return this.meIdentifier() ?? 'You';
-    const author = m.author ?? '';
+    const author = this.readAuthor(m);
+    const authorRecord = this.asAuthorLike(author);
+
+    // API Platform can embed the author object in JSON-LD.
+    if (authorRecord) {
+      const displayName = authorRecord.displayName;
+      if (typeof displayName === 'string' && displayName.trim() !== '') return displayName;
+
+      const email = authorRecord.email;
+      if (typeof email === 'string' && email.trim() !== '') return email;
+
+      const id = this.extractNumericId(authorRecord);
+      if (id) return `User #${id}`;
+      return 'Unknown';
+    }
+
     const id = this.extractNumericId(author);
     if (id) return `User #${id}`;
-    return author || 'Unknown';
+    return typeof author === 'string' && author.trim() !== '' ? author : 'Unknown';
   }
 
-  formatTime(iso?: string): string {
+  formatTime(iso?: string | null): string {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   }
 
-  private extractNumericId(iri?: string | null): number | null {
+  private extractNumericId(input?: unknown): number | null {
+    if (!input) return null;
+
+    if (typeof input === 'number') {
+      return Number.isFinite(input) ? input : null;
+    }
+
+    const iri =
+      typeof input === 'string'
+        ? input
+        : typeof this.asAuthorLike(input)?.['@id'] === 'string'
+          ? this.asAuthorLike(input)?.['@id']
+          : undefined;
+
+    const numericId = this.asAuthorLike(input)?.id;
+    if (typeof numericId === 'number') return numericId;
+
     if (!iri) return null;
     const m = String(iri).match(/\/(\d+)(?:\/)?$/);
     if (!m?.[1]) return null;
@@ -381,5 +438,17 @@ export class ConversationsLabComponent implements AfterViewInit {
     const next = [...arr, entry];
     if (next.length > 200) next.splice(0, next.length - 200);
     this._logs.set(next);
+  }
+
+  private watchOptions(forceDedicatedConnection: boolean): WatchConnectionOptions | undefined {
+    return forceDedicatedConnection ? {newConnection: true} : undefined;
+  }
+
+  private readAuthor(message: Message): unknown {
+    return (message as unknown as {author?: unknown}).author;
+  }
+
+  private asAuthorLike(input: unknown): AuthorLike | undefined {
+    return input && typeof input === 'object' ? (input as AuthorLike) : undefined;
   }
 }

@@ -16,13 +16,13 @@ services:
       MERCURE_SUBSCRIBER_JWT_KEY: "!ChangeThisMercureHubJWTSecretKey!"
       MERCURE_PUBLISHER_JWT_ALG: "HS256"
       MERCURE_SUBSCRIBER_JWT_ALG: "HS256"
-      MERCURE_ALLOW_ORIGINS: "http://localhost:4200 http://localhost:8000"
+      MERCURE_ALLOW_ORIGINS: "http://localhost:4200 http://localhost:4201 http://localhost:8000"
       # DEV_RESET_DB=1 => drop schema + migrate + seed on boot
       DEV_RESET_DB: "0"
       FRANKENPHP_WORKER_CONFIG: watch
       MERCURE_EXTRA_DIRECTIVES: >
         demo
-        cors_origins http://localhost:4200 http://localhost:8000
+        cors_origins http://localhost:4200 http://localhost:4201 http://localhost:8000
       # Regex (nelmio_cors.origin_regex=true) - reflect Origin and allow credentials
       CORS_ALLOW_ORIGIN: '^https?://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$'
     volumes:
