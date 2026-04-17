@@ -3,8 +3,9 @@ import {HttpInterceptorFn, provideHttpClient, withFetch, withInterceptors} from 
 import {
   API_BASE_URL,
   BRIDGE_DEFAULTS,
+  BRIDGE_HTTP_WITH_CREDENTIALS,
   BRIDGE_LOGGER,
-  BRIDGE_WITH_CREDENTIALS,
+  BRIDGE_MERCURE_WITH_CREDENTIALS,
   MERCURE_CONNECTION_MODE,
   MERCURE_HUB_URL,
   MERCURE_MAX_URL_LENGTH,
@@ -40,11 +41,23 @@ export interface BridgeMercureOptions {
   maxUrlLength?: number;
 }
 
+export interface BridgeHttpOptions {
+  /**
+   * Enables cookies / credentials on HTTP requests by default.
+   *
+   * When omitted, the bridge preserves the historical behavior and derives the
+   * HTTP value from `mercure.init.credentials`.
+   */
+  withCredentials?: boolean;
+}
+
 export interface BridgeOptions {
   /** Base URL of the API (e.g. `http://localhost:8000`). */
   baseUrl: string;
   /** Auth strategy used to attach an Authorization header. */
   auth?: BridgeAuth;
+  /** Default HTTP transport options. */
+  http?: BridgeHttpOptions;
   /**
    * Use `topicMode` to control the `topic=` values sent to the hub.
    */
@@ -69,6 +82,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
   const {
     baseUrl,
     auth,
+    http,
     mercure,
     defaults,
     singleFlight = true,
@@ -85,7 +99,8 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
   const resolvedMercureTopicMode: MercureTopicMode = mercure?.topicMode ?? 'url';
   const resolvedMercureConnectionMode: MercureConnectionMode = mercure?.connectionMode ?? 'auto';
   const resolvedMercureMaxUrlLength = normalizeMercureMaxUrlLength(mercure?.maxUrlLength, 1900);
-  const withCredentials = resolveWithCredentials(resolvedMercureInit);
+  const mercureWithCredentials = resolveWithCredentials(resolvedMercureInit);
+  const httpWithCredentials = http?.withCredentials ?? mercureWithCredentials;
 
   const loggerProvider: BridgeLogger = createBridgeLogger(debug);
 
@@ -104,7 +119,8 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
       withInterceptors(interceptors)
     ),
     {provide: API_BASE_URL, useValue: baseUrl},
-    {provide: BRIDGE_WITH_CREDENTIALS, useValue: withCredentials},
+    {provide: BRIDGE_HTTP_WITH_CREDENTIALS, useValue: httpWithCredentials},
+    {provide: BRIDGE_MERCURE_WITH_CREDENTIALS, useValue: mercureWithCredentials},
     ...(resolvedMercureHubUrl ? [{provide: MERCURE_HUB_URL, useValue: resolvedMercureHubUrl}] : []),
     {provide: MERCURE_TOPIC_MODE, useValue: resolvedMercureTopicMode},
     {provide: MERCURE_CONNECTION_MODE, useValue: resolvedMercureConnectionMode},

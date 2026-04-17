@@ -60,6 +60,7 @@ export class AppModule {}
 `provideBridge({ ... })` accepte notamment :
 - `baseUrl` (requis) ;
 - `auth` (Bearer ou interceptor custom) ;
+- `http` (`withCredentials` HTTP par défaut) ;
 - `mercure` (hubUrl + `topicMode` + stratégie de connexions SSE `connectionMode`/`maxUrlLength`) ;
 - `defaults` (headers/timeout/retries) ;
 - `singleFlight` (déduplication “in-flight” des requêtes HTTP identiques `GET/HEAD/OPTIONS`) ;
@@ -70,17 +71,25 @@ export class AppModule {}
 
 Le bridge peut envoyer des cookies (sessions) côté HTTP et SSE.
 
-Le comportement `withCredentials` par défaut est déduit de `mercure.init` :
-- `credentials: 'include'` (défaut) → cookies envoyés
-- `credentials: 'omit'` → cookies non envoyés
+Vous pouvez configurer explicitement le HTTP via `http.withCredentials` :
+- `true` → cookies envoyés sur les requêtes HTTP
+- `false` → cookies désactivés côté HTTP
 
-Vous pouvez aussi surcharger au cas par cas via `opts.withCredentials` sur les appels HTTP.
+`mercure.init.credentials` pilote uniquement Mercure/SSE :
+- `credentials: 'include'` (défaut) → cookies envoyés sur EventSource
+- `credentials: 'omit'` → cookies désactivés côté SSE
+
+Compat legacy :
+- si `http.withCredentials` est absent, le bridge conserve le comportement historique et le déduit de `mercure.init.credentials`
+
+Vous pouvez aussi surcharger appel par appel via `opts.withCredentials` sur les appels HTTP.
 
 ```ts
 import {provideBridge} from '__PACKAGE_NAME__';
 
 provideBridge({
   baseUrl: 'https://api.example.com',
+  http: {withCredentials: true},
   mercure: {
     hubUrl: 'https://api.example.com/.well-known/mercure',
     init: {credentials: 'omit'},

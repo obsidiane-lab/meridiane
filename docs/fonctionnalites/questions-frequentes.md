@@ -35,9 +35,16 @@ Utilisez une connexion dédiée (`{newConnection: true}`) ou configurez `connect
 
 ## Comment gérer les cookies (`withCredentials`) ?
 
-Le défaut est dérivé de `mercure.init.credentials` :
-- `include` (défaut) : cookies envoyés
-- `omit` : cookies non envoyés
+Pour le HTTP :
+- `provideBridge({http: {withCredentials: true}})` active les cookies
+- `provideBridge({http: {withCredentials: false}})` les désactive
+
+Pour Mercure/SSE :
+- `mercure.init.credentials: 'include'` (défaut) active les cookies
+- `mercure.init.credentials: 'omit'` les désactive
+
+Compat legacy :
+- si `http.withCredentials` est absent, le défaut HTTP reste dérivé de `mercure.init.credentials`
 
 Vous pouvez surcharger appel par appel via `HttpCallOptions.withCredentials`.
 

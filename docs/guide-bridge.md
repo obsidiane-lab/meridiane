@@ -63,6 +63,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBridge({
       baseUrl: 'https://api.example.com',
+      http: {withCredentials: true},
       auth: {type: 'bearer', getToken: () => localStorage.getItem('token') ?? undefined},
       mercure: {
         hubUrl: 'https://api.example.com/.well-known/mercure',
@@ -81,6 +82,9 @@ export const appConfig: ApplicationConfig = {
   ],
 };
 ```
+
+`http.withCredentials` est prioritaire pour le HTTP.
+Si vous l'omettez, le bridge conserve le comportement historique et le déduit de `mercure.init.credentials`.
 
 ## Appels API
 

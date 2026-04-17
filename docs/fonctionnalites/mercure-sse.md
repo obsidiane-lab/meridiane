@@ -88,16 +88,22 @@ Pour isolation stricte d'un topic :
 
 ## Cookies / credentials
 
-Le `withCredentials` par défaut est déduit de `mercure.init` :
+`mercure.init.credentials` pilote les credentials SSE :
 
 - `credentials: 'include'` (défaut) : cookies envoyés
 - `credentials: 'omit'` : cookies non envoyés
+
+Pour le HTTP, utilisez `http.withCredentials`.
+
+Compat legacy :
+- si `http.withCredentials` n'est pas fourni, le bridge conserve le comportement historique et aligne HTTP sur `mercure.init.credentials`
 
 Exemple :
 
 ```ts
 provideBridge({
   baseUrl: 'https://api.example.com',
+  http: {withCredentials: true},
   mercure: {
     hubUrl: 'https://api.example.com/.well-known/mercure',
     init: {credentials: 'omit'},

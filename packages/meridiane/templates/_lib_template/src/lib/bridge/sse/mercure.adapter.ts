@@ -4,7 +4,7 @@ import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxj
 import {
   API_BASE_URL,
   BRIDGE_LOGGER,
-  BRIDGE_WITH_CREDENTIALS,
+  BRIDGE_MERCURE_WITH_CREDENTIALS,
   MERCURE_CONNECTION_MODE,
   MERCURE_HUB_URL,
   MERCURE_MAX_URL_LENGTH,
@@ -88,7 +88,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
   constructor(
     @Inject(API_BASE_URL) private readonly apiBase: string,
-    @Inject(BRIDGE_WITH_CREDENTIALS) private readonly withCredentialsDefault: boolean,
+    @Inject(BRIDGE_MERCURE_WITH_CREDENTIALS) private readonly mercureWithCredentials: boolean,
     @Inject(PLATFORM_ID) private readonly platformId: object,
     @Optional() @Inject(MERCURE_HUB_URL) private readonly hubUrl?: string,
     @Optional() @Inject(MERCURE_TOPIC_MODE) topicMode?: MercureTopicMode,
@@ -364,7 +364,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
       lastEventId,
     });
 
-    const wrapper = new EventSourceWrapper(url, {withCredentials: this.withCredentialsDefault}, this.logger);
+    const wrapper = new EventSourceWrapper(url, {withCredentials: this.mercureWithCredentials}, this.logger);
     const stop$ = new Subject<void>();
 
     const conn: ManagedConnection = {
@@ -704,7 +704,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
   private computeConnectionKey(topics: ReadonlySet<string>, scope: ManagedConnectionScope, groupId?: string): string {
     const topicsSorted = Array.from(topics).sort().join('|');
     const hub = this.hubUrl ?? '';
-    const creds = this.withCredentialsDefault ? '1' : '0';
+    const creds = this.mercureWithCredentials ? '1' : '0';
     const mode = this.connectionMode;
     const group = groupId ?? '';
     return `${scope}::${group}::${hub}::${creds}::${mode}::${topicsSorted}`;

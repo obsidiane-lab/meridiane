@@ -19,7 +19,7 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
     private readonly http: HttpClient,
     private readonly apiBase: string,
     private readonly resourcePath: Iri,
-    private readonly withCredentialsDefault: boolean,
+    private readonly httpWithCredentialsDefault: boolean,
   ) {
   }
 
@@ -28,42 +28,42 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
     return this.http.get<Collection<T>>(this.resolveUrl(this.resourcePath), {
       params,
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
+      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
     });
   }
 
   get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T> {
     return this.http.get<T>(this.resolveUrl(iri), {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
+      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
     });
   }
 
   post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
     return this.http.post<T>(this.resolveUrl(this.resourcePath), payload, {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
+      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
     });
   }
 
   patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T> {
     return this.http.patch<T>(this.resolveUrl(iri), changes, {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
+      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
     });
   }
 
   put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
     return this.http.put<T>(this.resolveUrl(iri), payload, {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
+      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
     });
   }
 
   delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void> {
     return this.http.delete<void>(this.resolveUrl(iri), {
       headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.withCredentialsDefault,
+      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
     });
   }
 
@@ -72,7 +72,7 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
     const {method, url} = req;
 
     const targetUrl = this.resolveUrl(url ?? this.resourcePath);
-    const mergedOptions = buildHttpRequestOptions(req, {withCredentialsDefault: this.withCredentialsDefault});
+    const mergedOptions = buildHttpRequestOptions(req, {withCredentialsDefault: this.httpWithCredentialsDefault});
     return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
   }
 

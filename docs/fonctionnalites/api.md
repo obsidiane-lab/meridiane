@@ -4,7 +4,7 @@ Surface exposée par le bridge généré (`src/public-api.ts`).
 
 ## Exports principaux
 
-- Runtime/config : `provideBridge`, `BridgeOptions`, `BridgeAuth`, `BridgeMercureOptions`
+- Runtime/config : `provideBridge`, `BridgeOptions`, `BridgeAuth`, `BridgeHttpOptions`, `BridgeMercureOptions`
 - Types bridge : `BridgeDefaults`, `BridgeLogger`, `MercureTopicMode`, `MercureConnectionMode`, `WatchConnectionOptions`, `RealtimeDiagnostics`
 - Facades : `FacadeFactory`, `ResourceFacade<T>`, `BridgeFacade`
 - Types utilitaires facades : `FacadeConfig<T>`, `TypedEvent`, `WatchTypesResult<R>`, `WatchTypesConfig`
@@ -19,11 +19,12 @@ Surface exposée par le bridge généré (`src/public-api.ts`).
 
 Options notables :
 - `auth` : string bearer, objet bearer (token/getToken), ou `HttpInterceptorFn`
+- `http.withCredentials` : credentials/cookies HTTP par défaut (prioritaire si fourni)
 - `mercure.hubUrl` : active le realtime
 - `mercure.topicMode` : `'url'` (défaut) ou `'iri'`
 - `mercure.connectionMode` : `'auto'` (défaut) ou `'single'`
 - `mercure.maxUrlLength` : seuil de découpage URL en mode `auto` (défaut `1900`)
-- `mercure.init` : options `EventSource` (notamment `credentials`)
+- `mercure.init` : options Mercure/EventSource (notamment `credentials`, sans effet sur HTTP si `http.withCredentials` est fourni)
 - `defaults` : headers/timeout/retries globaux
 - `singleFlight` : déduplication HTTP in-flight (`true` par défaut)
 - `debug` : logs runtime

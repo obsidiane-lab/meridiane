@@ -36,6 +36,20 @@ provideBridge({
 - un nombre (`2`), ou
 - un objet `{count, delayMs?, methods?}`
 
+## Cookies / credentials HTTP
+
+Le défaut HTTP se configure via `http.withCredentials` :
+
+```ts
+provideBridge({
+  baseUrl: 'https://api.example.com',
+  http: {withCredentials: true},
+});
+```
+
+Compat legacy :
+- si `http.withCredentials` est absent, le bridge reprend le comportement historique et le déduit de `mercure.init.credentials`
+
 ## Queries Hydra (collection)
 
 `ResourceFacade<T>.getCollection$()` accepte un objet de query simple :
