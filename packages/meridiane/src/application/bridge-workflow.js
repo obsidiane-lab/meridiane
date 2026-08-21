@@ -1,11 +1,13 @@
 import process from 'node:process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 import { generateBridgeWorkspace } from './generate-bridge.js';
 import { readOpenApiSpec } from '../infrastructure/spec-loader.js';
-import { ensureStandaloneWorkspace, ensureToolchainInstalled } from '../infrastructure/standalone-workspace.js';
 import { ExitCodeError, runCommand } from '../infrastructure/exec.js';
+
+const ngPackagrPath = fileURLToPath(import.meta.resolve('ng-packagr/src/cli/main.js'));
 
 export async function runBridgeWorkflow({
   repoRoot,
@@ -25,15 +27,17 @@ export async function runBridgeWorkflow({
   packRelativeTo,
   projectReadmePath,
 }) {
-  const { workspaceRoot, distRoot, npmCacheDir, requireFromWs } = await ensureStandaloneWorkspace({ repoRoot, log });
-  log?.info?.(`workspace: ${workspaceRoot}`);
+  const distRoot = path.join(repoRoot, 'dist');
+  const buildRoot = path.join(distRoot, '.meridiane-workspace');
+  const npmCacheDir = path.join(buildRoot, '.npm-cache');
+  await fs.rm(buildRoot, { recursive: true, force: true });
+  await fs.mkdir(buildRoot, { recursive: true });
+  log?.info?.(`workspace: ${buildRoot}`);
 
   const resolvedSpec = await loadSpecIfNeeded({ noModels, spec, specSource, log });
 
-  await ensureToolchainInstalled({ workspaceRoot, requireFromWs, npmCacheDir, log });
-
   await generateBridgeWorkspace({
-    cwd: workspaceRoot,
+    cwd: buildRoot,
     libName,
     packageName,
     version,
@@ -49,13 +53,13 @@ export async function runBridgeWorkflow({
     projectReadmePath,
   });
 
-  const ngPackageJsonPath = path.join(workspaceRoot, 'projects', libName, 'ng-package.json');
-  const tsconfigAbsPath = path.join(workspaceRoot, 'projects', libName, tsconfigPath);
+  const projectDir = path.join(buildRoot, 'projects', libName);
+  const ngPackageJsonPath = path.join(projectDir, 'ng-package.json');
+  const tsconfigAbsPath = path.join(projectDir, tsconfigPath);
 
   log?.step?.('ng-packagr');
-  const ngPackagrPath = requireFromWs.resolve('ng-packagr/src/cli/main.js');
   const packagrCode = await runCommand(process.execPath, [ngPackagrPath, '-p', ngPackageJsonPath, '-c', tsconfigAbsPath], {
-    cwd: workspaceRoot,
+    cwd: buildRoot,
   });
   if (packagrCode !== 0) throw new ExitCodeError(`ng-packagr failed (exit ${packagrCode})`, packagrCode);
 
@@ -75,7 +79,7 @@ export async function runBridgeWorkflow({
   });
   if (packCode !== 0) throw new ExitCodeError(`npm pack failed (exit ${packCode})`, packCode);
 
-  return { workspaceRoot, distRoot, distDir, npmCacheDir };
+  return { distDir };
 }
 
 async function loadSpecIfNeeded({ noModels, spec, specSource, log }) {

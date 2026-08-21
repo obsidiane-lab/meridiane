@@ -48,11 +48,11 @@ jobs:
             echo "RELEASE_TAG=${{ steps.tag_version.outputs.new_tag }}" >> "$GITHUB_ENV"
           fi
 
-      - name: Use Node.js 20.x
+      - name: Use Node.js 24.x
         if: env.RELEASE_TAG != ''
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
           cache: npm
 

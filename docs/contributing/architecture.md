@@ -9,9 +9,13 @@ Meridiane est organisé autour d'un produit publié et d'un environnement de dé
 - `cli.js` : point d'entrée stable de la commande `meridiane` ;
 - `src/application/` : orchestration des commandes `generate`, `dev` et `build` ;
 - `src/domain/` : normalisation des options et règles indépendantes des entrées/sorties ;
-- `src/infrastructure/` : fichiers, processus, chargement OpenAPI et workspace de build ;
+- `src/infrastructure/` : fichiers, processus, chargement OpenAPI et installation locale ;
 - `src/generators/` : transformation OpenAPI vers les modèles TypeScript ;
 - `templates/angular-bridge/` : runtime Angular copié dans chaque bridge généré.
+
+Le toolchain Angular utilisé par `dev` et `build` est une dépendance explicite de Meridiane. La
+configuration de compilation se trouve dans le template du bridge : aucun `package.json`, `tsconfig`
+ou `npm install` supplémentaire n'est généré pendant une commande.
 
 Les commandes, arguments et options du CLI constituent le contrat d'utilisation. Les dossiers sous `src/` restent internes.
 

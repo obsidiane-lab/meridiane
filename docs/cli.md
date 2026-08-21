@@ -28,7 +28,7 @@ npx meridiane generate @acme/backend-bridge --spec ./openapi.json
 
 Workflow dev complet :
 
-1. génère le bridge dans un workspace standalone sous `dist/.meridiane-workspace`
+1. génère le bridge dans un répertoire de build isolé sous `dist/.meridiane-workspace`
 2. build la lib (`ng-packagr`)
 3. exécute `npm pack` dans `dist/<libName>/`
 4. installe localement le package dans `node_modules/<packageName>` (copie offline)

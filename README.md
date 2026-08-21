@@ -16,7 +16,7 @@ Le package publié ne dépend pas du playground. Le playground fournit uniquemen
 
 ## Pré-requis
 
-- Node.js `>=20.19`
+- Node.js `>=24` (LTS)
 - npm
 - Docker + Docker Compose v2 (pour le backend)
 

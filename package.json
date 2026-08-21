@@ -2,6 +2,9 @@
   "name": "@obsidiane/meridiane-workspace",
 
   "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "workspaces": [
     "packages/*",
     "playground/*"
