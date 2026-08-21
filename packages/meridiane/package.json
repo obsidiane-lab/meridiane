@@ -4,7 +4,7 @@
   "description": "Générateur de librairie Angular et modèles TypeScript (OpenAPI) pour un bridge Symfony/API Platform + Mercure.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/obsidiane-lab/meridiane"
+    "url": "git+https://github.com/obsidiane-lab/meridiane.git"
   },
   "type": "module",
   "publishConfig": {
