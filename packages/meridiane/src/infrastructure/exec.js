@@ -10,12 +10,13 @@ export class ExitCodeError extends Error {
 }
 
 export function runCommand(cmd, args, { cwd, env } = {}) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       stdio: 'inherit',
       cwd: cwd ?? process.cwd(),
       env: env ?? process.env,
     });
-    child.on('exit', (code) => resolve(code ?? 0));
+    child.once('error', reject);
+    child.once('exit', (code) => resolve(code ?? 1));
   });
 }

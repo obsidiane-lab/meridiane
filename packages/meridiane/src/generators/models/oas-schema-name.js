@@ -1,13 +1,5 @@
 import { canonicalizeMediaType } from './oas-contract.js';
-
-function pascalizeTokens(tokens) {
-  return tokens
-    .filter(Boolean)
-    .map((t) => String(t).replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, ''))
-    .filter(Boolean)
-    .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
-    .join('');
-}
+import {pascalCase} from './utils.js';
 
 export function parseOpenApiSchemaName(originalName) {
   const raw = String(originalName || '');
@@ -50,22 +42,21 @@ export function parseOpenApiSchemaName(originalName) {
 export function baseTsNameFromBasePath(basePath) {
   const parts = String(basePath || '').split('.').filter(Boolean);
   if (parts.length === 0) return 'Model';
-  const a = pascalizeTokens([parts[0]]);
+  const a = pascalCase([parts[0]]);
   if (parts.length === 1) return a;
-  const b = pascalizeTokens([parts[1]]);
+  const b = pascalCase([parts[1]]);
   if (parts.length === 2 && b.toLowerCase().startsWith(a.toLowerCase())) return b;
-  return parts.map((p) => pascalizeTokens([p])).join('');
+  return parts.map((part) => pascalCase([part])).join('');
 }
 
 export function groupTsNameFromGroupPath(groupPath) {
   const tokens = String(groupPath || '').split(/[._:]+/g).filter(Boolean);
-  return pascalizeTokens(tokens);
+  return pascalCase(tokens);
 }
 
 export function formatSuffixToken(mediaType) {
   const canon = canonicalizeMediaType(mediaType);
   const tokens = canon.split(/[\/+.-]+/g).filter(Boolean);
   const trimmed = tokens[0] === 'application' ? tokens.slice(1) : tokens;
-  return pascalizeTokens(trimmed.length ? trimmed : tokens) || 'Fmt';
+  return pascalCase(trimmed.length ? trimmed : tokens) || 'Fmt';
 }
-

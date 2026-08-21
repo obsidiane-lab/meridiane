@@ -14,36 +14,24 @@ export const DEFAULT_MEDIA_TYPES: ApiMediaTypes = {
   patch: 'application/merge-patch+json',
 };
 
+const CONTENT_TYPE_BY_METHOD: Record<string, string> = {
+  POST: DEFAULT_MEDIA_TYPES.post,
+  PUT: DEFAULT_MEDIA_TYPES.put,
+  PATCH: DEFAULT_MEDIA_TYPES.patch,
+};
+
 export const contentTypeInterceptor: HttpInterceptorFn = (req, next) => {
-  const mediaTypes = DEFAULT_MEDIA_TYPES;
   let headers = req.headers;
 
-  // Set Accept if missing.
   if (!headers.has('Accept')) {
-    headers = headers.set('Accept', mediaTypes.accept);
+    headers = headers.set('Accept', DEFAULT_MEDIA_TYPES.accept);
   }
 
-  // Only methods with a body.
-  const isBodyMethod = ['POST', 'PUT', 'PATCH'].includes(req.method);
-  // Ignore FormData (browser sets multipart boundary).
+  const contentType = CONTENT_TYPE_BY_METHOD[req.method];
   const isFormData = typeof FormData !== 'undefined' && req.body instanceof FormData;
-
-  if (isBodyMethod && !isFormData && !headers.has('Content-Type')) {
-    let contentType: string;
-
-    switch (req.method) {
-      case 'PATCH':
-        contentType = mediaTypes.patch;
-        break;
-      case 'PUT':
-        contentType = mediaTypes.put;
-        break;
-      default:
-        contentType = mediaTypes.post;
-    }
-
+  if (contentType && !isFormData && !headers.has('Content-Type')) {
     headers = headers.set('Content-Type', contentType);
   }
 
-  return next(req.clone({headers}));
+  return next(headers === req.headers ? req : req.clone({headers}));
 };

@@ -10,7 +10,13 @@ export async function ensureCleanDir(dir) {
 }
 
 const RESERVED = new Set([
-  'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import', 'in', 'instanceof', 'new', 'null', 'return', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'let', 'implements', 'interface', 'package', 'private', 'protected', 'public', 'static', 'await', 'abstract', 'boolean', 'byte', 'char', 'double', 'final', 'float', 'goto', 'int', 'long', 'native', 'short', 'synchronized', 'throws', 'transient', 'volatile'
+  'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do',
+  'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import',
+  'in', 'instanceof', 'new', 'null', 'return', 'super', 'switch', 'this', 'throw', 'true',
+  'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'let', 'implements', 'interface',
+  'package', 'private', 'protected', 'public', 'static', 'await', 'abstract', 'boolean', 'byte',
+  'char', 'double', 'final', 'float', 'goto', 'int', 'long', 'native', 'short', 'synchronized',
+  'throws', 'transient', 'volatile',
 ]);
 
 /**
@@ -20,9 +26,9 @@ const RESERVED = new Set([
 export function pascalCase(tokens) {
   return tokens
     .filter(Boolean)
-    .map(t => t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, ''))
+    .map((token) => token.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, ''))
     .filter(Boolean)
-    .map(t => t.charAt(0).toUpperCase() + t.slice(1))
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
     .join('');
 }
 
@@ -35,11 +41,13 @@ export function pascalCase(tokens) {
 export function sanitizeTypeName(original, used) {
   const tokens = String(original).split(/[^A-Za-z0-9]+/);
   let name = pascalCase(tokens) || 'Model';
-  if (/^[0-9]/.test(name)) name = '_' + name;
-  if (RESERVED.has(name)) name = name + 'Model';
-  let unique = name, i = 2;
+  if (/^[0-9]/.test(name)) name = `_${name}`;
+  if (RESERVED.has(name)) name = `${name}Model`;
+
+  let unique = name;
+  let suffix = 2;
   while (used.has(unique)) {
-    unique = name + i++;
+    unique = `${name}${suffix++}`;
   }
   used.add(unique);
   return unique;

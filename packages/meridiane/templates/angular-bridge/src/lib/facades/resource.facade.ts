@@ -7,26 +7,23 @@ import {
   IriRequired,
   Collection,
   Item,
-  HttpRequestConfig
+  HttpRequestConfig,
 } from '../ports/resource-repository.port';
 import {RealtimePort, RealtimeStatus} from '../ports/realtime.port';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {filter, map, Observable, share} from 'rxjs';
 import {Facade} from './facade.interface';
 import {WatchConnectionOptions} from '../bridge.types';
+import {toIriList} from '../utils/iri';
 
 export class ResourceFacade<T extends Item> implements Facade<T> {
-
   readonly connectionStatus: Signal<RealtimeStatus>;
 
   constructor(
     protected readonly repo: ResourceRepository<T>,
     protected readonly realtime: RealtimePort
   ) {
-    this.connectionStatus = toSignal(
-      this.realtime.status$(),
-      {initialValue: 'closed'}
-    );
+    this.connectionStatus = toSignal(this.realtime.status$(), {initialValue: 'closed'});
   }
 
   getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>> {
@@ -62,14 +59,10 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
    * Undefined/empty values are ignored.
    */
   watch$(iri: Iri | Iri[], options?: WatchConnectionOptions): Observable<T> {
-    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
-    return this.subscribeAndSync(iris, options);
+    return this.subscribeAndSync(toIriList(iri), options);
   }
-
-
   unwatch(iri: Iri | Iri[]): void {
-    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
-    this.realtime.unsubscribe(iris);
+    this.realtime.unsubscribe(toIriList(iri));
   }
 
   /**
@@ -81,12 +74,12 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
     field: string,
     options?: WatchConnectionOptions
   ): Observable<R> {
-    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    const iris = toIriList(iri);
     return this.realtime
-      .subscribe$<R>(iris, {field: field}, options)
+      .subscribe$<R>(iris, {field}, options)
       .pipe(
-        map(e => e.data),
-        filter((d): d is R => d !== undefined),
+        map((event) => event.data),
+        filter((data): data is R => data !== undefined),
         share()
       );
   }
@@ -95,7 +88,7 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
     return this.realtime
       .subscribe$<T>(iris, undefined, options)
       .pipe(
-        map(event => event.data),
+        map((event) => event.data),
         filter((data): data is T => data !== undefined),
         share()
       );

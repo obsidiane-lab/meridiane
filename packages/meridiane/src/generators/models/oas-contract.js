@@ -57,18 +57,11 @@ function collectComponentSchemaRefs(schema, out) {
     }
 
     if (Array.isArray(node)) {
-      for (const it of node) walk(it);
+      for (const item of node) walk(item);
       return;
     }
 
-    if (node.allOf) walk(node.allOf);
-    if (node.oneOf) walk(node.oneOf);
-    if (node.anyOf) walk(node.anyOf);
-    if (node.items) walk(node.items);
-    if (node.properties) walk(node.properties);
-    if (node.additionalProperties) walk(node.additionalProperties);
-
-    for (const v of Object.values(node)) walk(v);
+    for (const value of Object.values(node)) walk(value);
   }
 
   walk(schema);
@@ -123,10 +116,10 @@ export function expandWithSchemaDependencies(start, schemas) {
   const out = new Set();
   const queue = [];
 
-  for (const n of start) {
-    if (!n || out.has(n)) continue;
-    out.add(n);
-    queue.push(n);
+  for (const schemaName of start) {
+    if (!schemaName || out.has(schemaName)) continue;
+    out.add(schemaName);
+    queue.push(schemaName);
   }
 
   while (queue.length) {
@@ -135,10 +128,10 @@ export function expandWithSchemaDependencies(start, schemas) {
     if (!schema) continue;
     const refs = new Set();
     collectComponentSchemaRefs(schema, refs);
-    for (const ref of refs) {
-      if (!ref || out.has(ref)) continue;
-      out.add(ref);
-      queue.push(ref);
+    for (const dependency of refs) {
+      if (!dependency || out.has(dependency)) continue;
+      out.add(dependency);
+      queue.push(dependency);
     }
   }
 
@@ -154,6 +147,6 @@ export function collectUsedSchemasForMediaType(spec, cfg) {
   const schemas = spec?.components?.schemas || {};
   const roots = listRootsFromPaths(spec, cfg);
   const initialRefs = new Set();
-  for (const r of roots) collectComponentSchemaRefs(r, initialRefs);
+  for (const root of roots) collectComponentSchemaRefs(root, initialRefs);
   return expandWithSchemaDependencies(initialRefs, schemas);
 }

@@ -1,8 +1,15 @@
-import { sanitizeTypeName, quoteKeyIfNeeded } from './utils.js';
-import { mergeAllOf, isObject, schemaNameFromRef } from './schema-utils.js';
-import { tsTypeOf, withNullable } from './type-resolver.js';
-import { canonicalizeMediaType, collectUsedSchemasForMediaType, expandWithSchemaDependencies } from './oas-contract.js';
-import { baseTsNameFromBasePath, formatSuffixToken, groupTsNameFromGroupPath, parseOpenApiSchemaName } from './oas-schema-name.js';
+import {canonicalizeMediaType, collectUsedSchemasForMediaType, expandWithSchemaDependencies} from './oas-contract.js';
+import {
+  baseTsNameFromBasePath,
+  formatSuffixToken,
+  groupTsNameFromGroupPath,
+  parseOpenApiSchemaName,
+} from './oas-schema-name.js';
+import {isObject, mergeAllOf, schemaNameFromRef} from './schema-utils.js';
+import {tsTypeOf, withNullable} from './type-resolver.js';
+import {quoteKeyIfNeeded, sanitizeTypeName} from './utils.js';
+
+const DEFAULT_FORMAT = 'application/ld+json';
 
 /**
  * @typedef {{
@@ -13,14 +20,7 @@ import { baseTsNameFromBasePath, formatSuffixToken, groupTsNameFromGroupPath, pa
  * }} BuildOptions
  */
 
-/**
- * @typedef {{
- *   name: string,
- *   tsKey: string,
- *   type: string,
- *   optional: boolean,
- * }} ModelProp
- */
+/** @typedef {{name: string, tsKey: string, type: string, optional: boolean}} ModelProp */
 
 /**
  * @typedef {{
@@ -32,209 +32,228 @@ import { baseTsNameFromBasePath, formatSuffixToken, groupTsNameFromGroupPath, pa
  * }} ModelDefinition
  */
 
-function ensureNullable(ts) {
-  return /\|\s*null\b/.test(ts) ? ts : `${ts} | null`;
+function normalizeRequiredMode(value) {
+  return String(value ?? '').trim().toLowerCase() === 'spec' ? 'spec' : 'all';
 }
 
-function normalizeRequiredMode(value) {
-  const v = String(value ?? '').trim().toLowerCase();
-  if (!v) return 'all';
-  if (v === 'spec') return 'spec';
-  if (v === 'all') return 'all';
-  return 'all';
+function normalizeFormats(values) {
+  const formats = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const format = canonicalizeMediaType(value);
+    if (format && !formats.includes(format)) formats.push(format);
+  }
+  return formats.length > 0 ? formats : [DEFAULT_FORMAT];
+}
+
+function indexFormatsBySchema(spec, formats) {
+  const schemaToFormats = new Map();
+
+  for (const format of formats) {
+    const schemaNames = collectUsedSchemasForMediaType(spec, {mediaType: format});
+    for (const schemaName of schemaNames) {
+      if (!schemaName) continue;
+      const schemaFormats = schemaToFormats.get(schemaName) ?? new Set();
+      schemaFormats.add(format);
+      schemaToFormats.set(schemaName, schemaFormats);
+    }
+  }
+
+  return schemaToFormats;
+}
+
+function matchesRule(value, rule) {
+  if (rule instanceof RegExp) return rule.test(value);
+  if (typeof rule === 'function') return !!rule(value);
+  return typeof rule === 'string' && rule.length > 0 && value.includes(rule);
+}
+
+function isSelectedSchema(schemaName, include, exclude) {
+  const parsed = parseOpenApiSchemaName(schemaName);
+  const canonicalName = parsed.groupPath ? `${parsed.basePath}-${parsed.groupPath}` : parsed.basePath;
+  const names = [schemaName, canonicalName];
+  const matchesAny = (rules) => rules.some((rule) => names.some((name) => matchesRule(name, rule)));
+
+  return (include.length === 0 || matchesAny(include)) && !matchesAny(exclude);
+}
+
+function selectCandidateSchemas({schemas, schemaToFormats, include, exclude}) {
+  const selected = [...schemaToFormats.keys()]
+    .filter((name) => name && !/^Hydra/i.test(name))
+    .sort((left, right) => left.localeCompare(right))
+    .filter((name) => isSelectedSchema(name, include, exclude));
+
+  const candidates = include.length > 0 || exclude.length > 0
+    ? expandWithSchemaDependencies(selected, schemas)
+    : new Set(selected);
+
+  return [...candidates]
+    .filter((name) => name && !/^Hydra/i.test(name))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function choosePreferredFormats(candidates, formats, schemaToFormats) {
+  const priority = new Map(formats.map((format, index) => [format, index]));
+  const preferredBySchema = new Map();
+
+  for (const schemaName of candidates) {
+    const schemaFormats = [...(schemaToFormats.get(schemaName) ?? [])];
+    const preferred = schemaFormats.sort(
+      (left, right) => (priority.get(left) ?? 999) - (priority.get(right) ?? 999)
+    )[0] ?? formats[0];
+    preferredBySchema.set(schemaName, preferred);
+  }
+
+  return {preferredBySchema, priority};
+}
+
+function desiredTypeName(schemaName) {
+  const parsed = parseOpenApiSchemaName(schemaName);
+  if (parsed.isMergePatch) return undefined;
+
+  const base = baseTsNameFromBasePath(parsed.basePath);
+  const group = groupTsNameFromGroupPath(parsed.groupPath);
+  return `${base}${group}` || 'Model';
+}
+
+function assignTypeNames(candidates, preferredBySchema, formatPriority) {
+  const entriesByName = new Map();
+
+  for (const schemaName of candidates) {
+    const desired = desiredTypeName(schemaName);
+    if (!desired) continue;
+
+    const preferredFormat = preferredBySchema.get(schemaName);
+    const entries = entriesByName.get(desired) ?? [];
+    entries.push({schemaName, preferredFormat});
+    entriesByName.set(desired, entries);
+  }
+
+  const usedNames = new Set();
+  const typeNameBySchema = new Map();
+
+  const sortedGroups = [...entriesByName.entries()].sort(([left], [right]) => left.localeCompare(right));
+  for (const [desired, entries] of sortedGroups) {
+    entries.sort((left, right) => {
+      const byFormat =
+        (formatPriority.get(left.preferredFormat) ?? 999) -
+        (formatPriority.get(right.preferredFormat) ?? 999);
+      return byFormat || left.schemaName.localeCompare(right.schemaName);
+    });
+
+    entries.forEach((entry, index) => {
+      const candidateName = index === 0
+        ? desired
+        : `${desired}${formatSuffixToken(entry.preferredFormat)}`;
+      typeNameBySchema.set(entry.schemaName, sanitizeTypeName(candidateName, usedNames));
+    });
+  }
+
+  return typeNameBySchema;
+}
+
+function resolveObjectSchema(raw, currentTypeName, typeNameBySchema, knownTypeNames) {
+  const extendsTypes = [];
+  if (!raw?.allOf) return {schema: raw, extendsTypes};
+
+  const merged = mergeAllOf(raw.allOf);
+  if (merged) return {schema: merged, extendsTypes};
+
+  const properties = {};
+  const required = new Set();
+  const inheritedTypes = new Set();
+
+  for (const part of raw.allOf) {
+    if (part?.$ref) {
+      const referencedSchema = schemaNameFromRef(part.$ref);
+      if (!referencedSchema || /^Hydra/i.test(referencedSchema)) continue;
+
+      const referencedType = typeNameBySchema.get(referencedSchema) ?? referencedSchema;
+      if (referencedType !== currentTypeName && knownTypeNames.has(referencedType)) {
+        inheritedTypes.add(referencedType);
+      }
+      continue;
+    }
+
+    if (part?.type !== 'object' && !isObject(part?.properties)) continue;
+    Object.assign(properties, part.properties ?? {});
+    for (const property of part.required ?? []) required.add(property);
+  }
+
+  extendsTypes.push(...[...inheritedTypes].sort((left, right) => left.localeCompare(right)));
+  return {
+    schema: {type: 'object', properties, required: [...required]},
+    extendsTypes,
+  };
+}
+
+function ensureNullable(type) {
+  return /\|\s*null\b/.test(type) ? type : `${type} | null`;
+}
+
+function buildModel({raw, typeName, typeNameBySchema, knownTypeNames, preferredFormat, requiredMode}) {
+  const {schema, extendsTypes} = resolveObjectSchema(raw, typeName, typeNameBySchema, knownTypeNames);
+  const isObjectLike = schema?.type === 'object' || isObject(schema?.properties) || extendsTypes.length > 0;
+  if (!isObjectLike) return undefined;
+
+  const isJsonLd = canonicalizeMediaType(preferredFormat) === DEFAULT_FORMAT;
+  const requiredProperties = new Set(schema.required ?? []);
+  const dependencies = new Set(extendsTypes);
+  const forceNullable = requiredMode !== 'spec';
+
+  const props = Object.entries(schema.properties ?? {})
+    .filter(([propertyName]) => !isJsonLd || !['@id', '@type', '@context'].includes(propertyName))
+    .map(([propertyName, propertySchema]) => {
+      const baseType = tsTypeOf(propertySchema, dependencies, typeNameBySchema, {requiredMode});
+      return {
+        name: propertyName,
+        tsKey: quoteKeyIfNeeded(propertyName),
+        type: forceNullable ? ensureNullable(baseType) : withNullable(baseType, propertySchema),
+        optional: requiredMode === 'spec' ? !requiredProperties.has(propertyName) : true,
+      };
+    });
+
+  const imports = [...dependencies]
+    .filter((dependency) => dependency !== typeName && knownTypeNames.has(dependency))
+    .sort((left, right) => left.localeCompare(right));
+
+  return {name: typeName, props, imports, extendsTypes, extendsItem: isJsonLd};
 }
 
 /**
- * Construit les définitions de modèles à partir d’une spec OpenAPI (components.schemas)
+ * Builds TypeScript model definitions from OpenAPI `components.schemas`.
  * @param {any} spec
  * @param {BuildOptions} [options]
- * @returns {{ models: ModelDefinition[] }}
+ * @returns {{models: ModelDefinition[]}}
  */
-export function buildModelsFromOpenAPI(spec, options) {
-  const opts = { requiredMode: 'all', ...(options || {}) };
-  const schemas = spec?.components?.schemas || {};
-  const formatsOpt = Array.isArray(opts.formats) ? opts.formats : [];
-  const formats = formatsOpt.length > 0 ? formatsOpt : ['application/ld+json'];
-  const requiredMode = normalizeRequiredMode(opts.requiredMode);
+export function buildModelsFromOpenAPI(spec, options = {}) {
+  const schemas = spec?.components?.schemas ?? {};
+  const formats = normalizeFormats(options.formats);
+  const requiredMode = normalizeRequiredMode(options.requiredMode);
+  const include = Array.isArray(options.includeSchemaNames) ? options.includeSchemaNames : [];
+  const exclude = Array.isArray(options.excludeSchemaNames) ? options.excludeSchemaNames : [];
 
-  /** @type {ModelDefinition[]} */
+  const schemaToFormats = indexFormatsBySchema(spec, formats);
+  const candidates = selectCandidateSchemas({schemas, schemaToFormats, include, exclude});
+  const {preferredBySchema, priority} = choosePreferredFormats(candidates, formats, schemaToFormats);
+  const typeNameBySchema = assignTypeNames(candidates, preferredBySchema, priority);
+  const knownTypeNames = new Set(typeNameBySchema.values());
+
   const models = [];
-
-  // Contract-driven (formats): keep only schemas used by selected media types in real endpoints.
-  const normalizedFormats = [];
-  for (const f of formats) {
-    const canon = canonicalizeMediaType(f);
-    if (!canon) continue;
-    if (!normalizedFormats.includes(canon)) normalizedFormats.push(canon);
-  }
-  if (normalizedFormats.length === 0) normalizedFormats.push('application/ld+json');
-
-  /** @type {Map<string, Set<string>>} */
-  const usedByFormat = new Map(); // formatLower -> Set<schemaName>
-
-  for (const fmt of normalizedFormats) {
-    usedByFormat.set(fmt, collectUsedSchemasForMediaType(spec, { mediaType: fmt }));
-  }
-
-  /** @type {Map<string, Set<string>>} */
-  const schemaToFormats = new Map();
-  for (const [fmt, names] of usedByFormat.entries()) {
-    for (const name of names) {
-      if (!name) continue;
-      const set = schemaToFormats.get(name) || new Set();
-      set.add(fmt);
-      schemaToFormats.set(name, set);
-    }
-  }
-
-  const include = Array.isArray(opts.includeSchemaNames) ? opts.includeSchemaNames : [];
-  const exclude = Array.isArray(opts.excludeSchemaNames) ? opts.excludeSchemaNames : [];
-  const matches = (val, rule) => {
-    if (rule instanceof RegExp) return rule.test(val);
-    if (typeof rule === 'function') return !!rule(val);
-    if (typeof rule === 'string' && rule.length) return val.includes(rule);
-    return false;
-  };
-
-  const allUsed = [...schemaToFormats.keys()]
-    .filter(Boolean)
-    .filter((n) => !/^Hydra/i.test(n))
-    .sort((a, b) => a.localeCompare(b))
-    .filter((originalName) => {
-      const parsed = parseOpenApiSchemaName(originalName);
-      const canonical = parsed.groupPath ? `${parsed.basePath}-${parsed.groupPath}` : parsed.basePath;
-      const fulls = [originalName, canonical];
-
-      const hasInclude = include.length > 0;
-      const included = !hasInclude || include.some((r) => fulls.some((v) => matches(v, r)));
-      const excluded = exclude.some((r) => fulls.some((v) => matches(v, r)));
-      return included && !excluded;
-    });
-
-  // Ensure filters never break compilation: always keep transitive deps of selected schemas.
-  const candidatesSet = include.length > 0 || exclude.length > 0 ? expandWithSchemaDependencies(allUsed, schemas) : new Set(allUsed);
-
-  const candidates = [...candidatesSet]
-    .filter((n) => !!n)
-    .filter((n) => !/^Hydra/i.test(n))
-    .sort((a, b) => a.localeCompare(b));
-
-  // Assign a preferred format to each schema (used for naming + JSON-LD behavior).
-  const formatIndex = new Map(normalizedFormats.map((f, i) => [f, i]));
-  const schemaEntries = candidates.map((schemaName) => {
-    const fmts = schemaToFormats.get(schemaName) || new Set();
-    const best = [...fmts].sort((a, b) => (formatIndex.get(a) ?? 999) - (formatIndex.get(b) ?? 999))[0] || normalizedFormats[0];
-    return { schemaName, preferredFormat: best, preferredFormatIndex: formatIndex.get(best) ?? 0 };
-  });
-  const preferredFormatBySchema = new Map(schemaEntries.map((e) => [e.schemaName, e.preferredFormat]));
-
-  // Compute desired TS names (format-agnostic), then disambiguate collisions by preferred format.
-  const byDesired = new Map(); // desired -> entries[]
-  for (const e of schemaEntries) {
-    const parsed = parseOpenApiSchemaName(e.schemaName);
-    if (parsed.isMergePatch) continue; // never generate patch models
-    const baseTs = baseTsNameFromBasePath(parsed.basePath);
-    const groupTs = groupTsNameFromGroupPath(parsed.groupPath);
-    const desired = `${baseTs}${groupTs}` || 'Model';
-    const list = byDesired.get(desired) || [];
-    list.push({ ...e, desired });
-    byDesired.set(desired, list);
-  }
-
-  // Assign unique TS names and build schemaName -> tsName map.
-  const usedTsNames = new Set();
-  const nameMap = new Map();
-  for (const [desired, list] of [...byDesired.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    list.sort((a, b) => {
-      const da = a.preferredFormatIndex - b.preferredFormatIndex;
-      if (da !== 0) return da;
-      return a.schemaName.localeCompare(b.schemaName);
-    });
-
-    for (let i = 0; i < list.length; i++) {
-      const entry = list[i];
-      const withFmt = i === 0 ? desired : `${desired}${formatSuffixToken(entry.preferredFormat)}`;
-      const tsName = sanitizeTypeName(withFmt, usedTsNames);
-      nameMap.set(entry.schemaName, tsName);
-    }
-  }
-  const allSanitizedNames = new Set([...nameMap.values()]);
-
   for (const schemaName of candidates) {
-    const sanitized = nameMap.get(schemaName);
-    if (!sanitized) continue;
-
+    const typeName = typeNameBySchema.get(schemaName);
     const raw = schemas[schemaName];
-    if (!raw) continue;
+    if (!typeName || !raw) continue;
 
-    const preferredFormat = preferredFormatBySchema.get(schemaName) ?? normalizedFormats[0];
-    const isJsonLd = canonicalizeMediaType(preferredFormat) === 'application/ld+json';
-    const forceNullable = requiredMode !== 'spec';
-
-    /** @type {string[]} */
-    const extendsTypes = [];
-    const deps = new Set();
-
-    let effective = raw;
-    if (raw?.allOf) {
-      const merged = mergeAllOf(raw.allOf);
-      if (merged) {
-        effective = merged;
-      } else {
-        // Non-flattenable allOf: keep inline object props + other model refs as extends.
-        const props = {};
-        const required = new Set();
-        const ext = new Set();
-
-        for (const part of raw.allOf) {
-          if (part?.$ref) {
-            const orig = schemaNameFromRef(part.$ref);
-            if (!orig) continue;
-            if (/^Hydra/i.test(orig)) continue;
-            const refName = orig ? nameMap.get(orig) || orig : undefined;
-            if (refName && refName !== sanitized && allSanitizedNames.has(refName)) ext.add(refName);
-            continue;
-          }
-          const isObj = part?.type === 'object' || isObject(part?.properties);
-          if (!isObj) continue;
-          Object.assign(props, part.properties || {});
-          for (const r of part.required || []) required.add(r);
-        }
-
-        extendsTypes.push(...[...ext].sort((a, b) => a.localeCompare(b)));
-        effective = { type: 'object', properties: props, required: [...required] };
-      }
-    }
-
-    const isObjectLike = effective?.type === 'object' || isObject(effective?.properties) || extendsTypes.length > 0;
-    if (!isObjectLike) continue;
-
-    for (const e of extendsTypes) deps.add(e);
-
-    const required = new Set(effective.required || []);
-    const props = Object.entries(effective.properties || {})
-      .filter(([propName]) => {
-        if (!isJsonLd) return true;
-        return propName !== '@id' && propName !== '@type' && propName !== '@context';
-      })
-      .map(([propName, prop]) => {
-        const baseType = tsTypeOf(prop, deps, nameMap, { requiredMode });
-        const type = forceNullable ? ensureNullable(baseType) : withNullable(baseType, prop);
-        return {
-          name: propName,
-          tsKey: quoteKeyIfNeeded(propName),
-          type,
-          optional: requiredMode === 'spec' ? !required.has(propName) : true,
-        };
-      });
-
-    const imports = [...deps]
-      .filter((n) => n !== sanitized)
-      .filter((n) => allSanitizedNames.has(n))
-      .sort((a, b) => a.localeCompare(b));
-
-    models.push({ name: sanitized, props, imports, extendsTypes, extendsItem: isJsonLd });
+    const model = buildModel({
+      raw,
+      typeName,
+      typeNameBySchema,
+      knownTypeNames,
+      preferredFormat: preferredBySchema.get(schemaName) ?? formats[0],
+      requiredMode,
+    });
+    if (model) models.push(model);
   }
 
-  return { models };
+  return {models};
 }

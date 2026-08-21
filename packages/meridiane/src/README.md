@@ -2,7 +2,7 @@
 
 - `application/` orchestre les workflows du CLI ;
 - `domain/` contient les règles et la normalisation des options ;
-- `infrastructure/` gère fichiers, processus, specs et workspaces ;
+- `infrastructure/` gère fichiers, processus, specs, workspaces et installation locale ;
 - `generators/` transforme les contrats OpenAPI ;
 - `build.js`, `dev.js` et `generate.js` sont les points d'entrée internes utilisés par `cli.js`.
 

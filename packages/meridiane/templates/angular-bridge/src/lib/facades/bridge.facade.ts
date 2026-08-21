@@ -3,12 +3,13 @@ import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {filter, map, share} from 'rxjs/operators';
 import {toHttpParams} from '../bridge/rest/query-builder';
-import {buildHttpRequestOptions} from '../bridge/rest/http-request.options';
+import {buildHttpRequestOptions, resolveHttpCallOptions} from '../bridge/rest/http-request.options';
 import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
 import {API_BASE_URL, BRIDGE_HTTP_WITH_CREDENTIALS} from '../tokens';
 import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequired, Item} from '../ports/resource-repository.port';
 import {SubscribeFilter} from '../ports/realtime.port';
 import {resolveUrl} from '../utils/url';
+import {toIriList} from '../utils/iri';
 import {RealtimeDiagnostics, WatchConnectionOptions} from '../bridge.types';
 
 export type TypedEvent<TType extends string = string, TPayload = unknown> = {
@@ -44,10 +45,7 @@ export class BridgeFacade {
   // ──────────────── HTTP ────────────────
 
   get$<R = unknown>(url: IriRequired, opts?: HttpCallOptions): Observable<R> {
-    return this.http.get<R>(this.resolveUrl(url), {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.get<R>(this.resolveUrl(url), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
   }
 
   getCollection$<T extends Item = Item>(
@@ -55,40 +53,38 @@ export class BridgeFacade {
     query?: AnyQuery,
     opts?: HttpCallOptions
   ): Observable<Collection<T>> {
-    const params = toHttpParams(query);
     return this.http.get<Collection<T>>(this.resolveUrl(url), {
-      params,
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
+      ...resolveHttpCallOptions(opts, this.httpWithCredentialsDefault),
+      params: toHttpParams(query),
     });
   }
 
   post$<R = unknown, B = unknown>(url: IriRequired, payload: B, opts?: HttpCallOptions): Observable<R> {
-    return this.http.post<R>(this.resolveUrl(url), payload, {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.post<R>(
+      this.resolveUrl(url),
+      payload,
+      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+    );
   }
 
   patch$<R = unknown, B = unknown>(url: IriRequired, changes: B, opts?: HttpCallOptions): Observable<R> {
-    return this.http.patch<R>(this.resolveUrl(url), changes, {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.patch<R>(
+      this.resolveUrl(url),
+      changes,
+      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+    );
   }
 
   put$<R = unknown, B = unknown>(url: IriRequired, payload: B, opts?: HttpCallOptions): Observable<R> {
-    return this.http.put<R>(this.resolveUrl(url), payload, {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.put<R>(
+      this.resolveUrl(url),
+      payload,
+      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+    );
   }
 
   delete$(url: IriRequired, opts?: HttpCallOptions): Observable<void> {
-    return this.http.delete<void>(this.resolveUrl(url), {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.delete<void>(this.resolveUrl(url), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
   }
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
@@ -106,7 +102,7 @@ export class BridgeFacade {
     subscribeFilter?: SubscribeFilter,
     options?: WatchSubscriptionOptions
   ): Observable<T> {
-    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    const iris = toIriList(iri);
     return this.realtime
       .subscribe$<T>(iris, subscribeFilter, options)
       .pipe(
@@ -134,7 +130,7 @@ export class BridgeFacade {
     cfg?: WatchTypesConfig,
     options?: WatchSubscriptionOptions
   ): Observable<WatchTypesResult<R>> {
-    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
+    const iris = toIriList(iri);
     const discriminator = cfg?.discriminator ?? '@type';
     const allowedTypes = new Set(resourceTypes.filter((v): v is string => typeof v === 'string' && v.length > 0));
 
@@ -157,8 +153,7 @@ export class BridgeFacade {
   }
 
   unwatch(iri: Iri | Iri[]): void {
-    const iris = (Array.isArray(iri) ? iri : [iri]).filter((v): v is string => typeof v === 'string' && v.length > 0);
-    this.realtime.unsubscribe(iris);
+    this.realtime.unsubscribe(toIriList(iri));
   }
 
   realtimeDiagnostics$(): Observable<RealtimeDiagnostics> {
@@ -173,7 +168,7 @@ export class BridgeFacade {
 
 function readDiscriminator(raw: unknown, discriminator: string): string | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
-  const value = (raw as any)?.[discriminator];
+  const value = (raw as Record<string, unknown>)[discriminator];
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) {
     const first = value.find((v) => typeof v === 'string');

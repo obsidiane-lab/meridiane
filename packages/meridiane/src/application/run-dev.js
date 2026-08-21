@@ -3,15 +3,35 @@ import path from 'node:path';
 
 import { normalizeDevOptions } from '../domain/bridge-options.js';
 import { createLogger } from '../infrastructure/logger.js';
-import {
-  findLatestTgz,
-  installPackageFromDist,
-  resolveDevAppRoot,
-  resolveSandboxAppRoot,
-  resolveSpecSource,
-} from '../infrastructure/dev-support.js';
+import {resolveDevAppRoot, resolveSandboxAppRoot, resolveSpecSource} from '../infrastructure/dev-project.js';
+import {installPackageFromDist} from '../infrastructure/local-package-install.js';
 import { readOpenApiSpec } from '../infrastructure/spec-loader.js';
 import { runBridgeWorkflow } from './bridge-workflow.js';
+
+async function loadDevSpec({config, opts, appRoot, log}) {
+  if (config.noModels) return {noModels: true};
+
+  const specSource = await resolveSpecSource({
+    useSandboxDefaults: config.useSandboxDefaults,
+    appRoot,
+    specArg: opts.spec,
+  });
+
+  if (!specSource) throw new Error('Missing --spec (url or JSON file path)');
+
+  try {
+    return {noModels: false, specSource, spec: await readOpenApiSpec(specSource)};
+  } catch (error) {
+    const canSkipModels = config.useSandboxDefaults && opts.spec == null;
+    if (!canSkipModels) throw error;
+
+    log.warn(
+      'spec OpenAPI indisponible (backend non démarré ?) → génération des models ignorée. ' +
+        'Démarrez le backend ou passez `--spec ./openapi.json` (ou `--no-models`).'
+    );
+    return {noModels: true, specSource};
+  }
+}
 
 export async function runDev(packageName, opts) {
   const startCwd = process.cwd();
@@ -20,32 +40,7 @@ export async function runDev(packageName, opts) {
 
   const appRoot = config.useSandboxDefaults ? await resolveSandboxAppRoot(startCwd) : await resolveDevAppRoot(startCwd);
   const projectReadmePath = path.join(appRoot, 'README.md');
-
-  const specSource = config.noModels
-    ? undefined
-    : await resolveSpecSource({
-        useSandboxDefaults: config.useSandboxDefaults,
-        appRoot,
-        specArg: opts.spec,
-      });
-  let noModels = config.noModels;
-  let spec;
-  if (!noModels) {
-    if (!specSource) throw new Error('Missing --spec (url or JSON file path)');
-    try {
-      spec = await readOpenApiSpec(specSource);
-    } catch (err) {
-      if (config.useSandboxDefaults && opts.spec == null) {
-        noModels = true;
-        log.warn(
-          "spec OpenAPI indisponible (backend non démarré ?) → génération des models ignorée. " +
-            'Démarrez le backend ou passez `--spec ./openapi.json` (ou `--no-models`).'
-        );
-      } else {
-        throw err;
-      }
-    }
-  }
+  const {noModels, specSource, spec} = await loadDevSpec({config, opts, appRoot, log});
 
   log.title('dev — build standalone + install local');
   log.info(`app: ${appRoot}`);
@@ -74,7 +69,6 @@ export async function runDev(packageName, opts) {
     projectReadmePath,
   });
 
-  await findLatestTgz(distDir);
   await installPackageFromDist({ packageName: config.packageName, distDir, appRoot, log });
 
   log.success('bridge installé (node_modules) ✅');

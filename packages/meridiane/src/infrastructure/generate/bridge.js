@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import {existsSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -12,6 +11,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const pkgRoot = path.resolve(__dirname, '../../..'); // packages/meridiane
+const bridgeTemplateDir = path.join(pkgRoot, 'templates', 'angular-bridge');
+const modelTemplatesDir = path.join(pkgRoot, 'src', 'generators', 'models', 'templates');
 
 async function readTextIfExists(filePath) {
   try {
@@ -34,10 +35,7 @@ async function appendProjectReadme({targetReadmePath, projectReadmePath, debug, 
     return;
   }
 
-  const combined =
-    `${targetReadme.trimEnd()}\n\n---\n\n` +
-    `## Documentation du projet\n\n` +
-    `${projectReadme.trimStart()}`;
+  const combined = `${targetReadme.trimEnd()}\n\n---\n\n## Documentation du projet\n\n${projectReadme.trimStart()}`;
   await fs.writeFile(targetReadmePath, combined);
   if (debug) log?.debug?.('[meridiane] project README appended', {source: projectReadmePath});
 }
@@ -49,47 +47,43 @@ async function replacePlaceholdersInDir(dir, placeholders) {
     if (entry.isDirectory()) {
       await replacePlaceholdersInDir(fullPath, placeholders);
     } else if (entry.isFile()) {
-      let content = await fs.readFile(fullPath, 'utf8');
+      const content = await fs.readFile(fullPath, 'utf8');
+      let next = content;
       for (const [key, value] of Object.entries(placeholders)) {
-        content = content.replaceAll(key, value);
+        next = next.replaceAll(key, value);
       }
-      await fs.writeFile(fullPath, content);
+      if (next !== content) await fs.writeFile(fullPath, next);
     }
   }
 }
 
 async function generateLibrary({projectDir, libName, packageName, version, debug, log, projectReadmePath}) {
-  const tplDir = path.resolve(pkgRoot, 'templates/angular-bridge');
-  const targetDir = projectDir;
-
   if (debug) {
     log?.debug?.('[meridiane] generate lib', {
       libName,
       packageName,
       version,
-      targetDir
+      targetDir: projectDir,
     });
   }
 
-  await fs.rm(targetDir, {recursive: true, force: true});
-  await fs.mkdir(targetDir, {recursive: true});
-  await fs.cp(tplDir, targetDir, {recursive: true});
+  await fs.rm(projectDir, {recursive: true, force: true});
+  await fs.mkdir(projectDir, {recursive: true});
+  await fs.cp(bridgeTemplateDir, projectDir, {recursive: true});
 
-  await replacePlaceholdersInDir(targetDir, {
+  await replacePlaceholdersInDir(projectDir, {
     '__LIB_NAME__': libName,
     '__PACKAGE_NAME__': packageName,
   });
 
-  const libPackageJsonPath = path.join(targetDir, 'package.json');
-  if (existsSync(libPackageJsonPath)) {
-    const libPkg = await readJson(libPackageJsonPath);
-    libPkg.name = packageName;
-    libPkg.version = version;
-    await writeJsonIfChanged(libPackageJsonPath, libPkg);
-  }
+  const packageJsonPath = path.join(projectDir, 'package.json');
+  const packageJson = await readJson(packageJsonPath);
+  packageJson.name = packageName;
+  packageJson.version = version;
+  await writeJsonIfChanged(packageJsonPath, packageJson);
 
   await appendProjectReadme({
-    targetReadmePath: path.join(targetDir, 'README.md'),
+    targetReadmePath: path.join(projectDir, 'README.md'),
     projectReadmePath,
     debug,
     log,
@@ -100,7 +94,6 @@ async function generateLibrary({projectDir, libName, packageName, version, debug
 
 async function generateModels({projectDir, spec, requiredMode, formats, include, exclude, debug, log}) {
   const outDir = path.resolve(projectDir, 'src', 'models');
-  const templatesDir = path.resolve(pkgRoot, 'src', 'generators', 'models', 'templates');
 
   if (debug) {
     log?.debug?.('[meridiane] generate models', {
@@ -114,7 +107,6 @@ async function generateModels({projectDir, spec, requiredMode, formats, include,
 
   await ensureCleanDir(outDir);
 
-  // Write models + index.ts.
   const {models} = buildModelsFromOpenAPI(spec, {
     requiredMode,
     formats: Array.isArray(formats) ? formats : [],
@@ -124,7 +116,7 @@ async function generateModels({projectDir, spec, requiredMode, formats, include,
 
   for (const m of models) {
     await renderTemplateToFile({
-      templatePath: path.join(templatesDir, 'model.hbs'),
+      templatePath: path.join(modelTemplatesDir, 'model.hbs'),
       outPath: path.join(outDir, `${m.name}.ts`),
       ctx: {
         name: m.name,
@@ -137,12 +129,22 @@ async function generateModels({projectDir, spec, requiredMode, formats, include,
   }
 
   await renderTemplateToFile({
-    templatePath: path.join(templatesDir, 'index.hbs'),
+    templatePath: path.join(modelTemplatesDir, 'index.hbs'),
     outPath: path.join(outDir, 'index.ts'),
     ctx: {models: models.map((m) => ({name: m.name}))},
   });
 
   if (debug) log?.debug?.(`[meridiane] ${models.length} model(s) generated`);
+}
+
+async function configurePackageOutput(projectDir, distRoot, libName, log) {
+  const ngPackagePath = path.join(projectDir, 'ng-package.json');
+  const ngPackage = await readJson(ngPackagePath);
+  const outputDir = path.join(distRoot, libName);
+
+  ngPackage.dest = path.relative(projectDir, outputDir).split(path.sep).join('/');
+  await writeJsonIfChanged(ngPackagePath, ngPackage);
+  log?.debug?.('ng-package.json dest overridden', {dest: ngPackage.dest});
 }
 
 /**
@@ -159,7 +161,6 @@ async function generateModels({projectDir, spec, requiredMode, formats, include,
  *   exclude: string[],
  *   debug: boolean,
  *   log?: { step?: (msg: string) => void, info?: (msg: string) => void, success?: (msg: string) => void, debug?: (msg: string, data?: any) => void },
- *   workspaceMode?: 'angular'|'standalone',
  *   distRoot?: string,
  *   projectDir?: string,
  *   projectReadmePath?: string,
@@ -188,15 +189,8 @@ export async function generateBridgeWorkspace(params) {
   log?.step?.(`génération de la librairie (${path.relative(cwd, projectDir)})`);
   await generateLibrary({projectDir, libName, packageName, version, debug, log, projectReadmePath});
 
-  // If a dist root is provided, force ng-packagr output to that directory.
   if (distRoot) {
-    const ngPackagePath = path.resolve(projectDir, 'ng-package.json');
-    const ngPkg = await readJson(ngPackagePath);
-    const desiredDestAbs = path.resolve(distRoot, libName);
-    const projectRoot = path.dirname(ngPackagePath);
-    ngPkg.dest = path.relative(projectRoot, desiredDestAbs).split(path.sep).join('/');
-    await writeJsonIfChanged(ngPackagePath, ngPkg);
-    log?.debug?.('ng-package.json dest overridden', {dest: ngPkg.dest});
+    await configurePackageOutput(projectDir, distRoot, libName, log);
   }
 
   if (noModels) {

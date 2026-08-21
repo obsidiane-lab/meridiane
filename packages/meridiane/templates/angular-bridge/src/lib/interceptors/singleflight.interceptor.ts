@@ -10,15 +10,8 @@ export function createSingleFlightInterceptor(mode: SingleFlightMode = DEFAULT_M
   const inflight = new Map<string, Observable<HttpEvent<unknown>>>();
 
   return (req, next) => {
-    if (mode === 'off') {
-      return next(req);
-    }
-
     const method = req.method.toUpperCase();
-    if (!SAFE_METHODS.has(method)) {
-      return next(req);
-    }
-    if (req.reportProgress === true) {
+    if (mode === 'off' || !SAFE_METHODS.has(method) || req.reportProgress) {
       return next(req);
     }
 

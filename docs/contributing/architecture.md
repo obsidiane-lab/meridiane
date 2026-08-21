@@ -15,6 +15,19 @@ Meridiane est organisé autour d'un produit publié et d'un environnement de dé
 
 Les commandes, arguments et options du CLI constituent le contrat d'utilisation. Les dossiers sous `src/` restent internes.
 
+### Runtime Angular généré
+
+Le template Angular sépare les responsabilités techniques sans exposer ces détails dans l'API publique :
+
+- `provide-bridge.ts` assemble la configuration et les providers ;
+- `interceptors/` porte les règles HTTP transverses, dont l'authentification limitée à l'API configurée ;
+- `bridge/rest/` adapte les appels HTTP à API Platform ;
+- `bridge/sse/` orchestre Mercure et isole la gestion des connexions, des abonnements et des payloads ;
+- `facades/` fournit l'API métier consommée par les applications Angular ;
+- `ports/` décrit les contrats internes entre facades et adaptateurs.
+
+Seuls les symboles réexportés par `public-api.ts` appartiennent au contrat public du bridge.
+
 ## Environnement de développement
 
 `playground/` ne fait pas partie du produit publié :

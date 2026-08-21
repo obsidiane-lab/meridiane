@@ -13,7 +13,6 @@ export type FacadeConfig<T> = {
   realtime?: RealtimePort;
 };
 
-
 @Injectable({providedIn: 'root'})
 export class FacadeFactory {
   private readonly env = inject(EnvironmentInjector);

@@ -30,6 +30,20 @@ function commonOptions(cmd) {
     .option('--debug', 'Enable debug logs');
 }
 
+function action(run) {
+  return async (packageName, opts) => {
+    const log = createLogger({debug: !!opts?.debug});
+
+    try {
+      const exitCode = await run(packageName, opts);
+      if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
+    } catch (error) {
+      log.error(error);
+      process.exit(typeof error?.exitCode === 'number' ? error.exitCode : 1);
+    }
+  };
+}
+
 commonOptions(
   program
     .command('dev')
@@ -37,17 +51,7 @@ commonOptions(
       '[packageName]',
       'NPM package name of the generated bridge (e.g. @acme/backend-bridge). Optional in this repo (defaults to @obsidiane/bridge-sandbox).'
     )
-    .action(async (packageName, opts) => {
-      const log = createLogger({ debug: !!opts?.debug });
-      try {
-        const exitCode = await runDev(packageName, opts);
-        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
-      } catch (err) {
-        log.error(err);
-        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
-        process.exit(exitCode);
-      }
-    })
+    .action(action(runDev))
 );
 
 commonOptions(
@@ -55,17 +59,7 @@ commonOptions(
     .command('build')
     .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
     .option('--version <semver>', 'Version to write in the generated bridge package.json (CI/CD)')
-    .action(async (packageName, opts) => {
-      const log = createLogger({ debug: !!opts?.debug });
-      try {
-        const exitCode = await runBuild(packageName, opts);
-        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
-      } catch (err) {
-        log.error(err);
-        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
-        process.exit(exitCode);
-      }
-    })
+    .action(action(runBuild))
 );
 
 commonOptions(
@@ -74,17 +68,7 @@ commonOptions(
     .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
     .option('--version <semver>', 'Version to write in the generated bridge package.json')
     .option('--out <dir>', 'Output directory (default: projects/<libName>)')
-    .action(async (packageName, opts) => {
-      const log = createLogger({ debug: !!opts?.debug });
-      try {
-        const exitCode = await runGenerate(packageName, opts);
-        if (typeof exitCode === 'number' && exitCode !== 0) process.exit(exitCode);
-      } catch (err) {
-        log.error(err);
-        const exitCode = typeof err?.exitCode === 'number' ? err.exitCode : 1;
-        process.exit(exitCode);
-      }
-    })
+    .action(action(runGenerate))
 );
 
 program.parse(process.argv);

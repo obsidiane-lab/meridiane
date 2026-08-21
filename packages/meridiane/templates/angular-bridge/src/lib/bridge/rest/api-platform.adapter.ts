@@ -1,7 +1,7 @@
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {toHttpParams} from './query-builder';
-import {buildHttpRequestOptions} from './http-request.options';
+import {buildHttpRequestOptions, resolveHttpCallOptions} from './http-request.options';
 import {
   Collection,
   HttpCallOptions,
@@ -24,47 +24,42 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
   }
 
   getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>> {
-    const params = toHttpParams(query);
     return this.http.get<Collection<T>>(this.resolveUrl(this.resourcePath), {
-      params,
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
+      ...resolveHttpCallOptions(opts, this.httpWithCredentialsDefault),
+      params: toHttpParams(query),
     });
   }
 
   get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T> {
-    return this.http.get<T>(this.resolveUrl(iri), {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.get<T>(this.resolveUrl(iri), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
   }
 
   post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.http.post<T>(this.resolveUrl(this.resourcePath), payload, {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.post<T>(
+      this.resolveUrl(this.resourcePath),
+      payload,
+      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+    );
   }
 
   patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.http.patch<T>(this.resolveUrl(iri), changes, {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.patch<T>(
+      this.resolveUrl(iri),
+      changes,
+      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+    );
   }
 
   put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.http.put<T>(this.resolveUrl(iri), payload, {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.put<T>(
+      this.resolveUrl(iri),
+      payload,
+      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+    );
   }
 
   delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void> {
-    return this.http.delete<void>(this.resolveUrl(iri), {
-      headers: opts?.headers,
-      withCredentials: opts?.withCredentials ?? this.httpWithCredentialsDefault,
-    });
+    return this.http.delete<void>(this.resolveUrl(iri), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
   }
 
   request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {

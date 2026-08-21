@@ -1,5 +1,12 @@
-import {HttpRequestConfig} from '../../ports/resource-repository.port';
+import {HttpCallOptions, HttpRequestConfig} from '../../ports/resource-repository.port';
 import {toHttpParams} from './query-builder';
+
+export function resolveHttpCallOptions(options: HttpCallOptions | undefined, withCredentialsDefault: boolean) {
+  return {
+    headers: options?.headers,
+    withCredentials: options?.withCredentials ?? withCredentialsDefault,
+  };
+}
 
 export function buildHttpRequestOptions(
   req: HttpRequestConfig,
@@ -12,9 +19,11 @@ export function buildHttpRequestOptions(
   if (query) mergedOptions['params'] = toHttpParams(query);
   if (body !== undefined) mergedOptions['body'] = body;
 
-  mergedOptions['responseType'] = (responseType ?? (mergedOptions['responseType'] as any) ?? 'json') as any;
-  mergedOptions['withCredentials'] =
-    withCredentials ?? (mergedOptions['withCredentials'] as any) ?? withCredentialsDefault;
+  const inheritedResponseType = mergedOptions['responseType'];
+  const inheritedWithCredentials = mergedOptions['withCredentials'];
+
+  mergedOptions['responseType'] = responseType ?? inheritedResponseType ?? 'json';
+  mergedOptions['withCredentials'] = withCredentials ?? inheritedWithCredentials ?? withCredentialsDefault;
   mergedOptions['observe'] = 'body';
 
   return mergedOptions;

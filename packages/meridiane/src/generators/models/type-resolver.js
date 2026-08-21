@@ -1,6 +1,14 @@
 import { schemaNameFromRef } from './schema-utils.js';
 import { quoteKeyIfNeeded } from './utils.js';
 
+const PRIMITIVE_TYPES = {
+  string: 'string',
+  integer: 'number',
+  number: 'number',
+  boolean: 'boolean',
+  null: 'null',
+};
+
 /**
  * Ajoute | null à un type TS si le schéma est nullable (compat OAS 3.0),
  * sauf si 'null' est déjà présent dans l'union.
@@ -9,6 +17,52 @@ import { quoteKeyIfNeeded } from './utils.js';
  */
 export function withNullable(ts, schema) {
   return schema?.nullable && !/\|\s*null\b/.test(ts) ? `${ts} | null` : ts;
+}
+
+function literalType(value) {
+  if (value === null) return 'null';
+  if (typeof value === 'string') return `'${value.replace(/'/g, "\\'")}'`;
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  if (typeof value === 'boolean') return String(value);
+  return 'any';
+}
+
+function unionMemberType(type, schema, deps, nameMap, cfg) {
+  if (type in PRIMITIVE_TYPES) return PRIMITIVE_TYPES[type];
+  if (type === 'array') return tsTypeOf({type, items: schema.items}, deps, nameMap, cfg);
+  if (type === 'object') {
+    return tsTypeOf(
+      {
+        type,
+        properties: schema.properties,
+        required: schema.required,
+        additionalProperties: schema.additionalProperties,
+      },
+      deps,
+      nameMap,
+      cfg
+    );
+  }
+  return 'any';
+}
+
+function inlineObjectType(schema, deps, nameMap, cfg) {
+  const requiredMode = cfg?.requiredMode ?? 'all';
+  const required = new Set(schema.required ?? []);
+  const properties = Object.entries(schema.properties ?? {}).map(([key, property]) => {
+    const baseType = tsTypeOf(property, deps, nameMap, cfg);
+    const optional = requiredMode === 'spec' && required.has(key) ? '' : '?';
+    const nullable = requiredMode !== 'spec' || property?.nullable;
+    const type = nullable && !/\|\s*null\b/.test(baseType) ? `${baseType} | null` : baseType;
+    return `${quoteKeyIfNeeded(key)}${optional}: ${type};`;
+  });
+
+  if (schema.additionalProperties) {
+    const valueType = tsTypeOf(schema.additionalProperties, deps, nameMap, cfg);
+    properties.push(`[key: string]: ${valueType};`);
+  }
+
+  return `{ ${properties.join(' ')} }`;
 }
 
 /**
@@ -21,87 +75,39 @@ export function withNullable(ts, schema) {
  */
 export function tsTypeOf(schema, deps, nameMap, cfg) {
   if (!schema) return 'any';
-  const requiredMode = cfg?.requiredMode ?? 'all';
-  const forceNullable = requiredMode !== 'spec';
 
   if (schema.$ref) {
-    const orig = schemaNameFromRef(schema.$ref);
-    if (!orig) return 'any';
-    if (/jsonMergePatch/i.test(orig)) return 'any';
-    if (/^Hydra/i.test(orig)) return 'any';
-    const name = nameMap.get(orig) || orig;
+    const referencedSchema = schemaNameFromRef(schema.$ref);
+    if (!referencedSchema || /jsonMergePatch/i.test(referencedSchema) || /^Hydra/i.test(referencedSchema)) {
+      return 'any';
+    }
+    const name = nameMap.get(referencedSchema) ?? referencedSchema;
     deps.add(name);
     return name;
   }
 
-  // Enum prioritaires: union littérale (supporte null)
   if (schema.enum) {
-    const lit = schema.enum.map((v) => {
-      if (v === null) return 'null';
-      if (typeof v === 'string') return `'${v.replace(/'/g, "\\'")}'`;
-      if (typeof v === 'number' || typeof v === 'bigint') return String(v);
-      if (typeof v === 'boolean') return v ? 'true' : 'false';
-      return 'any';
-    });
-    return [...new Set(lit)].join(' | ');
+    return [...new Set(schema.enum.map(literalType))].join(' | ');
   }
 
-  // OpenAPI 3.1: null explicite et tableau de types (union)
-  if (schema.type === 'null') return 'null';
   if (Array.isArray(schema.type)) {
-    const parts = new Set();
-    for (const t of schema.type) {
-      if (t === 'null') parts.add('null');
-      else if (t === 'string') parts.add('string');
-      else if (t === 'integer' || t === 'number') parts.add('number');
-      else if (t === 'boolean') parts.add('boolean');
-      else if (t === 'array') parts.add(tsTypeOf({ type: 'array', items: schema.items }, deps, nameMap, cfg));
-      else if (t === 'object') {
-        const objTs = tsTypeOf(
-          { type: 'object', properties: schema.properties, required: schema.required, additionalProperties: schema.additionalProperties },
-          deps,
-          nameMap,
-          cfg
-        );
-        parts.add(objTs);
-      } else parts.add('any');
-    }
-    return [...parts].join(' | ');
+    const types = schema.type.map((type) => unionMemberType(type, schema, deps, nameMap, cfg));
+    return [...new Set(types)].join(' | ');
   }
 
   if (schema.allOf) {
-    // Aplatir au niveau buildModelsFromOpenAPI; ici on combine si nécessaire
-    return schema.allOf.map((s) => tsTypeOf(s, deps, nameMap, cfg)).join(' & ');
+    return schema.allOf.map((part) => tsTypeOf(part, deps, nameMap, cfg)).join(' & ');
   }
-  if (schema.oneOf) return schema.oneOf.map((s) => tsTypeOf(s, deps, nameMap, cfg)).join(' | ');
-  if (schema.anyOf) return schema.anyOf.map((s) => tsTypeOf(s, deps, nameMap, cfg)).join(' | ');
+  if (schema.oneOf) return schema.oneOf.map((part) => tsTypeOf(part, deps, nameMap, cfg)).join(' | ');
+  if (schema.anyOf) return schema.anyOf.map((part) => tsTypeOf(part, deps, nameMap, cfg)).join(' | ');
 
   if (schema.type === 'array') {
-    const it = tsTypeOf(schema.items || {}, deps, nameMap, cfg);
-    return `${it}[]`;
+    return `${tsTypeOf(schema.items ?? {}, deps, nameMap, cfg)}[]`;
   }
 
   if (schema.type === 'object' || (schema.properties || schema.additionalProperties)) {
-    const props = schema.properties || {};
-    const entries = Object.entries(props);
-    const inline = entries.map(([k, v]) => {
-      const t0 = tsTypeOf(v, deps, nameMap, cfg);
-      const opt = requiredMode === 'spec' ? ((schema.required || []).includes(k) ? '' : '?') : '?';
-      const wantsNull = forceNullable || v?.nullable;
-      const nullable = wantsNull && !/\|\s*null\b/.test(t0) ? ' | null' : '';
-      const key = quoteKeyIfNeeded(k);
-      return `${key}${opt}: ${t0}${nullable};`;
-    });
-    if (schema.additionalProperties) {
-      const at = tsTypeOf(schema.additionalProperties, deps, nameMap, cfg);
-      inline.push(`[key: string]: ${at};`);
-    }
-    return `{ ${inline.join(' ')} }`;
+    return inlineObjectType(schema, deps, nameMap, cfg);
   }
 
-  if (schema.type === 'string') return 'string';
-  if (schema.type === 'integer' || schema.type === 'number') return 'number';
-  if (schema.type === 'boolean') return 'boolean';
-
-  return 'any';
+  return PRIMITIVE_TYPES[schema.type] ?? 'any';
 }
