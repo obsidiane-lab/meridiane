@@ -19,6 +19,25 @@ const RESERVED = new Set([
   'throws', 'transient', 'volatile',
 ]);
 
+const STRING_ESCAPES = {
+  "'": "\\'",
+  '\\': '\\\\',
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+};
+
+export function quoteStringLiteral(value) {
+  const escaped = String(value).replace(/['\\\u0000-\u001f\u2028\u2029]/g, (character) => {
+    const knownEscape = STRING_ESCAPES[character];
+    if (knownEscape) return knownEscape;
+    return `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`;
+  });
+  return `'${escaped}'`;
+}
+
 /**
  * Construit un PascalCase à partir d’une liste de tokens
  * @param {string[]} tokens
@@ -66,5 +85,5 @@ export function isValidTsIdentifier(k) {
  * @param {string} k
  */
 export function quoteKeyIfNeeded(k) {
-  return isValidTsIdentifier(k) ? k : `'${k.replace(/'/g, "\\'")}'`;
+  return isValidTsIdentifier(k) ? k : quoteStringLiteral(k);
 }

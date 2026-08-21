@@ -31,7 +31,7 @@ export async function writeModelFiles({ projectDir, spec, requiredMode, formats,
 
   for (const model of models) {
     await renderTemplateToFile({
-      templatePath: path.join(templatesDir, 'model.hbs'),
+      templatePath: path.join(templatesDir, model.isAlias ? 'type-alias.hbs' : 'model.hbs'),
       outPath: path.join(outputDir, `${model.name}.ts`),
       ctx: {
         name: model.name,
@@ -39,6 +39,8 @@ export async function writeModelFiles({ projectDir, spec, requiredMode, formats,
         imports: model.imports,
         extendsTypes: model.extendsTypes || [],
         extendsItem: model.extendsItem === true,
+        type: model.type,
+        separator: model.imports.length > 0 ? '\n' : '',
       },
     });
   }

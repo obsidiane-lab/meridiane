@@ -1,5 +1,13 @@
-import { schemaNameFromRef } from './schema-utils.js';
-import { quoteKeyIfNeeded } from './utils.js';
+import {hasOwn, resolveLocalRef, schemaNameFromRef} from './schema-utils.js';
+import {
+  arrayType,
+  atomicType,
+  formatType,
+  intersectionType,
+  nullableType,
+  unionType,
+} from './type-expression.js';
+import {quoteKeyIfNeeded, quoteStringLiteral} from './utils.js';
 
 const PRIMITIVE_TYPES = {
   string: 'string',
@@ -9,105 +17,224 @@ const PRIMITIVE_TYPES = {
   null: 'null',
 };
 
-/**
- * Ajoute | null à un type TS si le schéma est nullable (compat OAS 3.0),
- * sauf si 'null' est déjà présent dans l'union.
- * @param {string} ts
- * @param {any} schema
- */
-export function withNullable(ts, schema) {
-  return schema?.nullable && !/\|\s*null\b/.test(ts) ? `${ts} | null` : ts;
-}
+function literalExpression(value) {
+  if (value === null) return atomicType('null', true);
+  if (typeof value === 'string') return atomicType(quoteStringLiteral(value));
+  if (typeof value === 'number' || typeof value === 'bigint') return atomicType(String(value));
+  if (typeof value === 'boolean') return atomicType(String(value));
 
-function literalType(value) {
-  if (value === null) return 'null';
-  if (typeof value === 'string') return `'${value.replace(/'/g, "\\'")}'`;
-  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
-  if (typeof value === 'boolean') return String(value);
-  return 'any';
-}
+  if (Array.isArray(value)) {
+    const items = value.map((item) => literalExpression(item).code);
+    return atomicType(`[${items.join(', ')}]`);
+  }
 
-function unionMemberType(type, schema, deps, nameMap, cfg) {
-  if (type in PRIMITIVE_TYPES) return PRIMITIVE_TYPES[type];
-  if (type === 'array') return tsTypeOf({type, items: schema.items}, deps, nameMap, cfg);
-  if (type === 'object') {
-    return tsTypeOf(
-      {
-        type,
-        properties: schema.properties,
-        required: schema.required,
-        additionalProperties: schema.additionalProperties,
-      },
-      deps,
-      nameMap,
-      cfg
+  if (value && typeof value === 'object') {
+    const properties = Object.entries(value).map(([key, item]) =>
+      `${quoteKeyIfNeeded(key)}: ${literalExpression(item).code};`
     );
+    return atomicType(`{ ${properties.join(' ')} }`);
   }
-  return 'any';
+
+  return atomicType('any');
 }
 
-function inlineObjectType(schema, deps, nameMap, cfg) {
-  const requiredMode = cfg?.requiredMode ?? 'all';
-  const required = new Set(schema.required ?? []);
-  const properties = Object.entries(schema.properties ?? {}).map(([key, property]) => {
-    const baseType = tsTypeOf(property, deps, nameMap, cfg);
-    const optional = requiredMode === 'spec' && required.has(key) ? '' : '?';
-    const nullable = requiredMode !== 'spec' || property?.nullable;
-    const type = nullable && !/\|\s*null\b/.test(baseType) ? `${baseType} | null` : baseType;
-    return `${quoteKeyIfNeeded(key)}${optional}: ${type};`;
-  });
+function tupleMember(type, optional = false) {
+  return optional ? `${formatType(type)}?` : type.code;
+}
 
-  if (schema.additionalProperties) {
-    const valueType = tsTypeOf(schema.additionalProperties, deps, nameMap, cfg);
-    properties.push(`[key: string]: ${valueType};`);
-  }
-
-  return `{ ${properties.join(' ')} }`;
+function nonNegativeInteger(value) {
+  return Number.isInteger(value) && value >= 0 ? value : undefined;
 }
 
 /**
- * Résout un schéma OpenAPI vers un type TypeScript, en collectant les dépendances ($ref)
- * @param {any} schema
- * @param {Set<string>} deps
- * @param {Map<string,string>} nameMap
- * @param {{ requiredMode?: 'all'|'spec' }} [cfg]
- * @returns {string}
+ * Creates one resolver for a model. Its lexical context owns name resolution,
+ * dependency collection and local-reference cycle detection.
  */
-export function tsTypeOf(schema, deps, nameMap, cfg) {
-  if (!schema) return 'any';
+export function createTypeResolver({
+  dependencies = new Set(),
+  typeNames = new Map(),
+  requiredMode = 'all',
+  spec,
+} = {}) {
+  const resolvingRefs = new Set();
 
-  if (schema.$ref) {
-    const referencedSchema = schemaNameFromRef(schema.$ref);
-    if (!referencedSchema || /jsonMergePatch/i.test(referencedSchema) || /^Hydra/i.test(referencedSchema)) {
-      return 'any';
+  function resolveReference(ref) {
+    const componentName = schemaNameFromRef(ref);
+    if (componentName) {
+      if (/jsonMergePatch/i.test(componentName) || /^Hydra/i.test(componentName)) {
+        return atomicType('any');
+      }
+
+      const typeName = typeNames.get(componentName) ?? componentName;
+      dependencies.add(typeName);
+      return atomicType(typeName);
     }
-    const name = nameMap.get(referencedSchema) ?? referencedSchema;
-    deps.add(name);
-    return name;
+
+    const target = resolveLocalRef(spec, ref);
+    if (target === undefined || resolvingRefs.has(ref)) return atomicType('any');
+
+    resolvingRefs.add(ref);
+    try {
+      return resolve(target);
+    } finally {
+      resolvingRefs.delete(ref);
+    }
   }
 
-  if (schema.enum) {
-    return [...new Set(schema.enum.map(literalType))].join(' | ');
+  function resolveProperty(schema) {
+    const type = resolve(schema);
+    return requiredMode === 'spec' ? type : nullableType(type);
   }
 
-  if (Array.isArray(schema.type)) {
-    const types = schema.type.map((type) => unionMemberType(type, schema, deps, nameMap, cfg));
-    return [...new Set(types)].join(' | ');
+  function resolveDictionaryValue(additionalProperties, properties) {
+    const additionalType = additionalProperties === true
+      ? atomicType('any')
+      : resolve(additionalProperties);
+    if (additionalType.code === 'any') return additionalType;
+
+    const memberTypes = properties.map(({type}) => type);
+    if (properties.some(({optional}) => optional)) memberTypes.push(atomicType('undefined'));
+    return unionType([additionalType, ...memberTypes]);
   }
 
-  if (schema.allOf) {
-    return schema.allOf.map((part) => tsTypeOf(part, deps, nameMap, cfg)).join(' & ');
-  }
-  if (schema.oneOf) return schema.oneOf.map((part) => tsTypeOf(part, deps, nameMap, cfg)).join(' | ');
-  if (schema.anyOf) return schema.anyOf.map((part) => tsTypeOf(part, deps, nameMap, cfg)).join(' | ');
+  function resolveObject(schema) {
+    const requiredProperties = new Set(schema.required ?? []);
+    const properties = Object.entries(schema.properties ?? {}).map(([key, propertySchema]) => ({
+      key,
+      optional: requiredMode !== 'spec' || !requiredProperties.has(key),
+      type: resolveProperty(propertySchema),
+    }));
+    const members = properties.map(({key, optional, type}) =>
+      `${quoteKeyIfNeeded(key)}${optional ? '?' : ''}: ${type.code};`
+    );
 
-  if (schema.type === 'array') {
-    return `${tsTypeOf(schema.items ?? {}, deps, nameMap, cfg)}[]`;
+    if (hasOwn(schema, 'additionalProperties') && schema.additionalProperties !== false) {
+      const valueType = resolveDictionaryValue(schema.additionalProperties, properties);
+      members.push(`[key: string]: ${valueType.code};`);
+    } else if (properties.length === 0) {
+      const valueType = schema.additionalProperties === false ? 'never' : 'any';
+      members.push(`[key: string]: ${valueType};`);
+    }
+
+    return atomicType(`{ ${members.join(' ')} }`);
   }
 
-  if (schema.type === 'object' || (schema.properties || schema.additionalProperties)) {
-    return inlineObjectType(schema, deps, nameMap, cfg);
+  function resolveTuple(schema, prefixSchemas, additionalSchema) {
+    const minimum = nonNegativeInteger(schema.minItems) ?? 0;
+    const maximum = nonNegativeInteger(schema.maxItems);
+    if (maximum !== undefined && maximum < minimum) return atomicType('never');
+
+    const prefixLimit = maximum === undefined
+      ? prefixSchemas.length
+      : Math.min(prefixSchemas.length, maximum);
+    const prefix = prefixSchemas.slice(0, prefixLimit).map(resolve);
+    const requiredPrefixCount = Math.min(minimum, prefix.length);
+    const members = prefix.map((type, index) => tupleMember(type, index >= requiredPrefixCount));
+
+    const hasAdditionalItems = additionalSchema !== false;
+    if (!hasAdditionalItems && minimum > prefix.length) return atomicType('never');
+    if (!hasAdditionalItems || maximum === prefix.length) {
+      return atomicType(`[${members.join(', ')}]`);
+    }
+
+    const additionalType = additionalSchema === undefined || additionalSchema === true
+      ? atomicType('any')
+      : resolve(additionalSchema);
+    const requiredAdditionalCount = Math.max(0, minimum - prefix.length);
+    for (let index = 0; index < requiredAdditionalCount; index += 1) {
+      members.push(tupleMember(additionalType));
+    }
+
+    if (maximum === undefined) {
+      members.push(`...${formatType(additionalType)}[]`);
+    } else {
+      const optionalCount = Math.max(0, maximum - prefix.length - requiredAdditionalCount);
+      for (let index = 0; index < optionalCount; index += 1) {
+        members.push(tupleMember(additionalType, true));
+      }
+    }
+
+    return atomicType(`[${members.join(', ')}]`);
   }
 
-  return PRIMITIVE_TYPES[schema.type] ?? 'any';
+  function resolveArray(schema) {
+    if (Array.isArray(schema.prefixItems)) {
+      return resolveTuple(schema, schema.prefixItems, schema.items);
+    }
+    if (Array.isArray(schema.items)) {
+      return resolveTuple(schema, schema.items, schema.additionalItems);
+    }
+    if (schema.items === false) return atomicType('[]');
+
+    const itemType = schema.items === true || schema.items === undefined
+      ? atomicType('any')
+      : resolve(schema.items);
+    return arrayType(itemType);
+  }
+
+  function resolveDeclaredType(type, schema) {
+    if (type === 'array') return resolveArray(schema);
+    if (type === 'object') return resolveObject(schema);
+
+    const primitive = PRIMITIVE_TYPES[type];
+    return primitive ? atomicType(primitive, type === 'null') : atomicType('any');
+  }
+
+  function resolveStructure(schema) {
+    if (Array.isArray(schema.type)) {
+      return unionType(schema.type.map((type) => resolveDeclaredType(type, schema)));
+    }
+    if (typeof schema.type === 'string') return resolveDeclaredType(schema.type, schema);
+    if (schema.properties || hasOwn(schema, 'additionalProperties') || schema.patternProperties) {
+      return resolveObject(schema);
+    }
+    if (schema.prefixItems || hasOwn(schema, 'items')) return resolveArray(schema);
+    return undefined;
+  }
+
+  function resolve(schema) {
+    if (schema === true || schema === undefined || schema === null) return atomicType('any');
+    if (schema === false) return atomicType('never');
+
+    const constraints = [];
+    if (schema.$ref) constraints.push(resolveReference(schema.$ref));
+
+    if (hasOwn(schema, 'const')) {
+      constraints.push(literalExpression(schema.const));
+    } else if (Array.isArray(schema.enum)) {
+      constraints.push(unionType(schema.enum.map(literalExpression)));
+    } else {
+      const structure = resolveStructure(schema);
+      if (structure) constraints.push(structure);
+    }
+
+    if (Array.isArray(schema.allOf)) {
+      constraints.push(intersectionType(schema.allOf.map(resolve)));
+    }
+    if (Array.isArray(schema.oneOf)) {
+      constraints.push(unionType(schema.oneOf.map(resolve)));
+    }
+    if (Array.isArray(schema.anyOf)) {
+      constraints.push(unionType(schema.anyOf.map(resolve)));
+    }
+
+    const type = intersectionType(constraints);
+    return schema.nullable ? nullableType(type) : type;
+  }
+
+  return {
+    typeOf: (schema) => resolve(schema).code,
+    nullableTypeOf: (schema) => nullableType(resolve(schema)).code,
+  };
+}
+
+/**
+ * Resolves an OpenAPI schema to TypeScript and collects component dependencies.
+ */
+export function tsTypeOf(schema, dependencies, typeNames, options) {
+  return createTypeResolver({dependencies, typeNames, ...options}).typeOf(schema);
+}
+
+export function nullableTsTypeOf(schema, dependencies, typeNames, options) {
+  return createTypeResolver({dependencies, typeNames, ...options}).nullableTypeOf(schema);
 }

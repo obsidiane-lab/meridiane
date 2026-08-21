@@ -1,21 +1,8 @@
-import { schemaNameFromRef } from './schema-utils.js';
-
-function resolveRefPointer(spec, ref) {
-  const pointer = String(ref || '');
-  if (!pointer.startsWith('#/')) return undefined;
-
-  const segments = pointer.slice(2).split('/').filter(Boolean);
-  let current = spec;
-  for (const segment of segments) {
-    if (!current || typeof current !== 'object') return undefined;
-    current = current[segment];
-  }
-  return current;
-}
+import {resolveLocalRef, schemaNameFromRef} from './schema-utils.js';
 
 function deref(spec, maybeRef) {
   if (!maybeRef || typeof maybeRef !== 'object') return maybeRef;
-  if (typeof maybeRef.$ref === 'string') return resolveRefPointer(spec, maybeRef.$ref) || maybeRef;
+  if (typeof maybeRef.$ref === 'string') return resolveLocalRef(spec, maybeRef.$ref) || maybeRef;
   return maybeRef;
 }
 
@@ -37,6 +24,8 @@ function is2xxStatus(code) {
   return /^2xx$/i.test(status);
 }
 
+const HTTP_METHODS = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
+
 /**
  * Collects only component schema refs (`#/components/schemas/*`) found in a JSON schema.
  * @param {any} schema
@@ -53,7 +42,6 @@ function collectComponentSchemaRefs(schema, out) {
     if (node.$ref && typeof node.$ref === 'string') {
       const name = schemaNameFromRef(node.$ref);
       if (name) out.add(name);
-      return;
     }
 
     if (Array.isArray(node)) {
@@ -61,48 +49,78 @@ function collectComponentSchemaRefs(schema, out) {
       return;
     }
 
-    for (const value of Object.values(node)) walk(value);
+    for (const [key, value] of Object.entries(node)) {
+      if (key !== '$ref') walk(value);
+    }
   }
 
   walk(schema);
 }
 
-/**
- * Extracts root schemas from endpoints for one media type.
- * - requestBody is ignored for PATCH (merge-patch typed as Partial<> elsewhere)
- * - responses keep only 2xx and default
- */
-function listRootsFromPaths(spec, { mediaType } = {}) {
+function listSchemaRoots(spec, {mediaType} = {}) {
   const wantedLower = canonicalizeMediaType(mediaType);
   const roots = [];
+  const visited = new Set();
 
-  const paths = spec?.paths;
-  if (!paths || typeof paths !== 'object') return roots;
+  function addParameter(parameterOrRef) {
+    const parameter = deref(spec, parameterOrRef);
+    if (!parameter || typeof parameter !== 'object') return;
+    if (parameter.schema) roots.push(parameter.schema);
+    const contentSchema = getContentSchema(parameter.content, wantedLower);
+    if (contentSchema) roots.push(contentSchema);
+  }
 
-  for (const pathItem of Object.values(paths)) {
-    if (!pathItem || typeof pathItem !== 'object') continue;
-    for (const [method, operationOrRef] of Object.entries(pathItem)) {
-      const operation = deref(spec, operationOrRef);
-      if (!operation || typeof operation !== 'object') continue;
+  function addHeaders(headers) {
+    for (const header of Object.values(headers ?? {})) addParameter(header);
+  }
 
-      const isPatch = String(method || '').toLowerCase() === 'patch';
+  function visitOperation(method, operationOrRef) {
+    const operation = deref(spec, operationOrRef);
+    if (!operation || typeof operation !== 'object') return;
+    if (visited.has(operation)) return;
+    visited.add(operation);
 
-      if (!isPatch) {
-        const requestBody = deref(spec, operation.requestBody);
-        const requestSchema = getContentSchema(requestBody?.content, wantedLower);
-        if (requestSchema) roots.push(requestSchema);
-      }
+    for (const parameter of operation.parameters ?? []) addParameter(parameter);
 
-      const responses = operation.responses;
-      if (!responses || typeof responses !== 'object') continue;
-      for (const [code, responseOrRef] of Object.entries(responses)) {
-        if (!is2xxStatus(code) && String(code).toLowerCase() !== 'default') continue;
-        const response = deref(spec, responseOrRef);
-        const schema = getContentSchema(response?.content, wantedLower);
-        if (schema) roots.push(schema);
-      }
+    if (method !== 'patch') {
+      const requestBody = deref(spec, operation.requestBody);
+      const requestSchema = getContentSchema(requestBody?.content, wantedLower);
+      if (requestSchema) roots.push(requestSchema);
+    }
+
+    for (const [code, responseOrRef] of Object.entries(operation.responses ?? {})) {
+      if (!is2xxStatus(code) && String(code).toLowerCase() !== 'default') continue;
+      const response = deref(spec, responseOrRef);
+      const responseSchema = getContentSchema(response?.content, wantedLower);
+      if (responseSchema) roots.push(responseSchema);
+      addHeaders(response?.headers);
+    }
+
+    for (const callbackOrRef of Object.values(operation.callbacks ?? {})) {
+      const callback = deref(spec, callbackOrRef);
+      for (const pathItem of Object.values(callback ?? {})) visitPathItem(pathItem);
     }
   }
+
+  function visitPathItem(pathItemOrRef) {
+    const pathItem = deref(spec, pathItemOrRef);
+    if (!pathItem || typeof pathItem !== 'object') return;
+    if (visited.has(pathItem)) return;
+    visited.add(pathItem);
+
+    for (const parameter of pathItem.parameters ?? []) addParameter(parameter);
+    for (const [method, operation] of Object.entries(pathItem)) {
+      const normalizedMethod = method.toLowerCase();
+      if (HTTP_METHODS.has(normalizedMethod)) visitOperation(normalizedMethod, operation);
+    }
+  }
+
+  function visitPaths(paths) {
+    for (const pathItem of Object.values(paths ?? {})) visitPathItem(pathItem);
+  }
+
+  visitPaths(spec?.paths);
+  visitPaths(spec?.webhooks);
 
   return roots;
 }
@@ -145,7 +163,7 @@ export function expandWithSchemaDependencies(start, schemas) {
  */
 export function collectUsedSchemasForMediaType(spec, cfg) {
   const schemas = spec?.components?.schemas || {};
-  const roots = listRootsFromPaths(spec, cfg);
+  const roots = listSchemaRoots(spec, cfg);
   const initialRefs = new Set();
   for (const root of roots) collectComponentSchemaRefs(root, initialRefs);
   return expandWithSchemaDependencies(initialRefs, schemas);

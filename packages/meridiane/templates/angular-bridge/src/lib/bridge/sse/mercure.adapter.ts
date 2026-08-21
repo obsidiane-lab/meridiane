@@ -40,6 +40,11 @@ type DedicatedSubscriptionClaim = {
   stop$: Subject<void>;
 };
 
+type PreparedSubscription = {
+  iris: string[];
+  source$: Observable<IncomingMessage>;
+};
+
 @Injectable({providedIn: 'root'})
 export class MercureRealtimeAdapter implements RealtimeDiagnosticsPort, OnDestroy {
   private readonly apiBase = inject(API_BASE_URL);
@@ -102,22 +107,16 @@ export class MercureRealtimeAdapter implements RealtimeDiagnosticsPort, OnDestro
     options?: WatchConnectionOptions
   ): Observable<RealtimeEvent<T>> {
     return defer(() => {
-      const inputIris = toIriList(iris);
-      if (inputIris.length === 0) return EMPTY;
+      const subscription = this.prepareSubscription(iris, options);
+      if (!subscription) return EMPTY;
 
-      if (!this.hubUrl) {
-        this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
-        return EMPTY;
-      }
+      const matchTopic = createPayloadTopicMatcher(
+        subscription.iris,
+        subscribeFilter,
+        this.topicMapper
+      );
 
-      const registeredTopics = uniqueStrings(inputIris.map((iri) => this.topicMapper.toTopic(iri)));
-      const source$ = this.buildIncomingStream$(registeredTopics, options);
-
-      const matchTopic = createPayloadTopicMatcher(inputIris, subscribeFilter, this.topicMapper);
-
-      return source$.pipe(
-        map((event) => parseMercurePayload(event.data, this.logger)),
-        filter((payload): payload is Item => payload !== undefined),
+      return this.payloads$(subscription.source$).pipe(
         map((payload) => {
           const topic = matchTopic(payload);
           if (!topic) return undefined;
@@ -133,20 +132,10 @@ export class MercureRealtimeAdapter implements RealtimeDiagnosticsPort, OnDestro
 
   subscribeAll$<T>(iris: Iri[], options?: WatchConnectionOptions): Observable<RealtimeEvent<T>> {
     return defer(() => {
-      const inputIris = toIriList(iris);
-      if (inputIris.length === 0) return EMPTY;
+      const subscription = this.prepareSubscription(iris, options);
+      if (!subscription) return EMPTY;
 
-      if (!this.hubUrl) {
-        this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
-        return EMPTY;
-      }
-
-      const registeredTopics = uniqueStrings(inputIris.map((iri) => this.topicMapper.toTopic(iri)));
-      const source$ = this.buildIncomingStream$(registeredTopics, options);
-
-      return source$.pipe(
-        map((event) => parseMercurePayload(event.data, this.logger)),
-        filter((payload): payload is Item => payload !== undefined),
+      return this.payloads$(subscription.source$).pipe(
         map((payload) => {
           const rawId = payload['@id'];
           const iri = typeof rawId === 'string' ? rawId : '';
@@ -187,6 +176,32 @@ export class MercureRealtimeAdapter implements RealtimeDiagnosticsPort, OnDestro
     this.destroy$.next();
     this.destroy$.complete();
     this.sharedRebuild$.complete();
+  }
+
+  private prepareSubscription(
+    iris: Iri[],
+    options?: WatchConnectionOptions
+  ): PreparedSubscription | undefined {
+    const inputIris = toIriList(iris);
+    if (inputIris.length === 0) return undefined;
+
+    if (!this.hubUrl) {
+      this.logger?.debug?.('[Mercure] hubUrl not configured → realtime disabled');
+      return undefined;
+    }
+
+    const topics = uniqueStrings(inputIris.map((iri) => this.topicMapper.toTopic(iri)));
+    return {
+      iris: inputIris,
+      source$: this.buildIncomingStream$(topics, options),
+    };
+  }
+
+  private payloads$(source$: Observable<IncomingMessage>): Observable<Item> {
+    return source$.pipe(
+      map((event) => parseMercurePayload(event.data, this.logger)),
+      filter((payload): payload is Item => payload !== undefined)
+    );
   }
 
   private buildIncomingStream$(topics: string[], options?: WatchConnectionOptions): Observable<IncomingMessage> {

@@ -59,9 +59,26 @@ Sorties :
 ## Notes importantes
 
 - fallback automatique `.../api/docs.json` -> `.../api/docs.jsonopenapi` si nécessaire
-- mode contract-driven : uniquement les schémas atteignables via `paths` pour les formats sélectionnés
+- mode contract-driven : uniquement les schémas atteignables via `paths` et `webhooks` pour les formats sélectionnés
 - modèles `*jsonMergePatch*` non générés (`PATCH` typé `Partial<T>`)
 - Meridiane ne publie pas : publication via `npm publish` côté CI
+
+## Couverture des schémas
+
+Le compilateur suit les types d’[OpenAPI 3.0](https://spec.openapis.org/oas/v3.0.4.html) et le dialecte
+[JSON Schema 2020-12 d’OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0.html#schema-object) :
+
+- primitives, unions de `type`, objets, propriétés requises, dictionnaires et schémas booléens ;
+- tableaux homogènes, tuples `prefixItems`, tuples historiques et bornes de longueur des tuples ;
+- `enum` et `const`, y compris les valeurs JSON structurées ;
+- `allOf`, `oneOf`, `anyOf`, `nullable` et références locales vers `components.schemas` ou `$defs` ;
+- schémas racine objets sous forme d’interfaces et autres schémas sous forme d’aliases TypeScript ;
+- contrats atteignables depuis les bodies, paramètres, en-têtes, callbacks et webhooks.
+
+Les règles de validation sans équivalent structurel TypeScript (`pattern`, bornes numériques,
+`uniqueItems`, `contains`, `not`, conditions, fermeture exacte des propriétés, etc.) restent à la
+charge de la validation runtime. Les références externes doivent être préalablement regroupées dans
+le document OpenAPI fourni à Meridiane.
 
 ## Spécifique à ce repo
 

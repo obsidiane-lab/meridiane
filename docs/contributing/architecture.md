@@ -15,6 +15,22 @@ Meridiane est organisé autour d'un produit publié et d'un environnement de dé
 
 Les commandes, arguments et options du CLI constituent le contrat d'utilisation. Les dossiers sous `src/` restent internes.
 
+### Compilation OpenAPI
+
+Le compilateur de modèles suit un pipeline unidirectionnel. Chaque module porte une seule décision :
+
+- `oas-contract.js` trouve les schémas atteignables depuis les opérations OpenAPI ;
+- `model-selection.js` applique les formats et filtres, puis attribue les noms TypeScript ;
+- `interface-schema.js` décide si un schéma objet peut rester une interface sans perte de sens ;
+- `type-resolver.js` traduit récursivement un schéma en expression TypeScript ;
+- `type-expression.js` compose les unions, intersections et tableaux avec leur priorité syntaxique ;
+- `openapi-to-models.js` orchestre ces étapes et produit les définitions destinées aux templates ;
+- `write-model-files.js` se limite au rendu et à l'écriture des fichiers.
+
+Les particularités d'un projet consommateur ne doivent jamais entrer dans ce pipeline. Une règle de
+génération doit découler d'OpenAPI, de JSON Schema ou d'un comportement historique explicitement
+préservé par le contrat de Meridiane.
+
 ### Runtime Angular généré
 
 Le template Angular sépare les responsabilités techniques sans exposer ces détails dans l'API publique :
