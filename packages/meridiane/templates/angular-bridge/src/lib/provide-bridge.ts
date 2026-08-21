@@ -107,7 +107,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
   const interceptors: HttpInterceptorFn[] = [
     contentTypeInterceptor,
     bridgeDefaultsInterceptor,
-    ...createAuthInterceptors(auth),
+    ...createAuthInterceptors(auth, baseUrl),
     ...(singleFlight ? [createSingleFlightInterceptor('safe')] : [createSingleFlightInterceptor('off')]),
     ...(debug ? [bridgeDebugInterceptor] : []),
     ...extraInterceptors,
@@ -151,7 +151,7 @@ function normalizeMercureMaxUrlLength(input: unknown, fallback: number): number 
   return Number.isFinite(value) && value >= 256 ? value : fallback;
 }
 
-function createAuthInterceptors(auth?: BridgeAuth): HttpInterceptorFn[] {
+function createAuthInterceptors(auth: BridgeAuth | undefined, baseUrl: string): HttpInterceptorFn[] {
   if (!auth) return [];
 
   if (typeof auth === 'function') {
@@ -167,14 +167,18 @@ function createAuthInterceptors(auth?: BridgeAuth): HttpInterceptorFn[] {
 
   if ('token' in bearer) {
     const token = bearer.token;
-    return [createBearerAuthInterceptor(() => token)];
+    return [createBearerAuthInterceptor(baseUrl, () => token)];
   }
 
-  return [createBearerAuthInterceptor(bearer.getToken)];
+  return [createBearerAuthInterceptor(baseUrl, bearer.getToken)];
 }
 
-function createBearerAuthInterceptor(getToken: () => string | undefined | Promise<string | undefined>): HttpInterceptorFn {
+function createBearerAuthInterceptor(
+  baseUrl: string,
+  getToken: () => string | undefined | Promise<string | undefined>
+): HttpInterceptorFn {
   return (req, next) => {
+    if (!isRequestWithinBaseUrl(req.url, baseUrl)) return next(req);
     if (req.headers.has('Authorization')) return next(req);
     return from(Promise.resolve(getToken())).pipe(
       switchMap((token) => {
@@ -183,4 +187,45 @@ function createBearerAuthInterceptor(getToken: () => string | undefined | Promis
       })
     );
   };
+}
+
+/**
+ * Restricts built-in Bearer authentication to the configured API URL.
+ *
+ * Matching the URL origin alone would still leak credentials when `baseUrl`
+ * contains a path (for example `/v1`). The path boundary also prevents a
+ * `/v1` configuration from matching `/v10`.
+ */
+function isRequestWithinBaseUrl(requestUrl: string, baseUrl: string): boolean {
+  try {
+    const baseKind = classifyUrl(baseUrl);
+    const requestKind = classifyUrl(requestUrl);
+
+    // URLs using different resolution modes cannot safely be compared without
+    // guessing the browser's current origin or protocol.
+    if (baseKind !== requestKind) return false;
+
+    const protocol = baseKind === 'absolute' && baseUrl.toLowerCase().startsWith('http://') ? 'http:' : 'https:';
+    const comparisonOrigin = `${protocol}//bridge.invalid`;
+    const base = new URL(baseUrl, `${comparisonOrigin}/`);
+    const request = new URL(requestUrl, `${comparisonOrigin}/`);
+
+    if (base.origin !== request.origin) return false;
+
+    const basePath = normalizeScopePath(base.pathname);
+    return basePath === '/' || request.pathname === basePath || request.pathname.startsWith(`${basePath}/`);
+  } catch {
+    return false;
+  }
+}
+
+function classifyUrl(url: string): 'absolute' | 'protocol-relative' | 'relative' {
+  if (/^https?:\/\//i.test(url)) return 'absolute';
+  if (url.startsWith('//')) return 'protocol-relative';
+  return 'relative';
+}
+
+function normalizeScopePath(pathname: string): string {
+  if (pathname === '/') return pathname;
+  return pathname.replace(/\/+$/, '') || '/';
 }

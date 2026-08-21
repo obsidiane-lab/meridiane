@@ -33,6 +33,11 @@ Utilisez une connexion dédiée (`{newConnection: true}`) ou configurez `connect
 - `{ type: 'bearer', getToken }` (sync/async),
 - `HttpInterceptorFn` custom.
 
+Le Bearer intégré est limité à l’origine et au chemin du `baseUrl` fourni à
+`provideBridge()`. Les requêtes HTTP de l’application vers d’autres services ne
+reçoivent pas ce token. Le périmètre d’un interceptor custom reste à la charge de
+son implémentation.
+
 ## Comment gérer les cookies (`withCredentials`) ?
 
 Pour le HTTP :

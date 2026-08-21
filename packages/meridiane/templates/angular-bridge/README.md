@@ -105,6 +105,11 @@ provideBridge({
 - `{ type: 'bearer', getToken }` (sync ou async),
 - ou un `HttpInterceptorFn` custom.
 
+Le Bearer intégré est ajouté uniquement aux requêtes dont l’origine et le chemin
+appartiennent au `baseUrl` configuré. Une requête vers un autre service conserve
+donc ses en-têtes d’origine. Un interceptor custom garde le comportement Angular
+standard et reste responsable de son propre périmètre.
+
 ```ts
 import {provideBridge} from '__PACKAGE_NAME__';
 

@@ -100,7 +100,7 @@ async function generateLibrary({projectDir, libName, packageName, version, debug
 
 async function generateModels({projectDir, spec, requiredMode, formats, include, exclude, debug, log}) {
   const outDir = path.resolve(projectDir, 'src', 'models');
-  const templatesDir = path.resolve(pkgRoot, 'tools', 'generator', 'models', 'templates');
+  const templatesDir = path.resolve(pkgRoot, 'src', 'generators', 'models', 'templates');
 
   if (debug) {
     log?.debug?.('[meridiane] generate models', {
