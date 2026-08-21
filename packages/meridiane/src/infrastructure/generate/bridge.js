@@ -4,9 +4,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 import {readJson, writeJsonIfChanged} from '../json.js';
-import {renderTemplateToFile} from '../../generator/models/handlebars.js';
-import {ensureCleanDir} from '../../generator/models/utils.js';
-import {buildModelsFromOpenAPI} from '../../generator/models/openapi-to-models.js';
+import {renderTemplateToFile} from '../../generators/models/handlebars.js';
+import {ensureCleanDir} from '../../generators/models/utils.js';
+import {buildModelsFromOpenAPI} from '../../generators/models/openapi-to-models.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,7 +59,7 @@ async function replacePlaceholdersInDir(dir, placeholders) {
 }
 
 async function generateLibrary({projectDir, libName, packageName, version, debug, log, projectReadmePath}) {
-  const tplDir = path.resolve(pkgRoot, 'templates/_lib_template');
+  const tplDir = path.resolve(pkgRoot, 'templates/angular-bridge');
   const targetDir = projectDir;
 
   if (debug) {

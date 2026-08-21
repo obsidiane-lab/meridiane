@@ -4,12 +4,15 @@ CLI pour générer un bridge Angular depuis une spec OpenAPI (API Platform + Mer
 
 ![CI](https://github.com/obsidiane-lab/meridiane/actions/workflows/ci.yml/badge.svg)
 
-## Monorepo
+## Organisation du monorepo
 
-- `packages/meridiane` : package npm `@obsidiane/meridiane` (CLI de génération)
-- `apps/backend` : backend Symfony/API Platform + Mercure utilisé pour le développement
-- `apps/sandbox` : application Angular de démonstration qui consomme un bridge généré
+- `packages/meridiane` : le produit publié, package npm `@obsidiane/meridiane` et CLI de génération
+- `playground` : l'environnement interne utilisé pour développer et valider le générateur
+  - `playground/api-platform` : API Symfony/API Platform + Mercure de référence
+  - `playground/angular-app` : application Angular qui consomme un bridge généré
 - `docs` : documentation produit (CLI, guide d'intégration, HTTP, SSE, API publique)
+
+Le package publié ne dépend pas du playground. Le playground fournit uniquement un contrat OpenAPI et des scénarios réels pour développer le générateur.
 
 ## Pré-requis
 
@@ -28,7 +31,7 @@ npm install
 2. Démarrer le backend :
 
 ```bash
-cd apps/backend
+cd playground/api-platform
 docker compose up -d --build
 # optionnel mais recommandé au premier démarrage :
 docker compose exec php php bin/console app:dev:reset --no-interaction
@@ -65,9 +68,11 @@ npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.
 
 ## Scripts utiles (racine)
 
-- `npm run sandbox:bridge` : regénère le bridge sandbox
-- `npm run sandbox:dev` : bridge sandbox + `ng serve`
-- `npm run sandbox:build` : bridge sandbox + build Angular
+- `npm run playground:bridge` : regénère le bridge du playground
+- `npm run playground:dev` : bridge du playground + `ng serve`
+- `npm run playground:build` : bridge du playground + build Angular
+
+Les commandes historiques `npm run sandbox:bridge`, `npm run sandbox:dev` et `npm run sandbox:build` restent disponibles avec le même comportement.
 
 ## Documentation
 
@@ -78,5 +83,7 @@ npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.
 - Mercure / SSE : `docs/fonctionnalites/mercure-sse.md`
 - FAQ : `docs/fonctionnalites/questions-frequentes.md`
 - Package npm : `packages/meridiane/README.md`
-- Sandbox Angular : `apps/sandbox/README.md`
-- Backend Symfony : `apps/backend/README.md`
+- Environnement de développement : `playground/README.md`
+- Application Angular : `playground/angular-app/README.md`
+- API Symfony : `playground/api-platform/README.md`
+- Architecture interne : `docs/contributing/architecture.md`

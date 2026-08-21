@@ -2,9 +2,9 @@ import process from 'node:process';
 import path from 'node:path';
 
 import { normalizeGenerateOptions } from '../domain/bridge-options.js';
-import { createLogger } from '../infra/logger.js';
-import { readOpenApiSpec } from '../infra/spec-loader.js';
-import { generateBridgeWorkspace } from '../infra/generate/bridge.js';
+import { createLogger } from '../infrastructure/logger.js';
+import { readOpenApiSpec } from '../infrastructure/spec-loader.js';
+import { generateBridgeWorkspace } from '../infrastructure/generate/bridge.js';
 
 function resolveProjectDir({ cwd, libName, outDir }) {
   if (outDir && outDir.length > 0) return path.resolve(cwd, outDir);

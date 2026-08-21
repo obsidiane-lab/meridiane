@@ -2,10 +2,10 @@
 import process from 'node:process';
 import { Command } from 'commander';
 
-import { runDev } from './tools/dev.js';
-import { runBuild } from './tools/build.js';
-import { runGenerate } from './tools/generate.js';
-import { createLogger } from './tools/infra/logger.js';
+import { runDev } from './src/dev.js';
+import { runBuild } from './src/build.js';
+import { runGenerate } from './src/generate.js';
+import { createLogger } from './src/infrastructure/logger.js';
 
 const program = new Command();
 

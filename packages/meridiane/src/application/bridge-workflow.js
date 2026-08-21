@@ -2,10 +2,10 @@ import process from 'node:process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
-import { readOpenApiSpec } from '../infra/spec-loader.js';
-import { generateBridgeWorkspace } from '../infra/generate/bridge.js';
-import { ensureStandaloneWorkspace, ensureToolchainInstalled } from '../infra/standalone-workspace.js';
-import { ExitCodeError, runCommand } from '../infra/exec.js';
+import { readOpenApiSpec } from '../infrastructure/spec-loader.js';
+import { generateBridgeWorkspace } from '../infrastructure/generate/bridge.js';
+import { ensureStandaloneWorkspace, ensureToolchainInstalled } from '../infrastructure/standalone-workspace.js';
+import { ExitCodeError, runCommand } from '../infrastructure/exec.js';
 
 export async function runBridgeWorkflow({
   repoRoot,

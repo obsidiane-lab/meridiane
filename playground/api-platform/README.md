@@ -15,7 +15,7 @@ Backend de développement utilisé par Meridiane pour générer la spec OpenAPI 
 Depuis la racine du repo :
 
 ```bash
-cd apps/backend
+cd playground/api-platform
 docker compose up -d --build
 ```
 
@@ -70,4 +70,4 @@ Toutes sont disponibles via API Platform avec OpenAPI/Hydra et support Mercure (
 
 - migrations auto-appliquées au démarrage du conteneur `php`
 - CORS autorise les origines localhost/127.0.0.1
-- la doc `apps/backend/docs/` provient majoritairement du template Symfony Docker (référence infra)
+- la doc `playground/api-platform/docs/` provient majoritairement du template Symfony Docker (référence infra)

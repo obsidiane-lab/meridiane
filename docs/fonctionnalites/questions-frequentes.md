@@ -6,7 +6,7 @@ Chaque backend garde sa propre spec OpenAPI, ses modèles et son cycle de releas
 
 ## `meridiane dev` peut-il être lancé sans `packageName` ?
 
-Oui, dans ce repo uniquement. Sans argument, il cible `@obsidiane/bridge-sandbox` et applique les defaults de `apps/sandbox`.
+Oui, dans ce repo uniquement. Sans argument, il cible `@obsidiane/bridge-sandbox` et applique les defaults de `playground/angular-app`.
 
 ## Que se passe-t-il si la spec est indisponible en mode `dev` sandbox ?
 

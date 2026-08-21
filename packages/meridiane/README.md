@@ -65,4 +65,4 @@ Sorties :
 
 ## Spécifique à ce repo
 
-Dans ce monorepo, `meridiane dev` peut être exécuté sans `packageName` et cible alors `@obsidiane/bridge-sandbox` (app `apps/sandbox`).
+Dans ce monorepo, `meridiane dev` peut être exécuté sans `packageName` et cible alors `@obsidiane/bridge-sandbox` (app `playground/angular-app`).

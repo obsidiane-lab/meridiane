@@ -39,7 +39,7 @@ npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.jso
 
 Particularité de ce repo :
 - `packageName` est optionnel et vaut alors `@obsidiane/bridge-sandbox`
-- Meridiane applique les defaults sandbox (`apps/sandbox`)
+- Meridiane applique les defaults sandbox (`playground/angular-app`)
 
 ### `meridiane build <packageName>`
 
@@ -112,7 +112,7 @@ Active les logs détaillés du CLI.
 Quand vous lancez `meridiane dev` sans `packageName` dans ce repo, la spec est résolue dans cet ordre :
 
 1. valeur explicite `--spec`
-2. `apps/backend/var/openapi.json` si le fichier existe
+2. `playground/api-platform/var/openapi.json` si le fichier existe
 3. `http://localhost:8000/api/docs.json`
 
 Si la spec par défaut est indisponible et que `--spec` n'a pas été fourni, Meridiane bascule en `--no-models` (warning non bloquant).

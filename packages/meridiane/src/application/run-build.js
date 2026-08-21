@@ -2,7 +2,7 @@ import process from 'node:process';
 import path from 'node:path';
 
 import { normalizeBuildOptions } from '../domain/bridge-options.js';
-import { createLogger } from '../infra/logger.js';
+import { createLogger } from '../infrastructure/logger.js';
 import { runBridgeWorkflow } from './bridge-workflow.js';
 
 export async function runBuild(packageName, opts) {

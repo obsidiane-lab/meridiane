@@ -4,12 +4,15 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "playground/*"
   ],
   "scripts": {
-    "sandbox:bridge": "npm -w apps/sandbox run bridge:sync",
-    "sandbox:build": "npm -w apps/sandbox run build",
-    "sandbox:dev": "npm -w apps/sandbox run dev"
+    "playground:bridge": "npm -w @obsidiane/meridiane-sandbox run bridge:sync",
+    "playground:build": "npm -w @obsidiane/meridiane-sandbox run build",
+    "playground:dev": "npm -w @obsidiane/meridiane-sandbox run dev",
+    "sandbox:bridge": "npm -w @obsidiane/meridiane-sandbox run bridge:sync",
+    "sandbox:build": "npm -w @obsidiane/meridiane-sandbox run build",
+    "sandbox:dev": "npm -w @obsidiane/meridiane-sandbox run dev"
   },
   "dependencies": {
     "commander": "^14.0.3"

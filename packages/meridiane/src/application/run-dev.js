@@ -2,15 +2,15 @@ import process from 'node:process';
 import path from 'node:path';
 
 import { normalizeDevOptions } from '../domain/bridge-options.js';
-import { createLogger } from '../infra/logger.js';
+import { createLogger } from '../infrastructure/logger.js';
 import {
   findLatestTgz,
   installPackageFromDist,
   resolveDevAppRoot,
   resolveSandboxAppRoot,
   resolveSpecSource,
-} from '../infra/dev-support.js';
-import { readOpenApiSpec } from '../infra/spec-loader.js';
+} from '../infrastructure/dev-support.js';
+import { readOpenApiSpec } from '../infrastructure/spec-loader.js';
 import { runBridgeWorkflow } from './bridge-workflow.js';
 
 export async function runDev(packageName, opts) {

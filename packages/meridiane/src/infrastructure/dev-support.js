@@ -33,18 +33,20 @@ export async function resolveDevAppRoot(startCwd) {
 export async function resolveSandboxAppRoot(startCwd) {
   if (await isMeridianeSandboxApp(startCwd)) return startCwd;
 
-  const sandboxApp = path.join(startCwd, 'apps', 'sandbox');
+  const sandboxApp = path.join(startCwd, 'playground', 'angular-app');
   if (await pathIsFile(path.join(sandboxApp, 'package.json')) && (await isMeridianeSandboxApp(sandboxApp))) {
     return sandboxApp;
   }
 
-  throw new Error('Missing <packageName>. Run from the sandbox app (`apps/sandbox`) or provide a package name.');
+  throw new Error(
+    'Missing <packageName>. Run from the playground app (`playground/angular-app`) or provide a package name.'
+  );
 }
 
 export async function resolveSpecSource({ useSandboxDefaults, appRoot, specArg }) {
   if (!useSandboxDefaults) return specArg;
   if (specArg) return specArg;
-  const localSpec = path.resolve(appRoot, '..', 'backend', 'var', 'openapi.json');
+  const localSpec = path.resolve(appRoot, '..', 'api-platform', 'var', 'openapi.json');
   return (await pathIsFile(localSpec)) ? localSpec : 'http://localhost:8000/api/docs.json';
 }
 

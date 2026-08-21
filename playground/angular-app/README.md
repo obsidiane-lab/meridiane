@@ -19,7 +19,7 @@ La sandbox vérifie en conditions réelles :
 Démarrage backend (depuis la racine du repo) :
 
 ```bash
-cd apps/backend
+cd playground/api-platform
 docker compose up -d --build
 docker compose exec php php bin/console app:dev:reset --no-interaction
 cd ../..
@@ -37,7 +37,7 @@ npm run sandbox:dev
 Ce que fait `sandbox:dev` :
 - lance `bridge:sync` (`node ../../packages/meridiane/cli.js dev`)
 - génère/build le package `@obsidiane/bridge-sandbox`
-- l'installe dans `apps/sandbox/node_modules`
+- l'installe dans le `node_modules` du workspace
 - lance `ng serve sandbox`
 
 URL : `http://localhost:4200`
@@ -50,7 +50,7 @@ Comptes fixtures :
 
 ## Scripts utiles
 
-Dans `apps/sandbox` :
+Dans `playground/angular-app` :
 
 - `npm run bridge:sync` : regénérer le bridge sandbox
 - `npm run dev` : bridge sync + `ng serve sandbox`
@@ -61,7 +61,7 @@ Dans `apps/sandbox` :
 ## Forcer une spec locale
 
 ```bash
-npm -w apps/sandbox run bridge:sync -- --spec ./openapi.json
+npm -w @obsidiane/meridiane-sandbox run bridge:sync -- --spec ./openapi.json
 ```
 
 ## Pages principales
