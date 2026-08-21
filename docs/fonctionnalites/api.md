@@ -9,7 +9,7 @@ Surface exposée par le bridge généré (`src/public-api.ts`).
 - Facades : `FacadeFactory`, `ResourceFacade<T>`, `BridgeFacade`
 - Types utilitaires facades : `FacadeConfig<T>`, `TypedEvent`, `WatchTypesResult<R>`, `WatchTypesConfig`
 - Types HTTP/Hydra : `Item`, `Iri`, `Collection<T>`, `Query`, `AnyQuery`, `HttpCallOptions`, `HttpRequestConfig`, `HttpMethod`
-- Ports : `ResourceRepository<T>`
+- Ports : `ResourceRepository<T>`, `RealtimePort`, `RealtimeDiagnosticsPort`, `Facade<T>`
 - Utils URL : `joinUrl`, `resolveUrl`
 - Models générés : exports de `./models`
 
@@ -25,8 +25,8 @@ Options notables :
 - `mercure.connectionMode` : `'auto'` (défaut) ou `'single'`
 - `mercure.maxUrlLength` : seuil de découpage URL en mode `auto` (défaut `1900`)
 - `mercure.init` : options Mercure/EventSource (notamment `credentials`, sans effet sur HTTP si `http.withCredentials` est fourni)
-- `defaults` : headers/timeout/retries globaux
-- `singleFlight` : déduplication HTTP in-flight (`true` par défaut)
+- `defaults` : headers/timeout/retries appliqués aux requêtes du `baseUrl`
+- `singleFlight` : déduplication HTTP in-flight sur le `baseUrl` (`true` par défaut)
 - `debug` : logs runtime
 - `extraInterceptors` : interceptors Angular additionnels
 

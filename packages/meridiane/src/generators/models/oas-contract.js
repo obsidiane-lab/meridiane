@@ -1,15 +1,16 @@
 import { schemaNameFromRef } from './schema-utils.js';
 
 function resolveRefPointer(spec, ref) {
-  const s = String(ref || '');
-  if (!s.startsWith('#/')) return undefined;
-  const parts = s.slice(2).split('/').filter(Boolean);
-  let cur = spec;
-  for (const p of parts) {
-    if (!cur || typeof cur !== 'object') return undefined;
-    cur = cur[p];
+  const pointer = String(ref || '');
+  if (!pointer.startsWith('#/')) return undefined;
+
+  const segments = pointer.slice(2).split('/').filter(Boolean);
+  let current = spec;
+  for (const segment of segments) {
+    if (!current || typeof current !== 'object') return undefined;
+    current = current[segment];
   }
-  return cur;
+  return current;
 }
 
 function deref(spec, maybeRef) {
@@ -24,17 +25,16 @@ export function canonicalizeMediaType(mediaType) {
 
 function getContentSchema(content, wantedLower) {
   if (!content || typeof content !== 'object') return undefined;
-  for (const [k, v] of Object.entries(content)) {
-    const canon = canonicalizeMediaType(k);
-    if (canon === wantedLower) return v?.schema;
+  for (const [mediaType, definition] of Object.entries(content)) {
+    if (canonicalizeMediaType(mediaType) === wantedLower) return definition?.schema;
   }
   return undefined;
 }
 
 function is2xxStatus(code) {
-  const s = String(code || '');
-  if (/^[0-9]{3}$/.test(s)) return s.startsWith('2');
-  return /^2xx$/i.test(s);
+  const status = String(code || '');
+  if (/^[0-9]{3}$/.test(status)) return status.startsWith('2');
+  return /^2xx$/i.test(status);
 }
 
 /**
@@ -81,24 +81,24 @@ function listRootsFromPaths(spec, { mediaType } = {}) {
 
   for (const pathItem of Object.values(paths)) {
     if (!pathItem || typeof pathItem !== 'object') continue;
-    for (const [method, op0] of Object.entries(pathItem)) {
-      const op = deref(spec, op0);
-      if (!op || typeof op !== 'object') continue;
+    for (const [method, operationOrRef] of Object.entries(pathItem)) {
+      const operation = deref(spec, operationOrRef);
+      if (!operation || typeof operation !== 'object') continue;
 
       const isPatch = String(method || '').toLowerCase() === 'patch';
 
       if (!isPatch) {
-        const rb = deref(spec, op.requestBody);
-        const rbSchema = getContentSchema(rb?.content, wantedLower);
-        if (rbSchema) roots.push(rbSchema);
+        const requestBody = deref(spec, operation.requestBody);
+        const requestSchema = getContentSchema(requestBody?.content, wantedLower);
+        if (requestSchema) roots.push(requestSchema);
       }
 
-      const responses = op.responses;
+      const responses = operation.responses;
       if (!responses || typeof responses !== 'object') continue;
-      for (const [code, resp] of Object.entries(responses)) {
+      for (const [code, responseOrRef] of Object.entries(responses)) {
         if (!is2xxStatus(code) && String(code).toLowerCase() !== 'default') continue;
-        const resolved = deref(spec, resp);
-        const schema = getContentSchema(resolved?.content, wantedLower);
+        const response = deref(spec, responseOrRef);
+        const schema = getContentSchema(response?.content, wantedLower);
         if (schema) roots.push(schema);
       }
     }

@@ -26,32 +26,32 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
     this.connectionStatus = toSignal(this.realtime.status$(), {initialValue: 'closed'});
   }
 
-  getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>> {
-    return this.repo.getCollection$(query, opts);
+  getCollection$(query?: AnyQuery, options?: HttpCallOptions): Observable<Collection<T>> {
+    return this.repo.getCollection$(query, options);
   }
 
-  get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.get$(iri, opts);
+  get$(iri: IriRequired, options?: HttpCallOptions): Observable<T> {
+    return this.repo.get$(iri, options);
   }
 
-  patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.patch$(iri, changes, opts);
+  patch$(iri: IriRequired, changes: Partial<T>, options?: HttpCallOptions): Observable<T> {
+    return this.repo.patch$(iri, changes, options);
   }
 
-  post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.post$(payload, opts);
+  post$(payload: Partial<T>, options?: HttpCallOptions): Observable<T> {
+    return this.repo.post$(payload, options);
   }
 
-  put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
-    return this.repo.put$(iri, payload, opts);
+  put$(iri: IriRequired, payload: Partial<T>, options?: HttpCallOptions): Observable<T> {
+    return this.repo.put$(iri, payload, options);
   }
 
-  delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void> {
-    return this.repo.delete$(iri, opts);
+  delete$(iri: IriRequired, options?: HttpCallOptions): Observable<void> {
+    return this.repo.delete$(iri, options);
   }
 
-  request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
-    return this.repo.request$<R, B>(req);
+  request$<R = unknown, B = unknown>(request: HttpRequestConfig<B>): Observable<R> {
+    return this.repo.request$<R, B>(request);
   }
 
   /**

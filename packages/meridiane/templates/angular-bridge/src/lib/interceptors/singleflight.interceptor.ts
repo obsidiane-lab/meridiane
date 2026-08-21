@@ -1,48 +1,46 @@
-import {HttpEvent, HttpInterceptorFn, HttpRequest} from '@angular/common/http';
+import {HttpEvent, HttpHeaders, HttpInterceptorFn, HttpRequest} from '@angular/common/http';
 import {finalize, Observable, shareReplay} from 'rxjs';
 
-export type SingleFlightMode = 'off' | 'safe';
-
-const DEFAULT_MODE: SingleFlightMode = 'safe';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-export function createSingleFlightInterceptor(mode: SingleFlightMode = DEFAULT_MODE): HttpInterceptorFn {
-  const inflight = new Map<string, Observable<HttpEvent<unknown>>>();
+export function createSingleFlightInterceptor(): HttpInterceptorFn {
+  const inFlight = new Map<string, Observable<HttpEvent<unknown>>>();
 
-  return (req, next) => {
-    const method = req.method.toUpperCase();
-    if (mode === 'off' || !SAFE_METHODS.has(method) || req.reportProgress) {
-      return next(req);
+  return (request, next) => {
+    const method = request.method.toUpperCase();
+    if (!SAFE_METHODS.has(method) || request.reportProgress) {
+      return next(request);
     }
 
-    const key = computeKey(req);
-    const existing = inflight.get(key);
+    const key = computeKey(request);
+    const existing = inFlight.get(key);
     if (existing) {
       return existing;
     }
 
-    const shared$ = next(req).pipe(
-      finalize(() => inflight.delete(key)),
+    const shared$ = next(request).pipe(
+      finalize(() => inFlight.delete(key)),
       shareReplay({bufferSize: 1, refCount: true})
     );
 
-    inflight.set(key, shared$);
+    inFlight.set(key, shared$);
     return shared$;
   };
 }
 
-function computeKey(req: HttpRequest<unknown>): string {
-  const auth = req.headers.get('Authorization') ?? '';
-  const accept = req.headers.get('Accept') ?? '';
-  const contentType = req.headers.get('Content-Type') ?? '';
-  const creds = req.withCredentials ? '1' : '0';
+function computeKey(request: HttpRequest<unknown>): string {
   return [
-    req.method.toUpperCase(),
-    req.urlWithParams,
-    `rt=${req.responseType}`,
-    `wc=${creds}`,
-    `a=${auth}`,
-    `acc=${accept}`,
-    `ct=${contentType}`,
+    request.method.toUpperCase(),
+    request.urlWithParams,
+    `rt=${request.responseType}`,
+    `wc=${request.withCredentials ? '1' : '0'}`,
+    `h=${serializeHeaders(request.headers)}`,
   ].join('::');
+}
+
+function serializeHeaders(headers: HttpHeaders): string {
+  return headers.keys()
+    .sort((left, right) => left.localeCompare(right))
+    .map((name) => `${name.toLowerCase()}=${JSON.stringify(headers.getAll(name) ?? [])}`)
+    .join('&');
 }

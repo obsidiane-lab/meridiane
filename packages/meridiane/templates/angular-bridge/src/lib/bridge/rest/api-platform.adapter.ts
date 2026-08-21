@@ -23,51 +23,54 @@ export class ApiPlatformRestRepository<T extends Item> implements ResourceReposi
   ) {
   }
 
-  getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>> {
+  getCollection$(query?: AnyQuery, options?: HttpCallOptions): Observable<Collection<T>> {
     return this.http.get<Collection<T>>(this.resolveUrl(this.resourcePath), {
-      ...resolveHttpCallOptions(opts, this.httpWithCredentialsDefault),
+      ...resolveHttpCallOptions(options, this.httpWithCredentialsDefault),
       params: toHttpParams(query),
     });
   }
 
-  get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T> {
-    return this.http.get<T>(this.resolveUrl(iri), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
+  get$(iri: IriRequired, options?: HttpCallOptions): Observable<T> {
+    return this.http.get<T>(this.resolveUrl(iri), resolveHttpCallOptions(options, this.httpWithCredentialsDefault));
   }
 
-  post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+  post$(payload: Partial<T>, options?: HttpCallOptions): Observable<T> {
     return this.http.post<T>(
       this.resolveUrl(this.resourcePath),
       payload,
-      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
     );
   }
 
-  patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+  patch$(iri: IriRequired, changes: Partial<T>, options?: HttpCallOptions): Observable<T> {
     return this.http.patch<T>(
       this.resolveUrl(iri),
       changes,
-      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
     );
   }
 
-  put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T> {
+  put$(iri: IriRequired, payload: Partial<T>, options?: HttpCallOptions): Observable<T> {
     return this.http.put<T>(
       this.resolveUrl(iri),
       payload,
-      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
     );
   }
 
-  delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void> {
-    return this.http.delete<void>(this.resolveUrl(iri), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
+  delete$(iri: IriRequired, options?: HttpCallOptions): Observable<void> {
+    return this.http.delete<void>(
+      this.resolveUrl(iri),
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
+    );
   }
 
-  request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
+  request$<R = unknown, B = unknown>(request: HttpRequestConfig<B>): Observable<R> {
     // Low-level escape hatch for non-standard endpoints (custom controllers, uploads, etc.).
-    const {method, url} = req;
+    const {method, url} = request;
 
     const targetUrl = this.resolveUrl(url ?? this.resourcePath);
-    const mergedOptions = buildHttpRequestOptions(req, {withCredentialsDefault: this.httpWithCredentialsDefault});
+    const mergedOptions = buildHttpRequestOptions(request, {withCredentialsDefault: this.httpWithCredentialsDefault});
     return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
   }
 

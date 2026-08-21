@@ -51,19 +51,19 @@ export interface HttpCallOptions {
 }
 
 export interface ResourceRepository<T> {
-  getCollection$(query?: AnyQuery, opts?: HttpCallOptions): Observable<Collection<T>>;
+  getCollection$(query?: AnyQuery, options?: HttpCallOptions): Observable<Collection<T>>;
 
-  get$(iri: IriRequired, opts?: HttpCallOptions): Observable<T>;
+  get$(iri: IriRequired, options?: HttpCallOptions): Observable<T>;
 
-  post$(payload: Partial<T>, opts?: HttpCallOptions): Observable<T>;
+  post$(payload: Partial<T>, options?: HttpCallOptions): Observable<T>;
 
-  patch$(iri: IriRequired, changes: Partial<T>, opts?: HttpCallOptions): Observable<T>;
+  patch$(iri: IriRequired, changes: Partial<T>, options?: HttpCallOptions): Observable<T>;
 
-  put$(iri: IriRequired, payload: Partial<T>, opts?: HttpCallOptions): Observable<T>;
+  put$(iri: IriRequired, payload: Partial<T>, options?: HttpCallOptions): Observable<T>;
 
-  delete$(iri: IriRequired, opts?: HttpCallOptions): Observable<void>;
+  delete$(iri: IriRequired, options?: HttpCallOptions): Observable<void>;
 
-  request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R>;
+  request$<R = unknown, B = unknown>(request: HttpRequestConfig<B>): Observable<R>;
 }
 
 export interface HttpRequestConfig<TBody = unknown> {

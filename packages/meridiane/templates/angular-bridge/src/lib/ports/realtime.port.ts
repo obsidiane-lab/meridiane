@@ -1,8 +1,8 @@
 import {Observable} from 'rxjs';
 import {Iri} from './resource-repository.port';
-import {WatchConnectionOptions} from '../bridge.types';
+import {RealtimeConnectionStatus, RealtimeDiagnostics, WatchConnectionOptions} from '../bridge.types';
 
-export type RealtimeStatus = 'connecting' | 'connected' | 'closed';
+export type RealtimeStatus = RealtimeConnectionStatus;
 
 export interface SseEvent {
   type: string;
@@ -64,4 +64,8 @@ export interface RealtimePort {
   unsubscribe(iris: Iri[]): void;
 
   status$(): Observable<RealtimeStatus>;
+}
+
+export interface RealtimeDiagnosticsPort extends RealtimePort {
+  diagnostics$(): Observable<RealtimeDiagnostics>;
 }

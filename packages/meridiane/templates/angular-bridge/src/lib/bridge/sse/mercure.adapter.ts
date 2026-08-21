@@ -1,6 +1,6 @@
-import {Inject, Injectable, OnDestroy, Optional, PLATFORM_ID} from '@angular/core';
-import {defer, EMPTY, fromEvent, Observable, of, Subject} from 'rxjs';
-import {auditTime, concatMap, filter, finalize, map, share, takeUntil} from 'rxjs/operators';
+import {inject, Injectable, OnDestroy, PLATFORM_ID} from '@angular/core';
+import {defer, EMPTY, fromEvent, Observable, Subject} from 'rxjs';
+import {auditTime, filter, finalize, map, takeUntil} from 'rxjs/operators';
 import {
   API_BASE_URL,
   BRIDGE_LOGGER,
@@ -11,13 +11,10 @@ import {
   MERCURE_TOPIC_MODE,
 } from '../../tokens';
 import {
-  BridgeLogger,
-  MercureConnectionMode,
-  MercureTopicMode,
   RealtimeDiagnostics,
   WatchConnectionOptions,
 } from '../../bridge.types';
-import {RealtimeEvent, RealtimePort, RealtimeStatus, SubscribeFilter} from '../../ports/realtime.port';
+import {RealtimeDiagnosticsPort, RealtimeEvent, RealtimeStatus, SubscribeFilter} from '../../ports/realtime.port';
 import {Iri, Item} from '../../ports/resource-repository.port';
 import {isPlatformBrowser} from '@angular/common';
 import {RefCountTopicRegistry} from './ref-count-topic.registry';
@@ -44,52 +41,43 @@ type DedicatedSubscriptionClaim = {
 };
 
 @Injectable({providedIn: 'root'})
-export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
-  private readonly connectionMode: MercureConnectionMode;
-
-  private readonly topicsRegistry = new RefCountTopicRegistry();
-  private readonly topicMapper: MercureTopicMapper;
-  private readonly connectionManager: MercureConnectionManager;
-  private readonly sharedClaims = new SubscriptionClaims<SharedSubscriptionClaim>();
-  private readonly dedicatedClaims = new SubscriptionClaims<DedicatedSubscriptionClaim>();
+export class MercureRealtimeAdapter implements RealtimeDiagnosticsPort, OnDestroy {
+  private readonly apiBase = inject(API_BASE_URL);
+  private readonly withCredentials = inject(BRIDGE_MERCURE_WITH_CREDENTIALS);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly hubUrl = inject(MERCURE_HUB_URL, {optional: true}) ?? undefined;
+  private readonly topicMode = inject(MERCURE_TOPIC_MODE, {optional: true}) ?? 'url';
+  private readonly connectionMode = inject(MERCURE_CONNECTION_MODE, {optional: true}) ?? 'auto';
+  private readonly maxUrlLength = normalizeMaxUrlLength(
+    inject(MERCURE_MAX_URL_LENGTH, {optional: true}),
+    1900
+  );
+  private readonly logger = inject(BRIDGE_LOGGER, {optional: true}) ?? undefined;
 
   private readonly destroy$ = new Subject<void>();
   private readonly sharedRebuild$ = new Subject<void>();
+  private readonly incoming$ = new Subject<IncomingMessage>();
   private shuttingDown = false;
   private sequence = 0;
 
-  private readonly incoming$ = new Subject<IncomingMessage>();
+  private readonly topicsRegistry = new RefCountTopicRegistry();
+  private readonly topicMapper = new MercureTopicMapper(this.apiBase, this.topicMode);
+  private readonly connectionManager = new MercureConnectionManager({
+    hubUrl: this.hubUrl,
+    withCredentials: this.withCredentials,
+    mode: this.connectionMode,
+    maxUrlLength: this.maxUrlLength,
+    logger: this.logger,
+    destroy$: this.destroy$,
+    nextId: (prefix) => `${prefix}-${++this.sequence}`,
+  });
+  private readonly sharedClaims = new SubscriptionClaims<SharedSubscriptionClaim>();
+  private readonly dedicatedClaims = new SubscriptionClaims<DedicatedSubscriptionClaim>();
 
-  constructor(
-    @Inject(API_BASE_URL) apiBase: string,
-    @Inject(BRIDGE_MERCURE_WITH_CREDENTIALS) mercureWithCredentials: boolean,
-    @Inject(PLATFORM_ID) platformId: object,
-    @Optional() @Inject(MERCURE_HUB_URL) private readonly hubUrl?: string,
-    @Optional() @Inject(MERCURE_TOPIC_MODE) topicMode?: MercureTopicMode,
-    @Optional() @Inject(MERCURE_CONNECTION_MODE) connectionMode?: MercureConnectionMode | null,
-    @Optional() @Inject(MERCURE_MAX_URL_LENGTH) maxUrlLength?: number | null,
-    @Optional() @Inject(BRIDGE_LOGGER) private readonly logger?: BridgeLogger,
-  ) {
-    this.connectionMode = connectionMode ?? 'auto';
-    this.topicMapper = new MercureTopicMapper(apiBase, topicMode ?? 'url');
-    this.connectionManager = new MercureConnectionManager({
-      hubUrl,
-      withCredentials: mercureWithCredentials,
-      mode: this.connectionMode,
-      maxUrlLength: normalizeMaxUrlLength(maxUrlLength, 1900),
-      logger,
-      destroy$: this.destroy$,
-      nextId: (prefix) => `${prefix}-${++this.sequence}`,
-    });
+  constructor() {
+    this.sharedRebuild$.pipe(auditTime(10)).subscribe(() => this.rebuildSharedConnections());
 
-    this.sharedRebuild$
-      .pipe(
-        auditTime(10),
-        concatMap(() => this.rebuildSharedConnectionsOnce$()),
-      )
-      .subscribe();
-
-    if (isPlatformBrowser(platformId)) {
+    if (isPlatformBrowser(this.platformId)) {
       fromEvent<PageTransitionEvent>(window, 'pagehide')
         .pipe(takeUntil(this.destroy$))
         .subscribe(() => this.shutdownBeforeExit());
@@ -99,8 +87,6 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
         .subscribe(() => this.shutdownBeforeExit());
     }
   }
-
-  // ──────────────── API publique ────────────────
 
   status$(): Observable<RealtimeStatus> {
     return this.connectionManager.status$;
@@ -140,8 +126,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
           const iri = typeof rawId === 'string' ? rawId : topic;
           return {topic, iri, data: payload as T} as RealtimeEvent<T>;
         }),
-        filter((e): e is RealtimeEvent<T> => !!e),
-        share()
+        filter((event): event is RealtimeEvent<T> => event !== undefined)
       );
     });
   }
@@ -166,8 +151,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
           const rawId = payload['@id'];
           const iri = typeof rawId === 'string' ? rawId : '';
           return {iri, data: payload as T} as RealtimeEvent<T>;
-        }),
-        share()
+        })
       );
     });
   }
@@ -190,7 +174,7 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     this.logger?.warn?.('[Mercure] unsubscribe ignored: no matching active claim for topics', {topics});
   }
 
-  public shutdownBeforeExit(): void {
+  shutdownBeforeExit(): void {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
     this.teardownAllConnections();
@@ -204,8 +188,6 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     this.destroy$.complete();
     this.sharedRebuild$.complete();
   }
-
-  // ───────────────── PRIVATE ─────────────────
 
   private buildIncomingStream$(topics: string[], options?: WatchConnectionOptions): Observable<IncomingMessage> {
     const useDedicatedConnection = this.connectionMode === 'single' || options?.newConnection === true;
@@ -242,8 +224,8 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
 
       try {
         this.connectionManager.openDedicated(groupId, uniqueTopics, incoming);
-      } catch (err) {
-        this.logger?.error?.('[Mercure] dedicated connection setup failed:', err);
+      } catch (error) {
+        this.logger?.error?.('[Mercure] dedicated connection setup failed:', error);
         this.releaseDedicatedClaim(claim.id);
         return EMPTY;
       }
@@ -262,23 +244,19 @@ export class MercureRealtimeAdapter implements RealtimePort, OnDestroy {
     this.sharedRebuild$.next();
   }
 
-  private rebuildSharedConnectionsOnce$(): Observable<void> {
-    return defer(() => {
-      if (this.shuttingDown) return of(void 0);
+  private rebuildSharedConnections(): void {
+    if (this.shuttingDown) return;
 
-      try {
-        if (!this.hubUrl || !this.topicsRegistry.hasAny()) {
-          this.connectionManager.closeShared();
-          return of(void 0);
-        }
-
-        this.connectionManager.reconcileShared(this.topicsRegistry.snapshot(), this.incoming$);
-      } catch (err) {
-        this.logger?.error?.('[Mercure] shared rebuild failed:', err);
+    try {
+      if (!this.hubUrl || !this.topicsRegistry.hasAny()) {
+        this.connectionManager.closeShared();
+        return;
       }
 
-      return of(void 0);
-    });
+      this.connectionManager.reconcileShared(this.topicsRegistry.snapshot(), this.incoming$);
+    } catch (error) {
+      this.logger?.error?.('[Mercure] shared rebuild failed:', error);
+    }
   }
 
   private createSharedClaim(topics: string[]): SharedSubscriptionClaim {

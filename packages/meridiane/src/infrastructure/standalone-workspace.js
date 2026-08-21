@@ -5,13 +5,13 @@ import { createRequire } from 'node:module';
 import { runCommand } from './exec.js';
 import { writeJsonIfChanged } from './json.js';
 
-async function ensureDir(p) {
-  await fs.mkdir(p, { recursive: true });
+async function ensureDirectory(directory) {
+  await fs.mkdir(directory, { recursive: true });
 }
 
-async function exists(p) {
+async function exists(filePath) {
   try {
-    await fs.stat(p);
+    await fs.stat(filePath);
     return true;
   } catch {
     return false;
@@ -19,16 +19,15 @@ async function exists(p) {
 }
 
 function toolchainPackageJson({ angularVersion, ngPackagrVersion, typescriptVersion, rxjsVersion, tslibVersion }) {
-  const v = angularVersion;
   return {
     name: 'meridiane-standalone-workspace',
     private: true,
     description: 'Temporary workspace created by @obsidiane/meridiane (standalone build).',
     devDependencies: {
-      '@angular/common': v,
-      '@angular/compiler': v,
-      '@angular/compiler-cli': v,
-      '@angular/core': v,
+      '@angular/common': angularVersion,
+      '@angular/compiler': angularVersion,
+      '@angular/compiler-cli': angularVersion,
+      '@angular/core': angularVersion,
       'ng-packagr': ngPackagrVersion,
       rxjs: rxjsVersion,
       tslib: tslibVersion,
@@ -62,8 +61,8 @@ export async function ensureStandaloneWorkspace({ repoRoot, log }) {
   const distRoot = path.join(repoRoot, 'dist');
   const workspaceRoot = path.join(distRoot, '.meridiane-workspace');
 
-  await ensureDir(distRoot);
-  await ensureDir(workspaceRoot);
+  await ensureDirectory(distRoot);
+  await ensureDirectory(workspaceRoot);
 
   const detected = await detectToolchainVersions(repoRoot);
   const angularVersion = detected.angularVersion ?? '21.1.4';
@@ -80,7 +79,7 @@ export async function ensureStandaloneWorkspace({ repoRoot, log }) {
   await writeJsonIfChanged(path.join(workspaceRoot, 'tsconfig.json'), rootTsconfigJson());
 
   const npmCacheDir = path.join(workspaceRoot, '.npm-cache');
-  await ensureDir(npmCacheDir);
+  await ensureDirectory(npmCacheDir);
 
   const requireFromWs = createRequire(path.join(workspaceRoot, 'package.json'));
 
@@ -88,26 +87,29 @@ export async function ensureStandaloneWorkspace({ repoRoot, log }) {
 }
 
 async function detectToolchainVersions(repoRoot) {
-  const pkgPath = path.join(repoRoot, 'package.json');
+  const packageJsonPath = path.join(repoRoot, 'package.json');
   try {
-    const raw = await fs.readFile(pkgPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    const angularVersion = readDependencyVersion(parsed, '@angular/core');
-    const ngPackagrVersion = readDependencyVersion(parsed, 'ng-packagr');
-    const typescriptVersion = readDependencyVersion(parsed, 'typescript');
-    const rxjsVersion = readDependencyVersion(parsed, 'rxjs');
-    const tslibVersion = readDependencyVersion(parsed, 'tslib');
+    const content = await fs.readFile(packageJsonPath, 'utf8');
+    const packageJson = JSON.parse(content);
+    const angularVersion = readDependencyVersion(packageJson, '@angular/core');
+    const ngPackagrVersion = readDependencyVersion(packageJson, 'ng-packagr');
+    const typescriptVersion = readDependencyVersion(packageJson, 'typescript');
+    const rxjsVersion = readDependencyVersion(packageJson, 'rxjs');
+    const tslibVersion = readDependencyVersion(packageJson, 'tslib');
     return { angularVersion, ngPackagrVersion, typescriptVersion, rxjsVersion, tslibVersion };
   } catch {
     return {};
   }
 }
 
-function readDependencyVersion(pkg, depName) {
-  const deps = pkg?.dependencies || {};
-  const devDeps = pkg?.devDependencies || {};
-  const peerDeps = pkg?.peerDependencies || {};
-  const value = deps[depName] ?? devDeps[depName] ?? peerDeps[depName];
+function readDependencyVersion(packageJson, dependencyName) {
+  const dependencies = packageJson?.dependencies || {};
+  const devDependencies = packageJson?.devDependencies || {};
+  const peerDependencies = packageJson?.peerDependencies || {};
+  const value =
+    dependencies[dependencyName] ??
+    devDependencies[dependencyName] ??
+    peerDependencies[dependencyName];
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
@@ -127,9 +129,9 @@ function deriveToolchainDefaultsFromAngular(angularVersion) {
 
 export async function ensureToolchainInstalled({ workspaceRoot, requireFromWs, npmCacheDir, log }) {
   // Prefer using existing (hoisted) deps during local dev; in CI this will trigger installation.
-  const canResolve = (id) => {
+  const canResolve = (packageId) => {
     try {
-      requireFromWs.resolve(id);
+      requireFromWs.resolve(packageId);
       return true;
     } catch {
       return false;
@@ -150,9 +152,9 @@ export async function ensureToolchainInstalled({ workspaceRoot, requireFromWs, n
   };
 
   // We avoid generating a lockfile in the backend repo by keeping everything under dist/.
-  const npmCmd = 'npm';
+  const npmCommand = 'npm';
   const args = ['install', '--silent', '--no-progress'];
-  const code = await runCommand(npmCmd, args, { cwd: workspaceRoot, env });
+  const code = await runCommand(npmCommand, args, { cwd: workspaceRoot, env });
 
   if (code !== 0) throw new Error(`Toolchain install failed (npm exit ${code})`);
   if (!(await exists(path.join(workspaceRoot, 'node_modules')))) {

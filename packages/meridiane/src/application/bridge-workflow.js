@@ -2,8 +2,8 @@ import process from 'node:process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
+import { generateBridgeWorkspace } from './generate-bridge.js';
 import { readOpenApiSpec } from '../infrastructure/spec-loader.js';
-import { generateBridgeWorkspace } from '../infrastructure/generate/bridge.js';
 import { ensureStandaloneWorkspace, ensureToolchainInstalled } from '../infrastructure/standalone-workspace.js';
 import { ExitCodeError, runCommand } from '../infrastructure/exec.js';
 
@@ -28,15 +28,7 @@ export async function runBridgeWorkflow({
   const { workspaceRoot, distRoot, npmCacheDir, requireFromWs } = await ensureStandaloneWorkspace({ repoRoot, log });
   log?.info?.(`workspace: ${workspaceRoot}`);
 
-  let resolvedSpec = spec;
-  if (!noModels) {
-    if (!resolvedSpec) {
-      if (!specSource) throw new Error('Missing --spec (url or JSON file path)');
-      log?.step?.('lecture de la spec OpenAPI');
-      resolvedSpec = await readOpenApiSpec(specSource);
-      log?.success?.('spec chargée');
-    }
-  }
+  const resolvedSpec = await loadSpecIfNeeded({ noModels, spec, specSource, log });
 
   await ensureToolchainInstalled({ workspaceRoot, requireFromWs, npmCacheDir, log });
 
@@ -84,6 +76,16 @@ export async function runBridgeWorkflow({
   if (packCode !== 0) throw new ExitCodeError(`npm pack failed (exit ${packCode})`, packCode);
 
   return { workspaceRoot, distRoot, distDir, npmCacheDir };
+}
+
+async function loadSpecIfNeeded({ noModels, spec, specSource, log }) {
+  if (noModels || spec) return spec;
+  if (!specSource) throw new Error('Missing --spec (url or JSON file path)');
+
+  log?.step?.('lecture de la spec OpenAPI');
+  const loadedSpec = await readOpenApiSpec(specSource);
+  log?.success?.('spec chargée');
+  return loadedSpec;
 }
 
 async function cleanupPackedTarballs(distDir) {

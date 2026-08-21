@@ -7,7 +7,7 @@ import {buildHttpRequestOptions, resolveHttpCallOptions} from '../bridge/rest/ht
 import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
 import {API_BASE_URL, BRIDGE_HTTP_WITH_CREDENTIALS} from '../tokens';
 import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, IriRequired, Item} from '../ports/resource-repository.port';
-import {SubscribeFilter} from '../ports/realtime.port';
+import {RealtimeDiagnosticsPort, SubscribeFilter} from '../ports/realtime.port';
 import {resolveUrl} from '../utils/url';
 import {toIriList} from '../utils/iri';
 import {RealtimeDiagnostics, WatchConnectionOptions} from '../bridge.types';
@@ -36,66 +36,68 @@ export type WatchSubscriptionOptions = WatchConnectionOptions;
 export class BridgeFacade {
   constructor(
     private readonly http: HttpClient,
-    private readonly realtime: MercureRealtimeAdapter,
+    @Inject(MercureRealtimeAdapter) private readonly realtime: RealtimeDiagnosticsPort,
     @Inject(API_BASE_URL) private readonly apiBase: string,
     @Inject(BRIDGE_HTTP_WITH_CREDENTIALS) private readonly httpWithCredentialsDefault: boolean,
   ) {
   }
 
-  // ──────────────── HTTP ────────────────
-
-  get$<R = unknown>(url: IriRequired, opts?: HttpCallOptions): Observable<R> {
-    return this.http.get<R>(this.resolveUrl(url), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
+  get$<R = unknown>(url: IriRequired, options?: HttpCallOptions): Observable<R> {
+    return this.http.get<R>(
+      this.resolveUrl(url),
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
+    );
   }
 
   getCollection$<T extends Item = Item>(
     url: IriRequired,
     query?: AnyQuery,
-    opts?: HttpCallOptions
+    options?: HttpCallOptions
   ): Observable<Collection<T>> {
     return this.http.get<Collection<T>>(this.resolveUrl(url), {
-      ...resolveHttpCallOptions(opts, this.httpWithCredentialsDefault),
+      ...resolveHttpCallOptions(options, this.httpWithCredentialsDefault),
       params: toHttpParams(query),
     });
   }
 
-  post$<R = unknown, B = unknown>(url: IriRequired, payload: B, opts?: HttpCallOptions): Observable<R> {
+  post$<R = unknown, B = unknown>(url: IriRequired, payload: B, options?: HttpCallOptions): Observable<R> {
     return this.http.post<R>(
       this.resolveUrl(url),
       payload,
-      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
     );
   }
 
-  patch$<R = unknown, B = unknown>(url: IriRequired, changes: B, opts?: HttpCallOptions): Observable<R> {
+  patch$<R = unknown, B = unknown>(url: IriRequired, changes: B, options?: HttpCallOptions): Observable<R> {
     return this.http.patch<R>(
       this.resolveUrl(url),
       changes,
-      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
     );
   }
 
-  put$<R = unknown, B = unknown>(url: IriRequired, payload: B, opts?: HttpCallOptions): Observable<R> {
+  put$<R = unknown, B = unknown>(url: IriRequired, payload: B, options?: HttpCallOptions): Observable<R> {
     return this.http.put<R>(
       this.resolveUrl(url),
       payload,
-      resolveHttpCallOptions(opts, this.httpWithCredentialsDefault)
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
     );
   }
 
-  delete$(url: IriRequired, opts?: HttpCallOptions): Observable<void> {
-    return this.http.delete<void>(this.resolveUrl(url), resolveHttpCallOptions(opts, this.httpWithCredentialsDefault));
+  delete$(url: IriRequired, options?: HttpCallOptions): Observable<void> {
+    return this.http.delete<void>(
+      this.resolveUrl(url),
+      resolveHttpCallOptions(options, this.httpWithCredentialsDefault)
+    );
   }
 
-  request$<R = unknown, B = unknown>(req: HttpRequestConfig<B>): Observable<R> {
-    const {method, url} = req;
+  request$<R = unknown, B = unknown>(request: HttpRequestConfig<B>): Observable<R> {
+    const {method, url} = request;
     const targetUrl = this.resolveUrl(url);
 
-    const mergedOptions = buildHttpRequestOptions(req, {withCredentialsDefault: this.httpWithCredentialsDefault});
+    const mergedOptions = buildHttpRequestOptions(request, {withCredentialsDefault: this.httpWithCredentialsDefault});
     return this.http.request<R>(method, targetUrl, mergedOptions as {observe: 'body'});
   }
-
-  // ──────────────── SSE / Mercure ────────────────
 
   watch$<T = Item>(
     iri: Iri | Iri[],
@@ -127,12 +129,14 @@ export class BridgeFacade {
   watchTypes$<R extends Record<string, any>>(
     iri: Iri | Iri[],
     resourceTypes: (keyof R & string)[],
-    cfg?: WatchTypesConfig,
+    config?: WatchTypesConfig,
     options?: WatchSubscriptionOptions
   ): Observable<WatchTypesResult<R>> {
     const iris = toIriList(iri);
-    const discriminator = cfg?.discriminator ?? '@type';
-    const allowedTypes = new Set(resourceTypes.filter((v): v is string => typeof v === 'string' && v.length > 0));
+    const discriminator = config?.discriminator ?? '@type';
+    const allowedTypes = new Set(
+      resourceTypes.filter((type): type is string => typeof type === 'string' && type.length > 0)
+    );
 
     return this.realtime
       .subscribeAll$<unknown>(iris, options)
@@ -147,7 +151,7 @@ export class BridgeFacade {
           const key = resolvedType as keyof R & string;
           return {resourceType: key, payload: raw as R[keyof R]} as WatchTypesResult<R>;
         }),
-        filter((evt): evt is WatchTypesResult<R> => !!evt),
+        filter((event): event is WatchTypesResult<R> => !!event),
         share()
       );
   }
@@ -166,9 +170,9 @@ export class BridgeFacade {
   }
 }
 
-function readDiscriminator(raw: unknown, discriminator: string): string | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const value = (raw as Record<string, unknown>)[discriminator];
+function readDiscriminator(payload: unknown, discriminator: string): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const value = (payload as Record<string, unknown>)[discriminator];
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) {
     const first = value.find((v) => typeof v === 'string');

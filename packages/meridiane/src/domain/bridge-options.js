@@ -23,13 +23,12 @@ function normalizeVersion(version) {
   return raw || '0.0.0';
 }
 
-function normalizeNamedOptions(mode, packageName, opts) {
+function normalizeNamedOptions(packageName, opts) {
   const common = normalizeCommonOptions(opts);
   const normalizedPackageName = String(packageName || '').trim();
   if (!normalizedPackageName) throw new Error('Missing packageName');
 
   return {
-    mode,
     packageName: normalizedPackageName,
     libName: deriveLibName(normalizedPackageName),
     version: normalizeVersion(opts?.version),
@@ -43,12 +42,12 @@ function normalizeNamedOptions(mode, packageName, opts) {
 }
 
 export function normalizeBuildOptions(packageName, opts) {
-  return normalizeNamedOptions('build', packageName, opts);
+  return normalizeNamedOptions(packageName, opts);
 }
 
 export function normalizeGenerateOptions(packageName, opts) {
   return {
-    ...normalizeNamedOptions('generate', packageName, opts),
+    ...normalizeNamedOptions(packageName, opts),
     outDir: typeof opts?.out === 'string' ? opts.out.trim() : '',
   };
 }
@@ -59,7 +58,6 @@ export function normalizeDevOptions(packageName, opts) {
   const effectivePackageName = String(packageName ?? SANDBOX_PACKAGE_NAME).trim();
 
   return {
-    mode: 'dev',
     useSandboxDefaults,
     packageName: effectivePackageName,
     libName: deriveLibName(effectivePackageName),

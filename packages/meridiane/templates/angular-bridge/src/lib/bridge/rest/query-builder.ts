@@ -1,14 +1,14 @@
 import {HttpParams} from '@angular/common/http';
 import {AnyQuery, Query, QueryParamValue} from '../../ports/resource-repository.port';
 
-export function toHttpParams(q: AnyQuery | undefined): HttpParams {
-  if (!q) return new HttpParams();
-  if (q instanceof HttpParams) return q;
+export function toHttpParams(query: AnyQuery | undefined): HttpParams {
+  if (!query) return new HttpParams();
+  if (query instanceof HttpParams) return query;
 
   const fromObject: Record<string, string | string[]> = {};
 
   const consumed = new Set<string>();
-  const maybeQuery = q as Query;
+  const maybeQuery = query as Query;
   if (maybeQuery.page != null) {
     fromObject['page'] = String(maybeQuery.page);
     consumed.add('page');
@@ -18,16 +18,16 @@ export function toHttpParams(q: AnyQuery | undefined): HttpParams {
     consumed.add('itemsPerPage');
   }
 
-  if (q.filters) {
+  if (query.filters) {
     consumed.add('filters');
-    for (const [k, v] of Object.entries(q.filters)) {
-      assign(fromObject, k, v);
+    for (const [key, value] of Object.entries(query.filters)) {
+      assign(fromObject, key, value);
     }
   }
 
-  for (const [k, v] of Object.entries(q as Record<string, QueryParamValue>)) {
-    if (consumed.has(k)) continue;
-    assign(fromObject, k, v);
+  for (const [key, value] of Object.entries(query as Record<string, QueryParamValue>)) {
+    if (consumed.has(key)) continue;
+    assign(fromObject, key, value);
   }
 
   return new HttpParams({fromObject});

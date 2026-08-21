@@ -6,6 +6,7 @@ import {createAuthInterceptors} from './interceptors/bearer-auth.interceptor';
 import {bridgeDebugInterceptor} from './interceptors/bridge-debug.interceptor';
 import {bridgeDefaultsInterceptor} from './interceptors/bridge-defaults.interceptor';
 import {contentTypeInterceptor} from './interceptors/content-type.interceptor';
+import {scopeInterceptor} from './interceptors/scoped.interceptor';
 import {createSingleFlightInterceptor} from './interceptors/singleflight.interceptor';
 import {
   API_BASE_URL,
@@ -22,7 +23,7 @@ import {
 export type {BridgeAuth, BridgeHttpOptions, BridgeMercureOptions, BridgeOptions} from './bridge-options';
 
 /** Registers the bridge HTTP client, interceptors, Mercure realtime adapter and configuration tokens. */
-export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
+export function provideBridge(options: BridgeOptions): EnvironmentProviders {
   const {
     baseUrl,
     auth,
@@ -32,7 +33,7 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
     singleFlight = true,
     debug = false,
     extraInterceptors = [],
-  } = opts;
+  } = options;
 
   if (!baseUrl) {
     throw new Error("provideBridge(): missing 'baseUrl'");
@@ -47,13 +48,14 @@ export function provideBridge(opts: BridgeOptions): EnvironmentProviders {
   const httpWithCredentials = http?.withCredentials ?? mercureWithCredentials;
 
   const loggerProvider: BridgeLogger = createBridgeLogger(debug);
+  const scopeToBridge = (interceptor: HttpInterceptorFn) => scopeInterceptor(baseUrl, interceptor);
 
   const interceptors: HttpInterceptorFn[] = [
-    contentTypeInterceptor,
-    bridgeDefaultsInterceptor,
+    scopeToBridge(contentTypeInterceptor),
+    scopeToBridge(bridgeDefaultsInterceptor),
     ...createAuthInterceptors(auth, baseUrl),
-    ...(singleFlight ? [createSingleFlightInterceptor('safe')] : [createSingleFlightInterceptor('off')]),
-    ...(debug ? [bridgeDebugInterceptor] : []),
+    ...(singleFlight ? [scopeToBridge(createSingleFlightInterceptor())] : []),
+    ...(debug ? [scopeToBridge(bridgeDebugInterceptor)] : []),
     ...extraInterceptors,
   ];
 

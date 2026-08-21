@@ -67,6 +67,10 @@ export class AppModule {}
 - `debug` (logs runtime) ;
 - `extraInterceptors` (interceptors Angular additionnels).
 
+Les comportements HTTP internes du bridge s'appliquent uniquement aux requêtes
+appartenant à l'origine et au chemin de `baseUrl`. Les interceptors personnalisés
+restent responsables de leur propre périmètre.
+
 ### Cookies / `withCredentials`
 
 Le bridge peut envoyer des cookies (sessions) côté HTTP et SSE.

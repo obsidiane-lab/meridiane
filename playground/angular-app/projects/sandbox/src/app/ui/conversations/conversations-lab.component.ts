@@ -204,10 +204,6 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   unwatchAll() {
     this.watchAllSub?.unsubscribe();
     this.watchAllSub = undefined;
-    const iris = this.conversations()
-      .map((c) => c['@id'])
-      .filter((x): x is IriRequired => typeof x === 'string' && x.length > 0);
-    this.conversationsRepo.unwatch(iris);
   }
 
   select(c: Conversation) {
@@ -258,12 +254,8 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   }
 
   unwatchOne() {
-    const id = this.selectedId();
-    if (id) {
-      this.watchOneSub?.unsubscribe();
-      this.watchOneSub = undefined;
-      this.conversationsRepo.unwatch(id as IriRequired);
-    }
+    this.watchOneSub?.unsubscribe();
+    this.watchOneSub = undefined;
   }
 
   manualGet() {
