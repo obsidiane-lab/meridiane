@@ -1,0 +1,31 @@
+<section class="panel">
+  <h1 style="margin:0 0 6px; font-size: 18px;">Realtime Lab</h1>
+  <p class="muted">
+    Chaque ressource écoutée ajoute un <code>match_urlpattern</code> à l'unique connexion Mercure.
+    Charger plus d'entités ne change pas la connexion ; seuls l'ajout et le retrait d'une ressource la rouvrent (reprise via <code>last_event_id</code>).
+  </p>
+
+  <div class="toolbar" style="gap: 8px; flex-wrap: wrap;">
+    @for (resource of resources; track resource.name) {
+      <button class="btn" type="button" [class.btn--primary]="!!resource.subscription" (click)="toggle(resource)">
+        {{ resource.subscription ? 'Unwatch' : 'Watch' }} {{ resource.name }}
+      </button>
+    }
+  </div>
+
+  <div class="grid grid--2" style="margin-top: 12px;">
+    <app-json-viewer title="Diagnostics" [value]="diagnostics() ?? null"/>
+
+    <section class="card">
+      <h3>Événements reçus</h3>
+      @if (events().length === 0) {
+        <p class="muted">Aucun événement. Modifiez une entité écoutée (autre onglet, API docs…).</p>
+      }
+      <ul class="list">
+        @for (event of events(); track $index) {
+          <li><code>{{ formatTime(event.t) }}</code> {{ event.resource }} <strong>{{ event.kind }}</strong> {{ event.iri }}</li>
+        }
+      </ul>
+    </section>
+  </div>
+</section>

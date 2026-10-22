@@ -2,17 +2,14 @@ import {inject, Injectable, Signal} from '@angular/core';
 import {tap} from 'rxjs/operators';
 import {Observable} from 'rxjs';
 
-import {AnyQuery, Collection, FacadeFactory, IriRequired, ResourceFacade, WatchConnectionOptions} from '@obsidiane/bridge-sandbox';
+import {AnyQuery, Collection, FacadeFactory, IriRequired, ResourceEvent, ResourceFacade} from '@obsidiane/bridge-sandbox';
 
-import type {ConversationConversationRead as Conversation, MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
-import {BACKEND_BASE_URL} from '../../core/backend';
+import type {Conversation} from '@obsidiane/bridge-sandbox';
 import {ConversationStore} from '../stores/conversation.store';
-import {MessageStore} from '../stores/message.store';
 
 @Injectable({providedIn: 'root'})
 export class ConversationRepository {
   private readonly store = inject(ConversationStore);
-  private readonly messageStore = inject(MessageStore);
   private readonly facadeFactory = inject(FacadeFactory);
 
   private readonly facade: ResourceFacade<Conversation> = this.facadeFactory.create<Conversation>({url: '/api/conversations'});
@@ -25,7 +22,7 @@ export class ConversationRepository {
 
   fetchAll$(query?: AnyQuery): Observable<Collection<Conversation>> {
     return this.facade.getCollection$(query).pipe(
-      tap((col) => this.store.setAll(col.member)),
+      tap((col) => this.store.upsertMany(col.member)),
     );
   }
 
@@ -45,35 +42,8 @@ export class ConversationRepository {
     return this.facade.delete$(iri).pipe(tap(() => this.store.remove(iri)));
   }
 
-  watch$(iris: IriRequired | IriRequired[], options?: WatchConnectionOptions): Observable<Conversation> {
-    return this.facade.watch$(iris, options).pipe(tap((c) => this.store.upsert(c)));
-  }
-
-  unwatch(iris: IriRequired | IriRequired[]): void {
-    this.facade.unwatch(iris);
-  }
-
-  watchMessages$(conversationIri: IriRequired, options?: WatchConnectionOptions): Observable<Message> {
-    const topics = this.topicsForConversationIri(conversationIri);
-    return this.facade
-      .watchSubResource$<Message>(topics, 'conversation', options)
-      .pipe(tap((m) => this.messageStore.upsert(m)));
-  }
-
-  unwatchMessages(conversationIri: IriRequired): void {
-    this.facade.unwatch(this.topicsForConversationIri(conversationIri));
-  }
-
-  private topicsForConversationIri(iri: string): string[] {
-    const abs = this.resolveBackendIri(iri);
-    return abs === iri ? [iri] : [iri, abs];
-  }
-
-  private resolveBackendIri(iri: string): string {
-    try {
-      return new URL(iri, BACKEND_BASE_URL).toString();
-    } catch {
-      return iri;
-    }
+  /** Applies the Mercure changes to the store while subscribed (one IRI or every conversation). */
+  watch$(iri?: IriRequired): Observable<ResourceEvent<Conversation>> {
+    return this.facade.watch$(iri).pipe(tap((event) => this.store.apply(event)));
   }
 }

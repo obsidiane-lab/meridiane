@@ -2,8 +2,8 @@ import {inject, Injectable, Signal} from '@angular/core';
 import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
-import {AnyQuery, BridgeFacade, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
-import type {FileAssetFileRead as FileAsset} from '@obsidiane/bridge-sandbox';
+import {AnyQuery, BridgeFacade, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade, ResourceEvent} from '@obsidiane/bridge-sandbox';
+import type {FileAsset} from '@obsidiane/bridge-sandbox';
 import {FileAssetStore} from '../stores/file-asset.store';
 
 @Injectable({providedIn: 'root'})
@@ -23,7 +23,7 @@ export class FileAssetRepository {
   }
 
   fetchAll$(query?: AnyQuery): Observable<Collection<FileAsset>> {
-    return this.facade.getCollection$(query).pipe(tap((col) => this.store.setAll(col.member)));
+    return this.facade.getCollection$(query).pipe(tap((col) => this.store.upsertMany(col.member)));
   }
 
   fetch$(iri: IriRequired): Observable<FileAsset> {
@@ -44,11 +44,8 @@ export class FileAssetRepository {
     return this.facade.delete$(iri).pipe(tap(() => this.store.remove(iri)));
   }
 
-  watch$(iris: IriRequired | IriRequired[]): Observable<FileAsset> {
-    return this.facade.watch$(iris).pipe(tap((a) => this.store.upsert(a)));
-  }
-
-  unwatch(iris: IriRequired | IriRequired[]): void {
-    this.facade.unwatch(iris);
+  /** Applies the Mercure changes of this resource to the store while subscribed. */
+  watch$(iri?: IriRequired): Observable<ResourceEvent<FileAsset>> {
+    return this.facade.watch$(iri).pipe(tap((event) => this.store.apply(event)));
   }
 }

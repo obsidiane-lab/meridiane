@@ -1,6 +1,6 @@
 # Guide — créer et utiliser un bridge
 
-Workflow complet : génération du bridge, intégration Angular, usage HTTP/SSE au quotidien.
+Workflow Meridiane 3.0 : génération du bridge, intégration Angular, usage HTTP/Mercure 1.0 au quotidien.
 
 ## Vue d'ensemble
 
@@ -40,6 +40,9 @@ Sorties :
 - `dist/<libName>/`
 - `dist/<libName>/*.tgz`
 
+Pour une même spec et les mêmes options, les trois modes produisent les mêmes modèles :
+propriétés requises et nullabilité suivent OpenAPI, en développement comme en production.
+
 ## Intégrer le bridge dans l'app
 
 ### Package npm
@@ -65,13 +68,7 @@ export const appConfig: ApplicationConfig = {
       baseUrl: 'https://api.example.com',
       http: {withCredentials: true},
       auth: {type: 'bearer', getToken: () => localStorage.getItem('token') ?? undefined},
-      mercure: {
-        hubUrl: 'https://api.example.com/.well-known/mercure',
-        topicMode: 'url',
-        connectionMode: 'auto',
-        maxUrlLength: 1900,
-        init: {credentials: 'include'},
-      },
+      mercure: {hubUrl: 'https://api.example.com/.well-known/mercure'},
       defaults: {
         timeoutMs: 15_000,
         retries: {count: 2, delayMs: 250, methods: ['GET']},
@@ -83,8 +80,9 @@ export const appConfig: ApplicationConfig = {
 };
 ```
 
-`http.withCredentials` est prioritaire pour le HTTP.
-Si vous l'omettez, le bridge conserve le comportement historique et le déduit de `mercure.init.credentials`.
+`http.withCredentials` vaut `false` par défaut pour les appels cross-origin.
+Mercure configure ses credentials indépendamment (`mercure.withCredentials`, `true`
+par défaut) pour transmettre le cookie d'abonné au hub.
 
 ## Appels API
 
@@ -128,32 +126,90 @@ export class HealthService {
 
 ## Realtime (Mercure/SSE)
 
-Mercure est optionnel. Sans `mercure.hubUrl`, aucune connexion SSE n'est ouverte.
+Mercure est optionnel. Sans `mercure.hubUrl`, aucune connexion SSE n'est ouverte. Le hub doit implémenter Mercure 1.0.
 
-API principale :
-- `ResourceFacade.watch$(iri|iri[], {newConnection?})`
-- `ResourceFacade.watchSubResource$(iri|iri[], field, {newConnection?})`
-- `BridgeFacade.watch$(iri|iri[], filter?, {newConnection?})`
-- `BridgeFacade.watchTypes$(iri|iri[], resourceTypes, cfg?, {newConnection?})`
-- `BridgeFacade.realtimeDiagnostics$()`
+`watch$()` écoute tous les items de la ressource via `match_urlpattern`. `watch$(iri)`
+écoute un item précis via `match`, avec une IRI relative ou absolue. Les deux émettent
+des événements `upsert` / `delete` que le repository applique au store.
 
-### Modes de connexion SSE
+```ts
+const books = factory.create<Book>({url: '/api/books'});
 
-- `connectionMode: 'auto'` (défaut) : connexions mutualisées + découpage automatique si URL Mercure trop longue (`maxUrlLength`)
-- `connectionMode: 'single'` : connexion dédiée par abonnement
-- `newConnection: true` : forcer une connexion dédiée pour un abonnement précis
+const allBooks = books.watch$().subscribe((event) =>
+  event.kind === 'delete' ? store.remove(event.iri) : store.upsert(event.data)
+);
 
-### Cas `watchTypes$`
+const oneBook = books.watch$('/api/books/42').subscribe((event) =>
+  event.kind === 'delete' ? store.remove(event.iri) : store.upsert(event.data)
+);
+// Quand l'écoute n'est plus nécessaire :
+allBooks.unsubscribe();
+oneBook.unsubscribe();
+```
 
-`watchTypes$()` filtre par discriminant de payload (`@type` par défaut), pas par provenance réseau stricte du topic.
+- une seule connexion SSE pour toute l'application, partagée par tous les `watch$()`
+- chaque abonnement dure tant que son Observable est souscrit
+- authentification par le cookie HttpOnly `__Secure-mercure_access_token` posé par le backend
+- état : `ResourceFacade.connectionStatus`, `BridgeFacade.realtimeStatus$()`, `BridgeFacade.realtimeDiagnostics$()`
+- SSR : aucune connexion `EventSource` côté serveur
 
-Pour isoler strictement un topic :
-- `newConnection: true` sur l'appel, ou
-- `connectionMode: 'single'` global.
+Détails, limites de reprise et migration de Meridiane 2.x vers 3.0 : `docs/fonctionnalites/mercure-sse.md`.
 
-### SSR
+## Ressources natives et stores à signaux
 
-Le bridge n'ouvre pas d'`EventSource` côté serveur.
+Meridiane fournit le transport et les types ; les stores, repositories, services et
+composants appartiennent à l'application. Configurez API Platform pour que GET et
+Mercure exposent la même représentation complète de chaque ressource. Le bridge
+transmet le JSON reçu sans résoudre les relations et sans GET supplémentaire.
+
+Le repository alimente le même store depuis HTTP et Mercure. Exemple avec un
+`BookStore` de l'application exposant `entities()`, `upsert()` et `remove()` :
+
+```ts
+import {inject, Injectable} from '@angular/core';
+import {tap} from 'rxjs';
+import {Book, FacadeFactory, IriRequired} from '@acme/backend-bridge';
+import {BookStore} from './book.store';
+
+@Injectable({providedIn: 'root'})
+export class BookRepository {
+  private readonly store = inject(BookStore);
+  private readonly api = inject(FacadeFactory).create<Book>({url: '/api/books'});
+  readonly books = this.store.entities(); // Signal<readonly Book[]>
+
+  fetch$(iri: IriRequired) {
+    return this.api.get$(iri).pipe(tap((book) => this.store.upsert(book)));
+  }
+
+  watch$(iri?: IriRequired) {
+    return this.api.watch$(iri).pipe(tap((event) => {
+      if (event.kind === 'delete') this.store.remove(event.iri);
+      else this.store.upsert(event.data);
+    }));
+  }
+}
+```
+
+Le code qui déclenche le chargement ou l'écoute souscrit à ces Observables, gère les
+erreurs et libère ses abonnements (`takeUntilDestroyed()` ou `unsubscribe()`). Un service
+peut exposer ces signaux et ajouter ses agrégations. Le composant les lit directement :
+
+```ts
+readonly books = inject(BookRepository).books;
+```
+
+```html
+@for (book of books(); track book['@id']) {
+  <p>{{ book.title }}</p>
+}
+```
+
+Si `Conversation.messages` contient des IRI, le store conserve ces IRI. Pour afficher
+les messages, l'application charge chaque ressource manquante via son repository,
+puis compose la vue depuis les signaux des stores. Elle réutilise les ressources déjà
+chargées. Le développeur configure également les publications et topics qui doivent
+actualiser une conversation lorsqu'un message change ; le bridge ne déduit pas cette
+logique métier.
 
 ## Models TypeScript
 

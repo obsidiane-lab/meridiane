@@ -1,15 +1,15 @@
 # API publique
 
-Surface exposée par le bridge généré (`src/public-api.ts`).
+Surface exposée par le bridge généré avec Meridiane 3.0 (`src/public-api.ts`).
 
 ## Exports principaux
 
 - Runtime/config : `provideBridge`, `BridgeOptions`, `BridgeAuth`, `BridgeHttpOptions`, `BridgeMercureOptions`
-- Types bridge : `BridgeDefaults`, `BridgeLogger`, `MercureTopicMode`, `MercureConnectionMode`, `WatchConnectionOptions`, `RealtimeDiagnostics`
+- Types bridge : `BridgeDefaults`, `BridgeLogger`, `RealtimeStatus`, `RealtimeDiagnostics`, `RealtimeSubscriptionDiagnostics`
 - Facades : `FacadeFactory`, `ResourceFacade<T>`, `BridgeFacade`
-- Types utilitaires facades : `FacadeConfig<T>`, `TypedEvent`, `WatchTypesResult<R>`, `WatchTypesConfig`
-- Types HTTP/Hydra : `Item`, `Iri`, `Collection<T>`, `Query`, `AnyQuery`, `HttpCallOptions`, `HttpRequestConfig`, `HttpMethod`
-- Ports : `ResourceRepository<T>`, `RealtimePort`, `RealtimeDiagnosticsPort`, `Facade<T>`
+- Types utilitaires facades : `FacadeConfig<T>`, `ResourceEvent<T>`
+- Types HTTP/Hydra : `Item`, `Iri`, `IriRequired`, `Collection<T>`, `Query`, `AnyQuery`, `HttpCallOptions`, `HttpRequestConfig`, `HttpMethod`
+- Ports : `ResourceRepository<T>`, `RealtimePort`, `MercureSubscription`, `MercureUpdate`, `Facade<T>`
 - Utils URL : `joinUrl`, `resolveUrl`
 - Models générés : exports de `./models`
 
@@ -19,12 +19,9 @@ Surface exposée par le bridge généré (`src/public-api.ts`).
 
 Options notables :
 - `auth` : string bearer, objet bearer (token/getToken), ou `HttpInterceptorFn`
-- `http.withCredentials` : credentials/cookies HTTP par défaut (prioritaire si fourni)
-- `mercure.hubUrl` : active le realtime
-- `mercure.topicMode` : `'url'` (défaut) ou `'iri'`
-- `mercure.connectionMode` : `'auto'` (défaut) ou `'single'`
-- `mercure.maxUrlLength` : seuil de découpage URL en mode `auto` (défaut `1900`)
-- `mercure.init` : options Mercure/EventSource (notamment `credentials`, sans effet sur HTTP si `http.withCredentials` est fourni)
+- `http.withCredentials` : credentials/cookies HTTP par défaut (`false` par défaut)
+- `mercure.hubUrl` : active le realtime (hub Mercure 1.0)
+- `mercure.withCredentials` : envoie le cookie d'abonné au hub (`true` par défaut)
 - `defaults` : headers/timeout/retries appliqués aux requêtes du `baseUrl`
 - `singleFlight` : déduplication HTTP in-flight sur le `baseUrl` (`true` par défaut)
 - `debug` : logs runtime
@@ -37,17 +34,15 @@ Construction :
 ```ts
 const factory = inject(FacadeFactory);
 const books = factory.create<Book>({url: '/api/books'});
+// topic Mercure par défaut : {baseUrl}/api/books/:id, surchargeable avec `topic`
 ```
 
 API principale `ResourceFacade<T>` :
 - `getCollection$(query?, opts?)`, `get$(iri, opts?)`
 - `post$(payload, opts?)`, `patch$(iri, changes, opts?)`, `put$(iri, payload, opts?)`, `delete$(iri, opts?)`
 - `request$({method, url?, query?, body?, headers?, responseType?, withCredentials?, options?})`
-- `watch$(iri|iri[], options?)`, `unwatch(iri|iri[])`
-- `watchSubResource$(iri|iri[], field, options?)`
+- `watch$(iri?: IriRequired)` : `Observable<ResourceEvent<T>>` (`{kind: 'upsert', iri, data}` / `{kind: 'delete', iri}`). Sans IRI, écoute la ressource via `match_urlpattern` ; avec une IRI relative ou absolue, écoute cet item via `match`. Le désabonnement se fait avec `unsubscribe()`.
 - `connectionStatus` (`'connecting' | 'connected' | 'closed'`)
-
-`options` de watch = `WatchConnectionOptions` (`{ newConnection?: boolean }`).
 
 ## `BridgeFacade`
 
@@ -55,18 +50,13 @@ HTTP ad-hoc :
 - `get$`, `getCollection$`, `post$`, `patch$`, `put$`, `delete$`, `request$`
 
 Realtime :
-- `watch$(iri|iri[], filter?, options?)`
-- `watchTypes$(iri|iri[], resourceTypes, cfg?, options?)`
-- `unwatch(iri|iri[])`
+- `realtimeStatus$()`
 - `realtimeDiagnostics$()`
-
-`watchTypes$()` :
-- discrimine les événements sur `cfg.discriminator` (défaut `@type`)
-- renvoie des événements `{ resourceType, payload }`
 
 ## Types utiles
 
 - `Item` contient les champs Hydra/JSON-LD usuels (`@id`, `@type`, `@context`)
+- `ResourceEvent<T>.data` conserve la ressource reçue, sans expansion des relations ni GET complémentaire ; le repository de l'application décide comment l'appliquer à son store
 - `Collection<T>` expose `member`, `totalItems`, `view`, `search`
 - `HttpRequestConfig` sert d'escape hatch pour les endpoints non standards
-- `RealtimeDiagnostics` expose l'état courant des connexions SSE (shared/dedicated)
+- `RealtimeDiagnostics` expose l'état de la connexion SSE unique (statut, URL, abonnements, `lastEventId`, échecs)

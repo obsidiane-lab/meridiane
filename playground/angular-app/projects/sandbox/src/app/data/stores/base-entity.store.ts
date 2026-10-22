@@ -1,5 +1,5 @@
 import {computed, Signal, signal} from '@angular/core';
-import {Iri, Item} from '@obsidiane/bridge-sandbox';
+import {Iri, Item, ResourceEvent} from '@obsidiane/bridge-sandbox';
 import {iriOf} from '../../core/utils/iri.util';
 
 export abstract class BaseEntityStore<T extends Item> {
@@ -46,6 +46,12 @@ export abstract class BaseEntityStore<T extends Item> {
       }
       return Array.from(map.values());
     });
+  }
+
+  /** Applies a complete resource or its deletion without hydrating relations. */
+  apply(event: ResourceEvent<T>): void {
+    if (event.kind === 'delete') this.remove(event.iri);
+    else this.upsert(event.data);
   }
 
   remove(iri: Iri): void {

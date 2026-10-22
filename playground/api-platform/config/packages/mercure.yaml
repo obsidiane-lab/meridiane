@@ -3,6 +3,12 @@ mercure:
         default:
             url: '%env(string:MERCURE_URL)%'
             public_url: '%env(string:MERCURE_PUBLIC_URL)%'
+            protocol_version: '1.0'
             jwt:
-                secret: '%env(string:MERCURE_SUBSCRIBER_JWT_KEY)%'
+                secret: '%env(string:MERCURE_PUBLISHER_JWT_KEY)%'
                 publish: ['*']
+                # RFC 9068 claims required by Mercure 1.0 access tokens; `iss` must match MERCURE_TRUSTED_ISSUERS
+                claims:
+                    iss: '%env(string:MERCURE_JWT_ISSUER)%'
+                    sub: 'meridiane-playground'
+                    client_id: 'meridiane-playground'

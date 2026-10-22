@@ -2,7 +2,15 @@
 
 CLI pour générer un bridge Angular (runtime + models TypeScript) depuis une spec OpenAPI (API Platform + Mercure).
 
+Meridiane 3.0 cible Mercure 1.0. Le bridge conserve les ressources JSON reçues et leurs
+relations par IRI. Les stores à signaux, repositories et services métier restent dans
+l'application consommatrice ; Meridiane fournit les types, HTTP et les abonnements temps réel.
+
 Documentation complète du repo : `docs/guide-bridge.md`.
+
+Le bridge généré déclare Angular 20, 21 et 22 comme peer dependencies. Il est compilé
+en Partial-Ivy pour être consommé par une application de version Angular égale ou
+supérieure à celle du compilateur de la bibliothèque.
 
 ## Installation
 
@@ -61,6 +69,7 @@ Sorties :
 - fallback automatique `.../api/docs.json` -> `.../api/docs.jsonopenapi` si nécessaire
 - mode contract-driven : uniquement les schémas atteignables via `paths` et `webhooks` pour les formats sélectionnés
 - modèles `*jsonMergePatch*` non générés (`PATCH` typé `Partial<T>`)
+- `generate`, `dev` et `build` produisent les mêmes modèles pour une même spec et les mêmes options ; les propriétés requises et la nullabilité suivent le contrat OpenAPI
 - Meridiane ne publie pas : publication via `npm publish` côté CI
 
 ## Couverture des schémas

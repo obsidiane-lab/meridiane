@@ -1,15 +1,16 @@
-import {Component, computed, inject, OnDestroy, signal} from '@angular/core';
+import {Component, computed, DestroyRef, effect, inject, OnDestroy, signal, untracked} from '@angular/core';
 
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
-import type {MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
+import type {Message} from '@obsidiane/bridge-sandbox';
 import {Iri, IriRequired} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {ConversationRepository} from '../../data/repositories/conversation.repository';
 import {MessageRepository} from '../../data/repositories/message.repository';
-import {distinctUntilChanged, map, Subscription} from 'rxjs';
+import {ConversationService} from '../../data/services/conversation.service';
+import {distinctUntilChanged, map, merge, Subscription} from 'rxjs';
 
 interface LogEntry {
   t: number;
@@ -31,10 +32,14 @@ export class MessagesLabComponent implements OnDestroy {
 
   private readonly messagesRepo = inject(MessageRepository);
   private readonly conversationsRepo = inject(ConversationRepository);
+  private readonly conversationService = inject(ConversationService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly conversationId = signal<string>('1');
   readonly conversationIri = computed<IriRequired>(() => `/api/conversations/${this.conversationId()}`);
-  readonly messages = computed(() => this.messagesRepo.messagesForConversation(this.conversationIri())());
+  readonly messages = computed(() => this.conversationService.messagesForConversation(this.conversationIri())());
+  readonly conversation = computed(() => this.conversationsRepo.conversations()()
+    .find((conversation) => conversation['@id'] === this.conversationIri()));
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -76,10 +81,24 @@ export class MessagesLabComponent implements OnDestroy {
   });
 
   private sseSub?: Subscription;
-  private watchedConversationIri?: IriRequired;
 
   constructor() {
     this.pushLog({t: Date.now(), kind: 'init'});
+
+    effect((onCleanup) => {
+      const conversation = this.conversation();
+      if (!conversation) return;
+
+      this.loading.set(true);
+      const subscription = untracked(() => this.conversationService.loadMessages$(conversation)).subscribe({
+        error: (err) => {
+          this.error.set(err?.message || 'Failed to load messages');
+          this.loading.set(false);
+        },
+        complete: () => this.loading.set(false),
+      });
+      onCleanup(() => subscription.unsubscribe());
+    });
 
     this.route.paramMap
       .pipe(
@@ -109,10 +128,10 @@ export class MessagesLabComponent implements OnDestroy {
     this.loading.set(true);
     this.error.set(null);
     const conversationIri = this.conversationIri();
-    this.messagesRepo
-      .fetchByConversation$(conversationIri, {page: 1, itemsPerPage: 20})
+    this.conversationsRepo
+      .fetch$(conversationIri)
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.loading.set(false),
         error: (err) => {
           this.error.set(err?.message || 'Failed to load messages');
           this.loading.set(false);
@@ -132,14 +151,6 @@ export class MessagesLabComponent implements OnDestroy {
     this.selectedId.set(m['@id']);
     this.editForm.setValue({originalText: m.originalText ?? ''});
     this.pushLog({t: Date.now(), kind: 'select', iri: m['@id'], snapshot: m});
-  }
-
-  watchOne() {
-    this.enableSse();
-  }
-
-  unwatchOne() {
-    this.disableSse();
   }
 
   manualGet() {
@@ -197,20 +208,15 @@ export class MessagesLabComponent implements OnDestroy {
   }
 
   private enableSse(): void {
-    if (this.sseSub) return;
-    const conversationIri = this.conversationIri();
-    this.watchedConversationIri = conversationIri;
-    this.sseSub = this.conversationsRepo.watchMessages$(conversationIri).subscribe(() => undefined);
+    this.sseSub ??= merge(
+      this.conversationsRepo.watch$(this.conversationIri()),
+      this.messagesRepo.watch$(),
+    ).subscribe({error: (err) => this.error.set(err?.message || 'Realtime subscription failed')});
   }
 
   private disableSse(): void {
-    const watchedConversationIri = this.watchedConversationIri;
-    if (watchedConversationIri) {
-      this.conversationsRepo.unwatchMessages(watchedConversationIri);
-    }
     this.sseSub?.unsubscribe();
     this.sseSub = undefined;
-    this.watchedConversationIri = undefined;
   }
 
   // utils logs

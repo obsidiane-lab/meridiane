@@ -2,8 +2,8 @@ import {inject, Injectable, Signal} from '@angular/core';
 import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
-import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
-import type {EventLogEventRead as EventLog} from '@obsidiane/bridge-sandbox';
+import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade, ResourceEvent} from '@obsidiane/bridge-sandbox';
+import type {EventLog} from '@obsidiane/bridge-sandbox';
 import {EventLogStore} from '../stores/event-log.store';
 
 @Injectable({providedIn: 'root'})
@@ -21,7 +21,7 @@ export class EventLogRepository {
   }
 
   fetchAll$(query?: AnyQuery): Observable<Collection<EventLog>> {
-    return this.facade.getCollection$(query).pipe(tap((col) => this.store.setAll(col.member)));
+    return this.facade.getCollection$(query).pipe(tap((col) => this.store.upsertMany(col.member)));
   }
 
   fetch$(iri: IriRequired): Observable<EventLog> {
@@ -44,11 +44,8 @@ export class EventLogRepository {
     return this.facade.delete$(iri).pipe(tap(() => this.store.remove(iri)));
   }
 
-  watch$(iris: IriRequired | IriRequired[]): Observable<EventLog> {
-    return this.facade.watch$(iris).pipe(tap((e) => this.store.upsert(e)));
-  }
-
-  unwatch(iris: IriRequired | IriRequired[]): void {
-    this.facade.unwatch(iris);
+  /** Applies the Mercure changes of this resource to the store while subscribed. */
+  watch$(iri?: IriRequired): Observable<ResourceEvent<EventLog>> {
+    return this.facade.watch$(iri).pipe(tap((event) => this.store.apply(event)));
   }
 }

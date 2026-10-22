@@ -1,9 +1,11 @@
 # Tests transverses
 
-Ce dossier accueillera les tests qui valident le générateur comme un produit complet et qui ne dépendent pas d'une application particulière :
+Les contrôles automatisés actuels vivent dans `packages/meridiane/test` :
 
-- fixtures OpenAPI déterministes ;
-- tests d'intégration `spec → génération → compilation` ;
-- tests end-to-end du playground.
+- fixture OpenAPI entity first et cohérence des modèles entre les modes ;
+- routage des événements Mercure, suppressions et cycle de vie de la connexion SSE ;
+- en CI, génération puis compilation du bridge et des modèles depuis cette fixture.
 
-Les tests unitaires propres à un package restent au plus près de son code. Le playground sert à l'exploration et à la validation manuelle ; il ne remplace pas ces tests automatisés.
+Lancer `npm -w packages/meridiane test` depuis la racine. Les tests end-to-end avec
+un hub et un navigateur réels restent à ajouter ; le playground sert à leur
+validation manuelle.

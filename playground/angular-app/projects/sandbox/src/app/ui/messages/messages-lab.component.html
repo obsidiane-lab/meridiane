@@ -64,8 +64,6 @@
                 <span class="badge">IRI: <code>{{ mesg['@id'] }}</code></span>
             </div>
             <div class="toolbar">
-                <button class="btn" type="button" (click)="watchOne()" [disabled]="!selectedId()">Watch</button>
-                <button class="btn" type="button" (click)="unwatchOne()" [disabled]="!selectedId()">Unwatch</button>
 
                 <button class="btn" type="button" (click)="manualGet()" [disabled]="!selectedId()">GET</button>
             </div>
@@ -101,7 +99,7 @@
     } @else {
         <div class="panel">
             <h3 style="margin-top: 0;">Select a message</h3>
-            <p class="muted">Create a message, reload the subresource list, then patch and test SSE watch/unwatch.</p>
+            <p class="muted">Messages are loaded by IRI from the conversation, then kept in their own store.</p>
         </div>
     }
 </section>

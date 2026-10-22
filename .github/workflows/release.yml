@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing tag to publish (for example 2.0.11); leave empty to create the next version"
+        description: "Existing tag to publish (for example 3.0.0); leave empty to create the next version"
         required: false
         type: string
 
@@ -31,6 +31,13 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.release_tag || github.ref }}
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
       - name: Calculate next tag
         id: tag_version
@@ -57,7 +64,8 @@ jobs:
           elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
             release_tag="$GITHUB_REF_NAME"
           else
-            release_tag="$GENERATED_TAG"
+            package_version="$(node -p "require('./packages/meridiane/package.json').version")"
+            release_tag="$(printf '%s\n' "$GENERATED_TAG" "$package_version" | sort -V | tail -n 1)"
           fi
 
           if [ -z "$release_tag" ]; then
@@ -66,13 +74,6 @@ jobs:
           fi
 
           echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
-
-      - name: Use Node.js 24.x
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false
 
       - name: Verify npm credentials
         env:
@@ -88,8 +89,11 @@ jobs:
           npm pkg set version="${RELEASE_TAG}"
           npm pkg set repository.url="git+https://github.com/obsidiane-lab/meridiane.git"
 
+      - name: Tests
+        run: npm -w packages/meridiane test
+
       - name: Bridge smoke build
-        run: node packages/meridiane/cli.js build @obsidiane/release-check --version "${RELEASE_TAG}" --no-models
+        run: node packages/meridiane/cli.js build @obsidiane/release-check --version "${RELEASE_TAG}" --spec packages/meridiane/test/fixtures/entity-first.openapi.json
 
       - name: Pack check
         run: npm -w packages/meridiane run pack:check

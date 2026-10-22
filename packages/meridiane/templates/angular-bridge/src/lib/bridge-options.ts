@@ -1,5 +1,5 @@
 import {HttpInterceptorFn} from '@angular/common/http';
-import {BridgeDefaults, MercureConnectionMode, MercureTopicMode} from './bridge.types';
+import {BridgeDefaults} from './bridge.types';
 
 export type BridgeAuth =
   | string
@@ -8,29 +8,19 @@ export type BridgeAuth =
   | HttpInterceptorFn;
 
 export interface BridgeMercureOptions {
-  hubUrl?: string;
-  init?: RequestInit;
-  topicMode?: MercureTopicMode;
+  /** Mercure hub URL (e.g. `https://api.example.com/.well-known/mercure`), resolved against `baseUrl` when relative. */
+  hubUrl: string;
   /**
-   * Connection strategy for SSE subscriptions.
-   * - `single`: one SSE connection per watch subscription
-   * - `auto` (default): shared connections with automatic URL-length sharding
+   * Sends cookies with the subscription request. Default: `true`.
+   *
+   * Browsers authenticate to a Mercure 1.0 hub with the HttpOnly `__Secure-mercure_access_token`
+   * cookie set by the backend (`EventSource` cannot send an `Authorization` header).
    */
-  connectionMode?: MercureConnectionMode;
-  /**
-   * Maximum Mercure URL length before auto-sharding topics into multiple connections.
-   * Used only when `connectionMode: 'auto'`. Default: `1900`.
-   */
-  maxUrlLength?: number;
+  withCredentials?: boolean;
 }
 
 export interface BridgeHttpOptions {
-  /**
-   * Enables cookies / credentials on HTTP requests by default.
-   *
-   * When omitted, the bridge preserves the historical behavior and derives the
-   * HTTP value from `mercure.init.credentials`.
-   */
+  /** Enables cookies / credentials on HTTP requests by default. Default: `false`. */
   withCredentials?: boolean;
 }
 
@@ -41,7 +31,7 @@ export interface BridgeOptions {
   auth?: BridgeAuth;
   /** Default HTTP transport options. */
   http?: BridgeHttpOptions;
-  /** Use `topicMode` to control the `topic=` values sent to the hub. */
+  /** Enables Mercure realtime. */
   mercure?: BridgeMercureOptions;
   /** Default HTTP behaviour (headers, timeout, retries). */
   defaults?: BridgeDefaults;

@@ -47,8 +47,9 @@ provideBridge({
 });
 ```
 
-Compat legacy :
-- si `http.withCredentials` est absent, le bridge reprend le comportement historique et le déduit de `mercure.init.credentials`
+Sans `http.withCredentials`, les credentials cross-origin sont désactivés (`false`
+par défaut), indépendamment de Mercure. Les cookies same-origin suivent le
+comportement normal du navigateur.
 
 ## Queries Hydra (collection)
 

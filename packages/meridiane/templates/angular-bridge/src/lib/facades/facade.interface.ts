@@ -1,13 +1,7 @@
-import {
-  Iri,
-  Item,
-  ResourceRepository,
-} from '../ports/resource-repository.port';
+import {IriRequired, Item, ResourceRepository} from '../ports/resource-repository.port';
 import {Observable} from 'rxjs';
-import {WatchConnectionOptions} from '../bridge.types';
+import {ResourceEvent} from '../bridge/sse/resource-topic';
 
 export interface Facade<T extends Item> extends ResourceRepository<T> {
-  watch$(iri: Iri | Iri[], options?: WatchConnectionOptions): Observable<T>;
-
-  unwatch(iri: Iri | Iri[]): void;
+  watch$(iri?: IriRequired): Observable<ResourceEvent<T>>;
 }

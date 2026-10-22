@@ -1,7 +1,7 @@
 import {EnvironmentProviders, makeEnvironmentProviders} from '@angular/core';
 import {HttpInterceptorFn, provideHttpClient, withFetch, withInterceptors} from '@angular/common/http';
 import {BridgeOptions} from './bridge-options';
-import {BridgeLogger, MercureConnectionMode, MercureTopicMode} from './bridge.types';
+import {BridgeLogger} from './bridge.types';
 import {createAuthInterceptors} from './interceptors/bearer-auth.interceptor';
 import {bridgeDebugInterceptor} from './interceptors/bridge-debug.interceptor';
 import {bridgeDefaultsInterceptor} from './interceptors/bridge-defaults.interceptor';
@@ -14,15 +14,13 @@ import {
   BRIDGE_HTTP_WITH_CREDENTIALS,
   BRIDGE_LOGGER,
   BRIDGE_MERCURE_WITH_CREDENTIALS,
-  MERCURE_CONNECTION_MODE,
   MERCURE_HUB_URL,
-  MERCURE_MAX_URL_LENGTH,
-  MERCURE_TOPIC_MODE,
 } from './tokens';
+import {resolveUrl} from './utils/url';
 
 export type {BridgeAuth, BridgeHttpOptions, BridgeMercureOptions, BridgeOptions} from './bridge-options';
 
-/** Registers the bridge HTTP client, interceptors, Mercure realtime adapter and configuration tokens. */
+/** Registers the bridge HTTP client, interceptors, Mercure realtime and configuration tokens. */
 export function provideBridge(options: BridgeOptions): EnvironmentProviders {
   const {
     baseUrl,
@@ -38,14 +36,6 @@ export function provideBridge(options: BridgeOptions): EnvironmentProviders {
   if (!baseUrl) {
     throw new Error("provideBridge(): missing 'baseUrl'");
   }
-
-  const resolvedMercureInit: RequestInit = mercure?.init ?? {credentials: 'include' as RequestCredentials};
-  const resolvedMercureHubUrl = mercure?.hubUrl;
-  const resolvedMercureTopicMode: MercureTopicMode = mercure?.topicMode ?? 'url';
-  const resolvedMercureConnectionMode: MercureConnectionMode = mercure?.connectionMode ?? 'auto';
-  const resolvedMercureMaxUrlLength = normalizeMercureMaxUrlLength(mercure?.maxUrlLength, 1900);
-  const mercureWithCredentials = resolveWithCredentials(resolvedMercureInit);
-  const httpWithCredentials = http?.withCredentials ?? mercureWithCredentials;
 
   const loggerProvider: BridgeLogger = createBridgeLogger(debug);
   const scopeToBridge = (interceptor: HttpInterceptorFn) => scopeInterceptor(baseUrl, interceptor);
@@ -65,12 +55,9 @@ export function provideBridge(options: BridgeOptions): EnvironmentProviders {
       withInterceptors(interceptors)
     ),
     {provide: API_BASE_URL, useValue: baseUrl},
-    {provide: BRIDGE_HTTP_WITH_CREDENTIALS, useValue: httpWithCredentials},
-    {provide: BRIDGE_MERCURE_WITH_CREDENTIALS, useValue: mercureWithCredentials},
-    ...(resolvedMercureHubUrl ? [{provide: MERCURE_HUB_URL, useValue: resolvedMercureHubUrl}] : []),
-    {provide: MERCURE_TOPIC_MODE, useValue: resolvedMercureTopicMode},
-    {provide: MERCURE_CONNECTION_MODE, useValue: resolvedMercureConnectionMode},
-    {provide: MERCURE_MAX_URL_LENGTH, useValue: resolvedMercureMaxUrlLength},
+    {provide: BRIDGE_HTTP_WITH_CREDENTIALS, useValue: http?.withCredentials ?? false},
+    {provide: BRIDGE_MERCURE_WITH_CREDENTIALS, useValue: mercure?.withCredentials ?? true},
+    ...(mercure?.hubUrl ? [{provide: MERCURE_HUB_URL, useValue: resolveUrl(baseUrl, mercure.hubUrl)}] : []),
     {provide: BRIDGE_DEFAULTS, useValue: defaults ?? {}},
     {provide: BRIDGE_LOGGER, useValue: loggerProvider},
   ]);
@@ -84,15 +71,4 @@ function createBridgeLogger(debug: boolean): BridgeLogger {
     warn: debug ? console.warn.bind(console) : noop,
     error: console.error.bind(console),
   };
-}
-
-function resolveWithCredentials(init: RequestInit | undefined): boolean {
-  if (!init) return false;
-  const anyInit = init as RequestInit & {withCredentials?: boolean};
-  return anyInit.withCredentials === true || init.credentials === 'include';
-}
-
-function normalizeMercureMaxUrlLength(input: unknown, fallback: number): number {
-  const value = typeof input === 'number' ? Math.floor(input) : fallback;
-  return Number.isFinite(value) && value >= 256 ? value : fallback;
 }

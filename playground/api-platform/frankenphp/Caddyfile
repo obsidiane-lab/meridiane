@@ -18,22 +18,27 @@
 :80 {
 	log {
 		{$CADDY_SERVER_LOG_OPTIONS}
-		# Redact the authorization query parameter that can be set by Mercure
-		format filter {
-			request>uri query {
-				replace authorization REDACTED
-			}
-		}
 	}
 
 	root /app/public
-	encode zstd br gzip
+	# Server-sent events must not be compressed
+	@compressible not path /.well-known/mercure*
+	encode @compressible zstd br gzip
 
 	mercure {
-		# Publisher JWT key
-		publisher_jwt {env.MERCURE_PUBLISHER_JWT_KEY} {env.MERCURE_PUBLISHER_JWT_ALG}
-		# Subscriber JWT key
-		subscriber_jwt {env.MERCURE_SUBSCRIBER_JWT_KEY} {env.MERCURE_SUBSCRIBER_JWT_ALG}
+		# Trusted issuer: binds the iss claim of the access tokens minted by Symfony to their keys
+		issuer {$MERCURE_TRUSTED_ISSUERS:https://localhost} {
+			publisher {
+				jwt {env.MERCURE_PUBLISHER_JWT_KEY} {env.MERCURE_PUBLISHER_JWT_ALG}
+			}
+			subscriber {
+				jwt {env.MERCURE_SUBSCRIBER_JWT_KEY} {env.MERCURE_SUBSCRIBER_JWT_ALG}
+			}
+		}
+		# Bolt transport keeps the history replayed on reconnection (last_event_id)
+		transport bolt {
+			path /data/mercure.db
+		}
 		# Allow anonymous subscribers (double-check that it's what you want)
 		anonymous
 		# Enable the subscription API (double-check that it's what you want)

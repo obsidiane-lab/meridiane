@@ -1,6 +1,20 @@
 # Mercure / SSE
 
-Le bridge intègre Mercure avec gestion des subscriptions, mutualisation des connexions et diagnostics runtime.
+Meridiane 3.0 implémente le protocole [Mercure 1.0](https://mercure.rocks/spec). Le hub doit parler ce protocole ; un hub Mercure 0.x doit être migré selon le [guide officiel](https://mercure.rocks/docs/UPGRADE).
+
+## Écouter une ressource ou un item
+
+Pour les topics d'item habituels d'API Platform, `watch$()` écoute une **ressource** sous la forme d'un [URL Pattern](https://urlpattern.spec.whatwg.org/) envoyé au hub avec `match_urlpattern` :
+
+```
+GET /.well-known/mercure?match_urlpattern=https://api.example.com/api/books/:id
+```
+
+Cet abonnement reçoit aussi les créations d'items encore absents du store, sans
+dépendre des entités déjà chargées. Pour écouter un item précis, utilisez
+`watch$('/api/books/1')` : le bridge résout l'IRI contre `baseUrl` et envoie
+`match=https://api.example.com/api/books/1`. Une IRI absolue est également acceptée.
+Les événements privés restent soumis aux autorisations configurées sur le hub.
 
 ## Activer Mercure
 
@@ -11,106 +25,141 @@ provideBridge({
 });
 ```
 
-Sans `hubUrl`, le realtime est désactivé.
+Sans `mercure`, le realtime est désactivé. Un `hubUrl` relatif est résolu par rapport à `baseUrl`.
 
-## Topic mode
+## Écouter une ressource
 
-`topicMode` contrôle la forme envoyée au hub :
-
-- `url` (défaut) : topics absolus
-- `iri` : topics relatifs same-origin
-
-## Modes de connexion
-
-`mercure.connectionMode` :
-
-- `auto` (défaut)
-  - mutualise les subscriptions sur des connexions partagées
-  - découpe automatiquement en plusieurs connexions si l'URL Mercure dépasse `mercure.maxUrlLength` (défaut `1900`)
-- `single`
-  - ouvre une connexion dédiée par abonnement
-
-Override ponctuel :
+`ResourceFacade<T>.watch$(iri?: IriRequired)` émet les changements sous forme d'événements d'entité :
 
 ```ts
-resource.watch$(iri, {newConnection: true});
-bridge.watchTypes$(topic, ['Message'], {discriminator: '@type'}, {newConnection: true});
+type ResourceEvent<T> =
+  | {kind: 'upsert'; iri: string; data: T}
+  | {kind: 'delete'; iri: string};
 ```
 
-## APIs realtime
-
-- `ResourceFacade.watch$(iri|iri[], {newConnection?})`
-- `ResourceFacade.watchSubResource$(iri|iri[], field, {newConnection?})`
-- `BridgeFacade.watch$(iri|iri[], filter?, {newConnection?})`
-- `BridgeFacade.watchTypes$(iri|iri[], resourceTypes, cfg?, {newConnection?})`
-- `BridgeFacade.realtimeDiagnostics$()`
-
-## `watchSubResource$`
-
-Permet de recevoir des événements d'une sous-ressource publiés sur un topic parent.
+Le repository applique ces événements au store de l'application :
 
 ```ts
-resource.watchSubResource$<Message>('/api/conversations/1', 'conversation');
+@Injectable({providedIn: 'root'})
+export class BookRepository {
+  private readonly store = inject(BookStore);
+  private readonly books = inject(FacadeFactory).create<Book>({url: '/api/books'});
+
+  watch$(iri?: IriRequired): Observable<ResourceEvent<Book>> {
+    return this.books.watch$(iri).pipe(
+      tap((event) => event.kind === 'delete' ? this.store.remove(event.iri) : this.store.upsert(event.data)),
+    );
+  }
+}
 ```
 
-Le champ filtré peut être une IRI (`string`) ou une liste d'IRIs (`string[]`).
+`data` conserve le JSON reçu. Pour remplacer directement la ressource dans le store,
+le backend doit publier la même représentation complète que GET. Meridiane n'ajoute
+pas de GET et ne reconstruit pas les relations.
 
-## `watchTypes$` (topic multi-entités)
+Les relations restent des IRI si le backend les expose ainsi. Les services de
+l'application chargent les ressources liées manquantes à la demande et composent
+les vues depuis les signaux des stores. Le développeur décide des topics et
+publications nécessaires pour maintenir la cohérence entre entités, par exemple
+entre un message et sa conversation.
 
-Usage :
+L'abonnement dure tant que l'Observable est souscrit. Plusieurs écoutes du même
+pattern ou de la même IRI partagent l'abonnement au hub ; `unsubscribe()` libère
+chaque consommateur. Le dernier désabonnement retire le sélecteur concerné.
+
+### Topic de la ressource
+
+Par défaut, le topic est `{url}/:id` (ex. `/api/books` → `https://api.example.com/api/books/:id`), ce qui correspond aux IRIs d'item par défaut d'API Platform. Si l'IRI de vos items a une autre forme, passez le pattern explicitement :
 
 ```ts
-bridge.watchTypes$<Registry>(
-  '/api/events/me',
-  ['Conversation', 'Message'],
-  {discriminator: '@type'}
-);
+factory.create<Book>({url: '/api/books', topic: '/api/library/books/:isbn'});
 ```
 
-Sortie : événements `{ resourceType, payload }`.
+### Suppressions
 
-Important :
-- le filtrage est fait sur le payload (`@type` par défaut), pas sur la provenance réseau stricte du topic
-- en mode mutualisé, un événement d'un autre topic partagé peut passer s'il matche le type demandé
+[API Platform](https://api-platform.com/docs/core/mercure/#pushing-the-api-updates) publie une suppression avec un payload réduit à `{"@id": ...}` (éventuellement accompagné de `@type`). Le bridge émet alors `{kind: 'delete', iri}`. Le repository retire cette IRI du store ; les signaux propagent la suppression aux composants.
 
-Pour isolation stricte d'un topic :
-- `newConnection: true` sur l'appel, ou
-- `connectionMode: 'single'` global.
+## Une seule connexion
 
-## Diagnostics runtime
+Toute l'application partage **une** connexion SSE, dont les abonnements sont l'union
+des `watch$()` actifs : patterns de ressources et IRI exactes.
 
-`BridgeFacade.realtimeDiagnostics$()` expose :
+Quand cet ensemble change, le bridge rouvre la connexion avec `last_event_id`
+lorsqu'un identifiant a déjà été reçu. Les changements d'abonnements faits dans la
+même tâche sont regroupés. La reprise dépend de l'historique conservé par le hub et
+de la disponibilité du curseur : elle ne garantit pas l'absence de perte. Avant le
+premier événement, aucun curseur n'est disponible ; la synchronisation du chargement
+HTTP initial avec le flux et les éventuelles resynchronisations restent à organiser
+dans l'application.
 
-- mode courant (`auto`/`single`)
-- nombre total de connexions
-- répartition `shared` / `dedicated`
-- liste détaillée des connexions (status, topics, longueur d'URL)
+Mercure n'indique pas quel abonnement a sélectionné un événement : chaque façade
+garde les événements dont l'`@id` correspond à son pattern ou à l'IRI demandée.
 
-## Cookies / credentials
+## Authentification
 
-`mercure.init.credentials` pilote les credentials SSE :
+Le bridge utilise l'`EventSource` natif. Un navigateur ne pouvant pas y ajouter d'en-tête `Authorization`, Mercure 1.0 prévoit un **cookie** : `__Secure-mercure_access_token` (HttpOnly). Le token n'est jamais accessible au JavaScript.
 
-- `credentials: 'include'` (défaut) : cookies envoyés
-- `credentials: 'omit'` : cookies non envoyés
+- Le backend pose le cookie (avec symfony/mercure-bundle : `Authorization::setCookie()`, ou la fonction Twig `mercure()` avec l'option `subscribe`).
+- Le bridge envoie les cookies au hub (`mercure.withCredentials`, `true` par défaut).
+- Le hub doit autoriser l'origine de l'application (`cors_origins`).
+- Le préfixe `__Secure-` impose HTTPS. En développement sur HTTP, configurez le hub avec `cookie_name mercure_access_token` (le bundle utilise ce nom quand `kernel.debug` est actif).
 
-Pour le HTTP, utilisez `http.withCredentials`.
+Sans cookie, le hub traite l'abonné en anonyme (directive `anonymous`) : il ne reçoit que les updates publiques.
 
-Compat legacy :
-- si `http.withCredentials` n'est pas fourni, le bridge conserve le comportement historique et aligne HTTP sur `mercure.init.credentials`
+Le paramètre de requête `authorization` a été supprimé en Mercure 1.0. Le bridge ne met jamais de token dans l'URL.
 
-Exemple :
+## Erreurs et reconnexion
 
-```ts
-provideBridge({
-  baseUrl: 'https://api.example.com',
-  http: {withCredentials: true},
-  mercure: {
-    hubUrl: 'https://api.example.com/.well-known/mercure',
-    init: {credentials: 'omit'},
-  },
-});
-```
+- Coupure réseau : le navigateur se reconnecte seul et renvoie `Last-Event-ID`.
+- Refus du hub (`401 invalid_token`, `403 insufficient_scope`, `400`) : `EventSource` abandonne. Le bridge réessaie avec un délai croissant (1 s à 30 s) et compte les échecs dans les diagnostics.
+
+## État et diagnostics
+
+- `ResourceFacade.connectionStatus` : signal `'closed' | 'connecting' | 'connected'`
+- `BridgeFacade.realtimeStatus$()`
+- `BridgeFacade.realtimeDiagnostics$()` : statut, URL d'abonnement, abonnements actifs (`match`, `type`, nombre de consommateurs), `lastEventId`, nombre d'échecs consécutifs
+
+## Compatibilité navigateur
+
+L'écoute d'une ressource utilise [`URLPattern`](https://developer.mozilla.org/docs/Web/API/URLPattern) pour router les événements. Si votre navigateur cible ne le fournit pas, chargez un polyfill tel que [`urlpattern-polyfill`](https://www.npmjs.com/package/urlpattern-polyfill) dans l'application.
 
 ## SSR
 
-Aucune connexion `EventSource` n'est ouverte côté serveur. SSE est actif uniquement dans le navigateur.
+Aucune connexion `EventSource` n'est ouverte côté serveur : `watch$()` y complète immédiatement.
+
+## Hub : configuration attendue (Caddyfile)
+
+```caddyfile
+mercure {
+	issuer {$MERCURE_TRUSTED_ISSUERS} {
+		publisher {
+			jwt {env.MERCURE_PUBLISHER_JWT_KEY} {env.MERCURE_PUBLISHER_JWT_ALG}
+		}
+		subscriber {
+			jwt {env.MERCURE_SUBSCRIBER_JWT_KEY} {env.MERCURE_SUBSCRIBER_JWT_ALG}
+		}
+	}
+	anonymous
+	cors_origins https://app.example.com
+}
+```
+
+Côté Symfony (symfony/mercure-bundle ≥ 0.6) : `protocol_version: '1.0'` et les claims `iss` (égal à `MERCURE_TRUSTED_ISSUERS`), `sub` et `client_id` dans `jwt.claims`. Voir `playground/api-platform` pour une configuration complète.
+
+## Migration de Meridiane 2.x vers 3.0
+
+La version de Meridiane et celle du protocole Mercure sont distinctes : cette
+migration de Meridiane accompagne le passage du hub de Mercure 0.x à Mercure 1.0.
+
+| Meridiane 2.x | Meridiane 3.0 |
+|---|---|
+| `resource.watch$(iri \| iri[])` + `unwatch(iri)` | `resource.watch$(iri)` pour un item ou `watch$()` pour la ressource ; un abonnement par IRI pour plusieurs items, libéré avec `unsubscribe()` |
+| `resource.watchSubResource$(parentIri, field)` | chargement des IRI liées et abonnements explicites dans le repository de l'application |
+| `bridge.watch$()`, `bridge.watchTypes$()`, `bridge.unwatch()` | supprimés : écouter chaque ressource avec `watch$()` |
+| événements = payload brut | `ResourceEvent<T>` (`upsert` / `delete`) |
+| `mercure.connectionMode`, `maxUrlLength`, `newConnection` | supprimés (connexion unique) |
+| `mercure.topicMode` | supprimé (topics absolus, comme API Platform) |
+| `mercure.init: {credentials}` | `mercure.withCredentials` |
+| `http.withCredentials` déduit de Mercure | `http.withCredentials`, `false` par défaut |
+| `?topic=` / `?lastEventID=` | Mercure 1.0 : `?match=` ou `?match_urlpattern=`, reprise avec `?last_event_id=` |
+| modèles de `dev` plus permissifs | mêmes modèles que `generate` et `build`, conformes aux champs requis et à la nullabilité OpenAPI |

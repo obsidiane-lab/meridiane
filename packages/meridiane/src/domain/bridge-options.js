@@ -62,7 +62,7 @@ export function normalizeDevOptions(packageName, opts) {
     packageName: effectivePackageName,
     libName: deriveLibName(effectivePackageName),
     version: '0.0.0-dev',
-    requiredMode: 'all',
+    requiredMode: 'spec',
     formats: normalizeFormats(common.formats),
     include: common.include,
     exclude: common.exclude,

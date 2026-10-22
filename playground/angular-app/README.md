@@ -8,8 +8,12 @@ La sandbox vérifie en conditions réelles :
 - appels HTTP (Hydra + endpoints custom)
 - auth JWT
 - upload multipart
-- realtime Mercure (`watch$`, `watchSubResource$`, `watchTypes$`)
-- stratégies SSE (`connectionMode`, `newConnection`, diagnostics)
+- realtime Mercure 1.0 (`watch$()` par ressource, `watch$(iri)` par entité, remplacement/suppression dans les stores)
+- connexion SSE unique, reprise `last_event_id`, diagnostics
+
+Les repositories enregistrent les ressources HTTP et Mercure dans des stores à signaux, sans transformer leurs relations en objets imbriqués. Le `ConversationService` compose la vue des messages et charge individuellement les IRI de `Conversation.messages` absentes du store. Les composants lisent les signaux ; les ressources déjà chargées sont réutilisées.
+
+Le backend de l'application reste responsable des topics publiés et de la cohérence des relations : un événement Message ne reconstruit pas automatiquement `Conversation.messages`. Une conversation actualisée reçue par Mercure déclenche le chargement de ses nouvelles relations manquantes.
 
 ## Pré-requis
 
@@ -67,7 +71,7 @@ npm -w @obsidiane/meridiane-sandbox run bridge:sync -- --spec ./openapi.json
 ## Pages principales
 
 - `/login` : login JWT
-- `/conversations` : CRUD + watch conversation/messages
-- `/conversations/:id/messages` : vue dédiée messages
+- `/conversations` : CRUD + abonnement ciblé à la conversation sélectionnée et abonnement aux messages
+- `/conversations/:id/messages` : GET conversation puis chargement des messages par leurs IRI
 - `/http` : lab HTTP (echo, delay, flaky, upload)
-- `/watch-types` : lab `watchTypes$` + diagnostics realtime
+- `/realtime` : écoute des ressources + diagnostics de la connexion Mercure

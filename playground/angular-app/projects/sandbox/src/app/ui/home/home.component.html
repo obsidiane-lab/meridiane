@@ -19,7 +19,7 @@
         <a class="btn btn--primary" routerLink="/login">Login</a>
         <a class="btn" routerLink="/conversations">Conversations</a>
         <a class="btn" routerLink="/http">HTTP Lab</a>
-        <a class="btn" routerLink="/watch-types">WatchTypes Lab</a>
+        <a class="btn" routerLink="/realtime">Realtime Lab</a>
       </div>
     </section>
 
@@ -68,9 +68,8 @@
         <li>HTTP Hydra: collection, item, PATCH, DELETE</li>
         <li>Headers: content-type, bearer auth</li>
         <li>Defaults: timeout, retry (HTTP Lab)</li>
-        <li>SSE/Mercure: watch/unwatch, status</li>
-        <li>SSE/Mercure: watchTypes (topic multi-entités)</li>
-        <li>SSE/Mercure: stratégie connexions (single/auto, sharding URL, newConnection)</li>
+        <li>SSE/Mercure 1.0 : <code>watch$()</code> par ressource (<code>match_urlpattern</code>), <code>watch$(iri)</code> par entité (<code>match</code>)</li>
+        <li>SSE/Mercure : connexion unique, reprise <code>last_event_id</code>, diagnostics (Realtime Lab)</li>
         <li>Upload multipart: <code>/api/file_assets/upload</code></li>
       </ul>
     </section>

@@ -3,25 +3,27 @@ import {
   ResourceRepository,
   AnyQuery,
   HttpCallOptions,
-  Iri,
   IriRequired,
   Collection,
   Item,
   HttpRequestConfig,
 } from '../ports/resource-repository.port';
-import {RealtimePort, RealtimeStatus} from '../ports/realtime.port';
+import {RealtimePort} from '../ports/realtime.port';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {filter, map, Observable, share} from 'rxjs';
 import {Facade} from './facade.interface';
-import {WatchConnectionOptions} from '../bridge.types';
-import {toIriList} from '../utils/iri';
+import {RealtimeStatus} from '../bridge.types';
+import {ResourceEvent, ResourceTopic} from '../bridge/sse/resource-topic';
+
+export type {ResourceEvent} from '../bridge/sse/resource-topic';
 
 export class ResourceFacade<T extends Item> implements Facade<T> {
   readonly connectionStatus: Signal<RealtimeStatus>;
 
   constructor(
     protected readonly repo: ResourceRepository<T>,
-    protected readonly realtime: RealtimePort
+    protected readonly realtime: RealtimePort,
+    protected readonly topic: ResourceTopic,
   ) {
     this.connectionStatus = toSignal(this.realtime.status$(), {initialValue: 'closed'});
   }
@@ -55,41 +57,18 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
   }
 
   /**
-   * Subscribes to real-time updates for one or many IRIs.
-   * Undefined/empty values are ignored.
+   * Streams changes of one item when an IRI is supplied, or of the resource's items otherwise.
+   *
+   * Item subscriptions use `match`; resource subscriptions use `match_urlpattern`.
+   * Unsubscribing releases this consumer; other consumers keep sharing the connection.
    */
-  watch$(iri: Iri | Iri[], options?: WatchConnectionOptions): Observable<T> {
-    return this.subscribeAndSync(toIriList(iri), options);
-  }
-  unwatch(iri: Iri | Iri[]): void {
-    this.realtime.unsubscribe(toIriList(iri));
-  }
-
-  /**
-   * Subscribes to updates of a related sub-resource published on the parent topic.
-   * Example: subscribe to Message events on a Conversation topic, filtering by `message.conversation`.
-   */
-  watchSubResource$<R>(
-    iri: Iri | Iri[],
-    field: string,
-    options?: WatchConnectionOptions
-  ): Observable<R> {
-    const iris = toIriList(iri);
+  watch$(iri?: IriRequired): Observable<ResourceEvent<T>> {
+    const topic = iri === undefined ? this.topic : this.topic.forIri(iri);
     return this.realtime
-      .subscribe$<R>(iris, {field}, options)
+      .subscribe$({match: topic.match, type: topic.type})
       .pipe(
-        map((event) => event.data),
-        filter((data): data is R => data !== undefined),
-        share()
-      );
-  }
-
-  protected subscribeAndSync(iris: string[], options?: WatchConnectionOptions): Observable<T> {
-    return this.realtime
-      .subscribe$<T>(iris, undefined, options)
-      .pipe(
-        map((event) => event.data),
-        filter((data): data is T => data !== undefined),
+        map((update) => topic.toEvent<T>(update.data)),
+        filter((event): event is ResourceEvent<T> => event !== undefined),
         share()
       );
   }

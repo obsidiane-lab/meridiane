@@ -42,11 +42,23 @@ Le template Angular sépare les responsabilités techniques sans exposer ces dé
 - `provide-bridge.ts` assemble la configuration et les providers ;
 - `interceptors/` porte les règles HTTP transverses, dont l'authentification limitée à l'API configurée ;
 - `bridge/rest/` adapte les appels HTTP à API Platform ;
-- `bridge/sse/` orchestre Mercure et isole la gestion des connexions, des abonnements et des payloads ;
-- `facades/` fournit l'API métier consommée par les applications Angular ;
+- `bridge/sse/` implémente Mercure 1.0 : connexion unique partagée (`mercure-hub.ts`), URL d'abonnement et routage des updates vers les ressources (`resource-topic.ts`) ;
+- `facades/` fournit les opérations HTTP et les abonnements par ressource ou par IRI consommés par les applications Angular ;
 - `ports/` décrit les contrats internes entre facades et adaptateurs.
 
 Seuls les symboles réexportés par `public-api.ts` appartiennent au contrat public du bridge.
+
+### Frontière avec l'application consommatrice
+
+Meridiane garde une approche « entity first » : les modèles suivent le contrat OpenAPI et
+les ressources HTTP/Mercure conservent leur représentation JSON, y compris les relations
+par IRI. Le bridge ne résout pas les relations et ne stocke pas les entités.
+
+Dans une application telle que Foundation, le repository appelle le bridge et applique
+les réponses HTTP et événements `upsert` / `delete` au store à signaux. Les services
+composent les données et portent la logique métier ; les composants lisent les signaux.
+Le développeur configure les publications et les topics API Platform nécessaires à la
+cohérence entre entités, ainsi que le chargement différé des relations.
 
 ## Environnement de développement
 

@@ -123,6 +123,7 @@ Pour une URL finissant par `/api/docs.json`, Meridiane tente automatiquement un 
 
 ## Notes utiles
 
+- `generate`, `dev` et `build` produisent les mêmes types pour une même spec et les mêmes options. Les propriétés requises et la nullabilité suivent OpenAPI, y compris en développement.
 - `PATCH` sur schémas merge-patch : pas de modèle dédié, typage en `Partial<T>`.
 - Les noms de modèles sont normalisés et désambiguïsés selon le format si nécessaire.
 - `meridiane generate` ne modifie pas `angular.json`.

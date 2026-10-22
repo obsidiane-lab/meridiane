@@ -3,23 +3,26 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   ElementRef,
   inject,
   OnDestroy,
   signal,
   Signal,
+  untracked,
   ViewChild,
 } from '@angular/core';
 
 import {FormBuilder, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Router} from '@angular/router';
-import {BridgeFacade, Iri, IriRequired, WatchConnectionOptions} from '@obsidiane/bridge-sandbox';
-import type {ConversationConversationRead as Conversation, MessageMessageRead as Message} from '@obsidiane/bridge-sandbox';
+import {BridgeFacade, Iri, IriRequired} from '@obsidiane/bridge-sandbox';
+import type {Conversation, Message} from '@obsidiane/bridge-sandbox';
 import {JsonViewerComponent} from '../shared/json-viewer.component';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {Subject, Subscription, takeUntil} from 'rxjs';
 import {ConversationRepository} from '../../data/repositories/conversation.repository';
 import {MessageRepository} from '../../data/repositories/message.repository';
+import {ConversationService} from '../../data/services/conversation.service';
 
 interface LogEntry {
   t: number;
@@ -70,6 +73,7 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly conversationsRepo = inject(ConversationRepository);
   private readonly messagesRepo = inject(MessageRepository);
+  private readonly conversationService = inject(ConversationService);
 
   readonly createForm = this.fb.nonNullable.group({
     title: ['New conversation', [Validators.required]],
@@ -83,12 +87,6 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
 
   readonly sendMessageForm = this.fb.nonNullable.group({
     text: ['', [Validators.required]],
-  });
-
-  readonly realtimeWatchForm = this.fb.nonNullable.group({
-    watchAllNewConnection: [false],
-    watchOneNewConnection: [false],
-    watchMessagesNewConnection: [false],
   });
 
   // Logs
@@ -125,7 +123,6 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   private readonly stopSelectedSse$ = new Subject<void>();
   private readonly destroyRef = inject(DestroyRef);
   private watchAllSub?: Subscription;
-  private watchOneSub?: Subscription;
 
   @ViewChild('messagesViewport') private messagesViewport?: ElementRef<HTMLElement>;
   @ViewChild('composer') private composer?: ElementRef<HTMLTextAreaElement>;
@@ -133,6 +130,25 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   constructor() {
     this.status = this.conversationsRepo.status;
     this.conversations = this.conversationsRepo.conversations();
+
+    effect((onCleanup) => {
+      const conversation = this.selected();
+      if (!conversation) {
+        this.messagesLoading.set(false);
+        return;
+      }
+
+      this.messagesLoading.set(true);
+      const subscription = untracked(() => this.conversationService.loadMessages$(conversation)).subscribe({
+        next: () => this.scrollMessagesToBottom(),
+        error: (err) => {
+          this.error.set(err?.message || 'Failed to load messages');
+          this.messagesLoading.set(false);
+        },
+        complete: () => this.messagesLoading.set(false),
+      });
+      onCleanup(() => subscription.unsubscribe());
+    });
 
     this.bridge.get$<MeResponse>('/api/auth/me').subscribe({
       next: (res) => {
@@ -157,8 +173,6 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
     this.stopSelectedSse$.complete();
     this.watchAllSub?.unsubscribe();
     this.watchAllSub = undefined;
-    this.watchOneSub?.unsubscribe();
-    this.watchOneSub = undefined;
   }
 
   routing() {
@@ -192,13 +206,7 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
   }
 
   watchAll() {
-    this.watchAllSub?.unsubscribe();
-    const iris = this.conversations()
-      .map((c) => c['@id'])
-      .filter((x): x is IriRequired => typeof x === 'string' && x.length > 0);
-    const options = this.watchOptions(this.realtimeWatchForm.controls.watchAllNewConnection.value);
-
-    this.watchAllSub = this.conversationsRepo.watch$(iris, options).subscribe(() => undefined);
+    this.watchAllSub ??= this.conversationsRepo.watch$().subscribe();
   }
 
   unwatchAll() {
@@ -218,44 +226,23 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
     const conversationIri = c['@id'];
     if (!conversationIri) return;
 
-    this.selectedMessagesSource.set(this.messagesRepo.messagesForConversation(conversationIri));
+    this.selectedMessagesSource.set(this.conversationService.messagesForConversation(conversationIri));
 
-    this.messagesLoading.set(true);
-    this.messagesRepo
-      .fetchByConversation$(conversationIri, {page: 1, itemsPerPage: 50})
-      .subscribe({
-        next: () => {
-          this.messagesLoading.set(false);
-          this.scrollMessagesToBottom();
-        },
-        error: () => this.messagesLoading.set(false),
-      });
-
-    // Listen to Message events published on Conversation topic
-    const watchMessagesOptions = this.watchOptions(this.realtimeWatchForm.controls.watchMessagesNewConnection.value);
     this.conversationsRepo
-      .watchMessages$(conversationIri, watchMessagesOptions)
+      .watch$(conversationIri)
       .pipe(takeUntilDestroyed(this.destroyRef), takeUntil(this.stopSelectedSse$))
-      .subscribe(() => {
-        this.scrollMessagesToBottom();
-        this.conversationsRepo.fetch$(conversationIri).subscribe(() => undefined);
+      .subscribe({error: (err) => this.error.set(err?.message || 'Conversation subscription failed')});
+
+    // Message changes rebuild the store; the selected conversation view is a store query.
+    this.messagesRepo
+      .watch$()
+      .pipe(takeUntilDestroyed(this.destroyRef), takeUntil(this.stopSelectedSse$))
+      .subscribe({
+        next: () => this.scrollMessagesToBottom(),
+        error: (err) => this.error.set(err?.message || 'Message subscription failed'),
       });
 
     queueMicrotask(() => this.composer?.nativeElement?.focus());
-  }
-
-  watchOne() {
-    const iri = this.selectedId();
-    if (iri) {
-      this.watchOneSub?.unsubscribe();
-      const options = this.watchOptions(this.realtimeWatchForm.controls.watchOneNewConnection.value);
-      this.watchOneSub = this.conversationsRepo.watch$(iri as IriRequired, options).subscribe(() => undefined);
-    }
-  }
-
-  unwatchOne() {
-    this.watchOneSub?.unsubscribe();
-    this.watchOneSub = undefined;
   }
 
   manualGet() {
@@ -430,10 +417,6 @@ export class ConversationsLabComponent implements AfterViewInit, OnDestroy {
     const next = [...arr, entry];
     if (next.length > 200) next.splice(0, next.length - 200);
     this._logs.set(next);
-  }
-
-  private watchOptions(forceDedicatedConnection: boolean): WatchConnectionOptions | undefined {
-    return forceDedicatedConnection ? {newConnection: true} : undefined;
   }
 
   private readAuthor(message: Message): unknown {

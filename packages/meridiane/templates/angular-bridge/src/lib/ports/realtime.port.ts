@@ -1,71 +1,33 @@
 import {Observable} from 'rxjs';
-import {Iri} from './resource-repository.port';
-import {RealtimeConnectionStatus, RealtimeDiagnostics, WatchConnectionOptions} from '../bridge.types';
+import {RealtimeDiagnostics, RealtimeStatus} from '../bridge.types';
 
-export type RealtimeStatus = RealtimeConnectionStatus;
-
-export interface SseEvent {
-  type: string;
-  data: string;
-  lastEventId?: string;
+/**
+ * A Mercure 1.0 subscription, sent to the hub as `match=` (exact) or `match_urlpattern=` (WHATWG URL Pattern).
+ */
+export interface MercureSubscription {
+  /** Absolute topic, or absolute URL Pattern when `type` is `urlpattern` (e.g. `https://api.example.com/api/books/:id`). */
+  match: string;
+  type: 'exact' | 'urlpattern';
 }
 
-export interface SseOptions {
-  withCredentials?: boolean;
+/** A Mercure update received on the SSE connection. */
+export interface MercureUpdate {
+  /** Update ID assigned by the hub (SSE `id`). */
+  id?: string;
+  /** Parsed JSON payload. */
+  data: unknown;
 }
-
-export interface RealtimeEvent<T> {
-  iri: string;
-  /**
-   * Matched subscription topic (normalized).
-   *
-   * - When matching by `@id`, this is typically the same as `iri`.
-   * - When matching by a relation field (e.g. `conversation`), this is the parent topic IRI.
-   */
-  topic?: string;
-  data?: T;
-}
-
-export type SubscribeFilter = {
-  /**
-   * Single relation path used to match events to subscription topics.
-   * Example: `conversation` or `embedded.author`.
-   */
-  field?: string;
-  /**
-   * Multiple relation paths used to match events to subscription topics.
-   */
-  fields?: string[];
-  /**
-   * When relation fields are provided, also include events whose `@id` matches the subscribed topics.
-   *
-   * Default:
-   * - `true` when no relation fields are provided (match by `@id`)
-   * - `false` when relation fields are provided (sub-resource mode)
-   */
-  includeSelf?: boolean;
-};
 
 export interface RealtimePort {
   /**
-   * Subscribes to Mercure events for the given topics.
+   * Registers a subscription for as long as the returned Observable is subscribed.
    *
-   * Note: topics must be stable strings. Undefined values are ignored by the adapter.
+   * Mercure does not tell which subscription matched an update: the stream emits every update received
+   * on the connection, and consumers keep the ones that concern them (e.g. by `@id`).
    */
-  subscribe$<T>(iris: Iri[], filter?: SubscribeFilter, options?: WatchConnectionOptions): Observable<RealtimeEvent<T>>;
-
-  /**
-   * Subscribes to all JSON payloads received on the given Mercure topics.
-   *
-   * No payload-to-topic matching is applied.
-   */
-  subscribeAll$<T>(iris: Iri[], options?: WatchConnectionOptions): Observable<RealtimeEvent<T>>;
-
-  unsubscribe(iris: Iri[]): void;
+  subscribe$(subscription: MercureSubscription): Observable<MercureUpdate>;
 
   status$(): Observable<RealtimeStatus>;
-}
 
-export interface RealtimeDiagnosticsPort extends RealtimePort {
   diagnostics$(): Observable<RealtimeDiagnostics>;
 }

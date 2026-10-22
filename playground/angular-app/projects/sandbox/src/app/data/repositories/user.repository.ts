@@ -2,7 +2,7 @@ import {inject, Injectable, Signal} from '@angular/core';
 import {Observable} from 'rxjs';
 import {tap} from 'rxjs/operators';
 
-import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade} from '@obsidiane/bridge-sandbox';
+import {AnyQuery, Collection, FacadeFactory, Iri, IriRequired, ResourceFacade, ResourceEvent} from '@obsidiane/bridge-sandbox';
 import type {UserUserRead as User} from '@obsidiane/bridge-sandbox';
 import {UserStore} from '../stores/user.store';
 
@@ -21,7 +21,7 @@ export class UserRepository {
   }
 
   fetchAll$(query?: AnyQuery): Observable<Collection<User>> {
-    return this.facade.getCollection$(query).pipe(tap((col) => this.store.setAll(col.member)));
+    return this.facade.getCollection$(query).pipe(tap((col) => this.store.upsertMany(col.member)));
   }
 
   fetch$(iri: IriRequired): Observable<User> {
@@ -40,11 +40,8 @@ export class UserRepository {
     return this.facade.put$(iri, payload).pipe(tap((u) => this.store.upsert(u)));
   }
 
-  watch$(iris: IriRequired | IriRequired[]): Observable<User> {
-    return this.facade.watch$(iris).pipe(tap((u) => this.store.upsert(u)));
-  }
-
-  unwatch(iris: IriRequired | IriRequired[]): void {
-    this.facade.unwatch(iris);
+  /** Applies the Mercure changes of this resource to the store while subscribed. */
+  watch$(iri?: IriRequired): Observable<ResourceEvent<User>> {
+    return this.facade.watch$(iri).pipe(tap((event) => this.store.apply(event)));
   }
 }

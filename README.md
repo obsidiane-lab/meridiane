@@ -2,6 +2,13 @@
 
 CLI pour générer un bridge Angular depuis une spec OpenAPI (API Platform + Mercure), avec un backend Symfony et une sandbox Angular pour valider le runtime.
 
+Meridiane 3.0 prend en charge Mercure 1.0. Le bridge fournit les types du contrat API,
+les appels HTTP et les abonnements temps réel. Dans l'application consommatrice,
+les repositories alimentent des stores à signaux avec les ressources reçues ; les services
+portent les agrégations et la logique métier, et les composants affichent les signaux.
+Les relations restent des IRI lorsque le backend les expose ainsi : leur chargement à la
+demande et la cohérence entre ressources appartiennent à l'application.
+
 ![CI](https://github.com/obsidiane-lab/meridiane/actions/workflows/ci.yml/badge.svg)
 
 ## Organisation du monorepo
