@@ -11,4 +11,4 @@ Chaque store conserve les ressources de son entité sous forme de `Signal<Entity
 
 La liste des entités connues du cache ne remplace pas les membres d'une réponse de collection serveur. Après rechargement, seules les IRI de la collection reçue déterminent les lignes affichées.
 
-HTTP et Mercure alimentent le même store. Un événement `delete` ne doit jamais être enregistré par `upsert` comme une entité ne contenant que `@id`.
+HTTP et Mercure alimentent le même store avec les ressources natives. Le repository utilise `isResourceDeletion` pour reconnaître un payload de suppression et appeler `remove` avec son `@id`, puis `upsert` pour les ressources complètes.

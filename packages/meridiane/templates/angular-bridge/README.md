@@ -188,13 +188,14 @@ Le realtime est inactif tant que `mercure.hubUrl` n’est pas fourni à `provide
 
 `watch$()` écoute une **ressource** via `match_urlpattern` (par défaut `{url}/:id`).
 `watch$(iri)` écoute un item précis via `match`, avec une IRI relative ou absolue.
-Les deux émettent des `ResourceEvent<T>` : `upsert` avec la ressource reçue,
-`delete` avec l'IRI supprimée.
+Les deux retournent un `Observable<T | ResourceDeletion>` et émettent directement
+le JSON reçu : la ressource pour une création ou modification, et `{"@id": ...}`
+pour une suppression. Les éventuels `@type` et `@context` sont conservés.
 
 ```ts
 import {inject, Injectable} from '@angular/core';
 import {tap} from 'rxjs';
-import {FacadeFactory, IriRequired} from '__PACKAGE_NAME__';
+import {Book, FacadeFactory, IriRequired, isResourceDeletion} from '__PACKAGE_NAME__';
 import {BookStore} from './book.store';
 
 @Injectable({providedIn: 'root'})
@@ -207,9 +208,9 @@ export class BooksRepository {
   }
 
   watch$(iri?: IriRequired) {
-    return this.books.watch$(iri).pipe(tap((event) => {
-      if (event.kind === 'delete') this.store.remove(event.iri);
-      else this.store.upsert(event.data);
+    return this.books.watch$(iri).pipe(tap((resource) => {
+      if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
+      else this.store.upsert(resource);
     }));
   }
 }
@@ -223,7 +224,7 @@ relations. Les relations par IRI sont chargées à la demande par l'application.
 
 - Une seule connexion SSE est partagée par toute l’application ; elle est rouverte avec `last_event_id`, s'il est disponible, quand les abonnements changent. La reprise dépend de l'historique du hub et du curseur disponible ; l'application organise sa synchronisation initiale et ses éventuelles resynchronisations.
 - Le désabonnement se fait avec `unsubscribe()`.
-- API Platform publie les suppressions avec `{"@id": ...}` (éventuellement `@type`) ; le repository applique l'événement `delete` en retirant l'entité du store.
+- `ResourceDeletion` étend `Item` avec un `@id: string` requis et les métadonnées optionnelles `@type` et `@context`. `isResourceDeletion(payload: Item): payload is ResourceDeletion` reconnaît ces payloads de suppression ; le repository retire l'entité du store par son `@id`.
 - Les publications et topics nécessaires à la cohérence entre entités liées sont configurés par le développeur côté backend.
 - Authentification : cookie HttpOnly `__Secure-mercure_access_token` posé par le backend (jamais de token dans l’URL ni en JavaScript).
 - IRIs d’item non standard : `factory.create<Book>({url: '/api/books', topic: '/api/library/books/:isbn'})`.

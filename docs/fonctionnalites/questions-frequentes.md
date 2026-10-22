@@ -37,9 +37,11 @@ actualiser les ressources liées.
 
 ## Un événement Mercure provoque-t-il un GET ?
 
-Non. `upsert.data` contient la ressource reçue et `delete.iri` identifie celle à
-retirer du store. Pour appliquer directement `upsert.data`, configurez API Platform
-pour publier la même représentation complète que GET.
+Non. `watch$()` transmet directement la ressource JSON reçue. Pour l'appliquer au
+store, configurez API Platform pour publier la même représentation complète que
+GET. Une suppression conserve le payload `{"@id": ...}` et les éventuels `@type`
+et `@context` ; `isResourceDeletion(resource)` permet au repository de retirer
+`resource['@id']` du store.
 
 ## Comment activer les logs ?
 

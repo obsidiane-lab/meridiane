@@ -9,7 +9,7 @@
 
 Une conversation conserve ses IRI de messages. Chaque message est chargé individuellement via son service et reste dans son propre store. Le chargement d'un message seul permet de récupérer ensuite sa conversation par IRI.
 
-Les repositories appliquent les réponses HTTP et les événements Mercure aux mêmes stores : `upsert` conserve la représentation complète, `delete` retire l'entité par IRI. Les composants se mettent à jour par leurs signaux.
+Les repositories appliquent les réponses HTTP et les payloads natifs Mercure aux mêmes stores : `upsert` conserve la représentation complète ; `isResourceDeletion` reconnaît un payload de suppression pour retirer l'entité par son `@id`. Les composants se mettent à jour par leurs signaux.
 
 Une liste serveur conserve la liste d'IRI de sa réponse courante. Le cache peut connaître d'autres entités, sans les ajouter automatiquement à cette liste. Un rechargement explicite doit réellement rafraîchir les données déjà présentes.
 

@@ -6,6 +6,12 @@ Meridiane 3.0 cible Mercure 1.0. Le bridge conserve les ressources JSON reçues 
 relations par IRI. Les stores à signaux, repositories et services métier restent dans
 l'application consommatrice ; Meridiane fournit les types, HTTP et les abonnements temps réel.
 
+`watch$(iri?)` retourne un `Observable<T | ResourceDeletion>` : la ressource JSON
+reçue pour une création ou modification, ou `{"@id": ...}` pour une suppression,
+avec ses éventuels `@type` et `@context`. Le helper exporté
+`isResourceDeletion()` permet au repository de retirer la ressource du store par
+son `@id`.
+
 Documentation complète du repo : `docs/guide-bridge.md`.
 
 Le bridge généré déclare Angular 20, 21 et 22 comme peer dependencies. Il est compilé

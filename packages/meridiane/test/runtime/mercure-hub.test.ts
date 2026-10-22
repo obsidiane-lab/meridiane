@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {Injector, PLATFORM_ID, runInInjectionContext} from '@angular/core';
 
 const {MercureHub} = await import('../../templates/angular-bridge/src/lib/bridge/sse/mercure-hub.ts');
-const {ResourceFacade} = await import('../../templates/angular-bridge/src/lib/facades/resource.facade.ts');
+const {isResourceDeletion, ResourceFacade} = await import('../../templates/angular-bridge/src/lib/facades/resource.facade.ts');
 const {ResourceTopic} = await import('../../templates/angular-bridge/src/lib/bridge/sse/resource-topic.ts');
 const {MERCURE_HUB_URL, BRIDGE_MERCURE_WITH_CREDENTIALS} = await import('../../templates/angular-bridge/src/lib/tokens.ts');
 
@@ -198,17 +198,17 @@ describe('ResourceFacade.watch$', () => {
     const relative: unknown[] = [];
     const absolute: unknown[] = [];
     const other: unknown[] = [];
-    books.watch$().subscribe((event) => all.push(event));
-    books.watch$('/api/books/1').subscribe((event) => relative.push(event));
-    books.watch$(`${BASE}/api/books/1`).subscribe((event) => absolute.push(event));
-    authors.watch$().subscribe((event) => other.push(event));
+    books.watch$().subscribe((resource) => all.push(resource));
+    books.watch$('/api/books/1').subscribe((resource) => relative.push(resource));
+    books.watch$(`${BASE}/api/books/1`).subscribe((resource) => absolute.push(resource));
+    authors.watch$().subscribe((resource) => other.push(resource));
     t.mock.timers.tick(0);
 
     assert.equal(sources.length, 1);
     const url = new URL(sources[0].url);
     assert.deepEqual(url.searchParams.getAll('match'), [`${BASE}/api/books/1`]);
     assert.deepEqual(url.searchParams.getAll('match_urlpattern').sort(), [AUTHORS.match, BOOKS.match]);
-    const first = {'@id': '/api/books/1', title: 'Dune', author: '/api/authors/1'};
+    const first = {'@id': '/api/books/1', title: 'Dune', author: '/api/authors/1', kind: 'delete', iri: '/business/value', data: {edition: 1}};
     const second = {'@id': `${BASE}/api/books/2`, title: 'Ubik'};
     const author = {'@id': '/api/authors/1', name: 'Herbert'};
     sources[0].message(first);
@@ -216,13 +216,16 @@ describe('ResourceFacade.watch$', () => {
     sources[0].message(author);
     sources[0].message({'@id': '/api/books/1/reviews/2', rating: 5});
     sources[0].message({'@id': 'https://other.example.com/api/books/1', title: 'Other API'});
-    sources[0].message({'@id': `${BASE}/api/books/1`, '@type': 'Book'});
+    const deletion = {'@id': `${BASE}/api/books/1`, '@type': 'Book', '@context': '/api/contexts/Book'};
+    sources[0].message(deletion);
 
-    const upsert = {kind: 'upsert', iri: first['@id'], data: first};
-    const deletion = {kind: 'delete', iri: `${BASE}/api/books/1`};
-    assert.deepEqual(relative, [upsert, deletion]);
+    assert.deepEqual(relative, [first, deletion]);
     assert.deepEqual(absolute, relative);
-    assert.deepEqual(all, [upsert, {kind: 'upsert', iri: second['@id'], data: second}, deletion]);
-    assert.deepEqual(other, [{kind: 'upsert', iri: author['@id'], data: author}]);
+    assert.deepEqual(all, [first, second, deletion]);
+    assert.deepEqual(other, [author]);
+    assert.equal(relative[0], absolute[0]);
+    assert.equal(relative[0], all[0]);
+    assert.equal(isResourceDeletion(first), false);
+    assert.equal(isResourceDeletion(deletion), true);
   });
 });

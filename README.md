@@ -9,6 +9,10 @@ portent les agrégations et la logique métier, et les composants affichent les 
 Les relations restent des IRI lorsque le backend les expose ainsi : leur chargement à la
 demande et la cohérence entre ressources appartiennent à l'application.
 
+Les abonnements `watch$()` transmettent directement les ressources JSON reçues.
+Les suppressions conservent le payload `{"@id": ...}` ; le helper
+`isResourceDeletion()` permet au repository de les appliquer au store.
+
 ![CI](https://github.com/obsidiane-lab/meridiane/actions/workflows/ci.yml/badge.svg)
 
 ## Organisation du monorepo

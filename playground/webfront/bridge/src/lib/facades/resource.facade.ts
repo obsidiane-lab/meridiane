@@ -13,9 +13,10 @@ import {toSignal} from '@angular/core/rxjs-interop';
 import {filter, map, Observable, share} from 'rxjs';
 import {Facade} from './facade.interface';
 import {RealtimeStatus} from '../bridge.types';
-import {ResourceEvent, ResourceTopic} from '../bridge/sse/resource-topic';
+import {ResourceDeletion, ResourceTopic} from '../bridge/sse/resource-topic';
 
-export type {ResourceEvent} from '../bridge/sse/resource-topic';
+export {isResourceDeletion} from '../bridge/sse/resource-topic';
+export type {ResourceDeletion} from '../bridge/sse/resource-topic';
 
 export class ResourceFacade<T extends Item> implements Facade<T> {
   readonly connectionStatus: Signal<RealtimeStatus>;
@@ -58,17 +59,18 @@ export class ResourceFacade<T extends Item> implements Facade<T> {
 
   /**
    * Streams changes of one item when an IRI is supplied, or of the resource's items otherwise.
+   * Payloads are forwarded unchanged, including deletion payloads and their JSON-LD metadata.
    *
    * Item subscriptions use `match`; resource subscriptions use `match_urlpattern`.
    * Unsubscribing releases this consumer; other consumers keep sharing the connection.
    */
-  watch$(iri?: IriRequired): Observable<ResourceEvent<T>> {
+  watch$(iri?: IriRequired): Observable<T | ResourceDeletion> {
     const topic = iri === undefined ? this.topic : this.topic.forIri(iri);
     return this.realtime
       .subscribe$({match: topic.match, type: topic.type})
       .pipe(
-        map((update) => topic.toEvent<T>(update.data)),
-        filter((event): event is ResourceEvent<T> => event !== undefined),
+        map((update) => topic.toResource<T>(update.data)),
+        filter((resource): resource is T | ResourceDeletion => resource !== undefined),
         share()
       );
   }

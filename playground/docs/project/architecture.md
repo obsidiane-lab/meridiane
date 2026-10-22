@@ -11,7 +11,7 @@ Les ressources restent proches des entités Symfony, sans groupes de sérialisat
 | Service | Actions applicatives, agrégation et chargement des relations. |
 | Composant | Actions utilisateur et lecture des signaux. |
 
-Les réponses HTTP et les événements Mercure `upsert` alimentent les mêmes stores. Les événements `delete` retirent la ressource par IRI. Les abonnements sont libérés avec leurs consommateurs.
+Les réponses HTTP et les payloads natifs Mercure alimentent les mêmes stores. Le repository conserve directement la ressource complète avec `upsert` ; un payload reconnu par `isResourceDeletion` retire la ressource par son `@id`. Les abonnements sont libérés avec leurs consommateurs.
 
 Le choix des topics et la publication d'une conversation actualisée après une mutation de ses messages appartiennent au backend de cette application de test. Meridiane transporte et route les événements ; il ne reconstruit pas les relations métier.
 

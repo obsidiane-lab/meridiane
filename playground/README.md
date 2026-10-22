@@ -49,7 +49,7 @@ Ouvrir deux onglets sur l'application et garder les requêtes réseau visibles p
 | Revenir sur une ressource déjà chargée | Les ressources connues sont réutilisées ; les entités liées restent dans leurs stores respectifs. |
 | Créer ou modifier depuis le second onglet | Les événements Mercure alimentent les stores ; les signaux actualisent l'autre écran. |
 | Ajouter ou supprimer un message | Le backend publie aussi la conversation actualisée ; sa liste d'IRI reflète la relation courante. |
-| Supprimer depuis le second onglet | L'événement `delete` retire l'entité du store, sans conserver une entrée contenant seulement `@id`. |
+| Supprimer depuis le second onglet | Le payload natif de suppression, reconnu par `isResourceDeletion`, retire l'entité du store par son `@id`. |
 | Désactiver le temps réel, modifier ailleurs, puis recharger | Le rafraîchissement explicite récupère les valeurs courantes, y compris les messages déjà connus. |
 | Supprimer une conversation ailleurs puis recharger la liste | La conversation absente de la réponse ne reste pas affichée à cause du cache. |
 | Changer de sélection et désactiver le temps réel | Les écoutes devenues inutiles sont libérées ; les diagnostics permettent de suivre la connexion. |

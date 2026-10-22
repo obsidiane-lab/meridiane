@@ -29,31 +29,44 @@ Sans `mercure`, le realtime est désactivé. Un `hubUrl` relatif est résolu par
 
 ## Écouter une ressource
 
-`ResourceFacade<T>.watch$(iri?: IriRequired)` émet les changements sous forme d'événements d'entité :
+`ResourceFacade<T>.watch$(iri?: IriRequired)` retourne un
+`Observable<T | ResourceDeletion>` et émet directement le JSON reçu : la ressource
+pour une création ou modification, ou le payload de suppression d'API Platform.
+`ResourceDeletion` est un type exporté qui conserve les métadonnées d'un `Item` :
 
 ```ts
-type ResourceEvent<T> =
-  | {kind: 'upsert'; iri: string; data: T}
-  | {kind: 'delete'; iri: string};
+interface ResourceDeletion extends Item {
+  '@id': string;
+}
 ```
 
-Le repository applique ces événements au store de l'application :
+Le helper exporté `isResourceDeletion(payload: Item): payload is ResourceDeletion`
+reconnaît un payload réduit à `@id`, éventuellement accompagné de `@type` et
+`@context`. Le repository applique les ressources au store de l'application :
 
 ```ts
+import {inject, Injectable} from '@angular/core';
+import {Observable, tap} from 'rxjs';
+import {Book, FacadeFactory, IriRequired, isResourceDeletion, ResourceDeletion} from '@acme/backend-bridge';
+import {BookStore} from './book.store';
+
 @Injectable({providedIn: 'root'})
 export class BookRepository {
   private readonly store = inject(BookStore);
   private readonly books = inject(FacadeFactory).create<Book>({url: '/api/books'});
 
-  watch$(iri?: IriRequired): Observable<ResourceEvent<Book>> {
+  watch$(iri?: IriRequired): Observable<Book | ResourceDeletion> {
     return this.books.watch$(iri).pipe(
-      tap((event) => event.kind === 'delete' ? this.store.remove(event.iri) : this.store.upsert(event.data)),
+      tap((resource) => {
+        if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
+        else this.store.upsert(resource);
+      }),
     );
   }
 }
 ```
 
-`data` conserve le JSON reçu. Pour remplacer directement la ressource dans le store,
+Le payload conserve le JSON reçu. Pour remplacer directement la ressource dans le store,
 le backend doit publier la même représentation complète que GET. Meridiane n'ajoute
 pas de GET et ne reconstruit pas les relations.
 
@@ -77,7 +90,7 @@ factory.create<Book>({url: '/api/books', topic: '/api/library/books/:isbn'});
 
 ### Suppressions
 
-[API Platform](https://api-platform.com/docs/core/mercure/#pushing-the-api-updates) publie une suppression avec un payload réduit à `{"@id": ...}` (éventuellement accompagné de `@type`). Le bridge émet alors `{kind: 'delete', iri}`. Le repository retire cette IRI du store ; les signaux propagent la suppression aux composants.
+[API Platform](https://api-platform.com/docs/core/mercure/#pushing-the-api-updates) publie une suppression avec un payload réduit à `{"@id": ...}`. Le bridge le transmet tel quel, en conservant aussi les éventuels `@type` et `@context`. Le repository utilise `isResourceDeletion(resource)` puis retire `resource['@id']` du store ; les signaux propagent la suppression aux composants.
 
 ## Une seule connexion
 
@@ -156,7 +169,6 @@ migration de Meridiane accompagne le passage du hub de Mercure 0.x à Mercure 1.
 | `resource.watch$(iri \| iri[])` + `unwatch(iri)` | `resource.watch$(iri)` pour un item ou `watch$()` pour la ressource ; un abonnement par IRI pour plusieurs items, libéré avec `unsubscribe()` |
 | `resource.watchSubResource$(parentIri, field)` | chargement des IRI liées et abonnements explicites dans le repository de l'application |
 | `bridge.watch$()`, `bridge.watchTypes$()`, `bridge.unwatch()` | supprimés : écouter chaque ressource avec `watch$()` |
-| événements = payload brut | `ResourceEvent<T>` (`upsert` / `delete`) |
 | `mercure.connectionMode`, `maxUrlLength`, `newConnection` | supprimés (connexion unique) |
 | `mercure.topicMode` | supprimé (topics absolus, comme API Platform) |
 | `mercure.init: {credentials}` | `mercure.withCredentials` |

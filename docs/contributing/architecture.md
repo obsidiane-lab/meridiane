@@ -55,8 +55,10 @@ les ressources HTTP/Mercure conservent leur représentation JSON, y compris les 
 par IRI. Le bridge ne résout pas les relations et ne stocke pas les entités.
 
 Dans une application telle que Foundation, le repository appelle le bridge et applique
-les réponses HTTP et événements `upsert` / `delete` au store à signaux. Les services
-composent les données et portent la logique métier ; les composants lisent les signaux.
+les réponses HTTP et les ressources JSON reçues par Mercure au store à signaux.
+Il utilise `isResourceDeletion()` pour retirer du store une ressource supprimée.
+Les services composent les données et portent la logique métier ; les composants
+lisent les signaux.
 Le développeur configure les publications et les topics API Platform nécessaires à la
 cohérence entre entités, ainsi que le chargement différé des relations.
 

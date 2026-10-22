@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { catchError, tap, throwError } from 'rxjs';
-import { FacadeFactory, type Message, type Iri, type IriRequired, type ResourceEvent } from 'bridge';
+import { FacadeFactory, isResourceDeletion, type Message, type Iri, type IriRequired } from 'bridge';
 import { iriOf } from 'src/app/core/utils/iri.util';
 import { MessageStore } from '../stores/message.store';
 
@@ -57,11 +57,11 @@ export class MessageRepository {
   }
 
   watch$(iri?: IriRequired) {
-    return this.facade.watch$(iri).pipe(tap((event) => this.applyEvent(event)));
-  }
-
-  private applyEvent(event: ResourceEvent<Message>): void {
-    if (event.kind === 'delete') this.store.remove(event.iri);
-    else this.store.upsert(event.data);
+    return this.facade.watch$(iri).pipe(
+      tap((resource) => {
+        if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
+        else this.store.upsert(resource);
+      }),
+    );
   }
 }

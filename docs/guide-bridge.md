@@ -130,17 +130,21 @@ Mercure est optionnel. Sans `mercure.hubUrl`, aucune connexion SSE n'est ouverte
 
 `watch$()` écoute tous les items de la ressource via `match_urlpattern`. `watch$(iri)`
 écoute un item précis via `match`, avec une IRI relative ou absolue. Les deux émettent
-des événements `upsert` / `delete` que le repository applique au store.
+directement les ressources JSON reçues (`T | ResourceDeletion`) que le repository
+applique au store. `isResourceDeletion()` reconnaît un payload de suppression limité
+à `@id`, éventuellement accompagné de `@type` et `@context`.
 
 ```ts
+import {isResourceDeletion} from '@acme/backend-bridge';
+
 const books = factory.create<Book>({url: '/api/books'});
 
-const allBooks = books.watch$().subscribe((event) =>
-  event.kind === 'delete' ? store.remove(event.iri) : store.upsert(event.data)
+const allBooks = books.watch$().subscribe((resource) =>
+  isResourceDeletion(resource) ? store.remove(resource['@id']) : store.upsert(resource)
 );
 
-const oneBook = books.watch$('/api/books/42').subscribe((event) =>
-  event.kind === 'delete' ? store.remove(event.iri) : store.upsert(event.data)
+const oneBook = books.watch$('/api/books/42').subscribe((resource) =>
+  isResourceDeletion(resource) ? store.remove(resource['@id']) : store.upsert(resource)
 );
 // Quand l'écoute n'est plus nécessaire :
 allBooks.unsubscribe();
@@ -168,7 +172,7 @@ Le repository alimente le même store depuis HTTP et Mercure. Exemple avec un
 ```ts
 import {inject, Injectable} from '@angular/core';
 import {tap} from 'rxjs';
-import {Book, FacadeFactory, IriRequired} from '@acme/backend-bridge';
+import {Book, FacadeFactory, IriRequired, isResourceDeletion} from '@acme/backend-bridge';
 import {BookStore} from './book.store';
 
 @Injectable({providedIn: 'root'})
@@ -182,9 +186,9 @@ export class BookRepository {
   }
 
   watch$(iri?: IriRequired) {
-    return this.api.watch$(iri).pipe(tap((event) => {
-      if (event.kind === 'delete') this.store.remove(event.iri);
-      else this.store.upsert(event.data);
+    return this.api.watch$(iri).pipe(tap((resource) => {
+      if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
+      else this.store.upsert(resource);
     }));
   }
 }

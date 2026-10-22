@@ -12,10 +12,10 @@ Une collection serveur et le cache d'entités ont des rôles différents : la r�
 
 ## Écritures et temps réel
 
-La façade expose `watch$(iri)` pour une entité et `watch$()` pour les ressources de cette façade. Les événements sont des `ResourceEvent<T>` :
+La façade expose `watch$(iri)` pour une entité et `watch$()` pour les ressources de cette façade. Ces observables émettent directement les payloads JSON natifs, typés `T | ResourceDeletion`, sans enveloppe d'événement :
 
-- `upsert` : placer la ressource complète dans le store ;
-- `delete` : retirer la ressource par son IRI.
+- si `isResourceDeletion(resource)` renvoie `true`, retirer la ressource du store par `resource['@id']` ;
+- sinon, conserver directement `resource` avec `store.upsert(resource)`.
 
 Les réponses HTTP de mutation alimentent aussi le store pour confirmer l'action locale. Les événements Mercure maintiennent les autres clients à jour. Appliquer deux fois la même représentation reste sans effet métier supplémentaire.
 

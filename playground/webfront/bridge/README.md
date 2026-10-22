@@ -188,13 +188,14 @@ Le realtime est inactif tant que `mercure.hubUrl` n’est pas fourni à `provide
 
 `watch$()` écoute une **ressource** via `match_urlpattern` (par défaut `{url}/:id`).
 `watch$(iri)` écoute un item précis via `match`, avec une IRI relative ou absolue.
-Les deux émettent des `ResourceEvent<T>` : `upsert` avec la ressource reçue,
-`delete` avec l'IRI supprimée.
+Les deux retournent un `Observable<T | ResourceDeletion>` et émettent directement
+le JSON reçu : la ressource pour une création ou modification, et `{"@id": ...}`
+pour une suppression. Les éventuels `@type` et `@context` sont conservés.
 
 ```ts
 import {inject, Injectable} from '@angular/core';
 import {tap} from 'rxjs';
-import {FacadeFactory, IriRequired} from '@app/bridge';
+import {Book, FacadeFactory, IriRequired, isResourceDeletion} from '@app/bridge';
 import {BookStore} from './book.store';
 
 @Injectable({providedIn: 'root'})
@@ -207,9 +208,9 @@ export class BooksRepository {
   }
 
   watch$(iri?: IriRequired) {
-    return this.books.watch$(iri).pipe(tap((event) => {
-      if (event.kind === 'delete') this.store.remove(event.iri);
-      else this.store.upsert(event.data);
+    return this.books.watch$(iri).pipe(tap((resource) => {
+      if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
+      else this.store.upsert(resource);
     }));
   }
 }
@@ -223,7 +224,7 @@ relations. Les relations par IRI sont chargées à la demande par l'application.
 
 - Une seule connexion SSE est partagée par toute l’application ; elle est rouverte avec `last_event_id`, s'il est disponible, quand les abonnements changent. La reprise dépend de l'historique du hub et du curseur disponible ; l'application organise sa synchronisation initiale et ses éventuelles resynchronisations.
 - Le désabonnement se fait avec `unsubscribe()`.
-- API Platform publie les suppressions avec `{"@id": ...}` (éventuellement `@type`) ; le repository applique l'événement `delete` en retirant l'entité du store.
+- `ResourceDeletion` étend `Item` avec un `@id: string` requis et les métadonnées optionnelles `@type` et `@context`. `isResourceDeletion(payload: Item): payload is ResourceDeletion` reconnaît ces payloads de suppression ; le repository retire l'entité du store par son `@id`.
 - Les publications et topics nécessaires à la cohérence entre entités liées sont configurés par le développeur côté backend.
 - Authentification : cookie HttpOnly `__Secure-mercure_access_token` posé par le backend (jamais de token dans l’URL ni en JavaScript).
 - IRIs d’item non standard : `factory.create<Book>({url: '/api/books', topic: '/api/library/books/:isbn'})`.
@@ -261,49 +262,69 @@ En JSON-LD (`application/ld+json`), l’IRI est typiquement dans `model['@id']`.
 
 ## Documentation du projet
 
-# Foundation Webfront
+# Playground Meridiane
 
-Frontend Angular 22 + Spartan UI + Tailwind 4 du template Foundation.
-Il est relie au backend via le bridge Meridiane genere localement.
+Application de test reconstruite depuis [Foundation](https://gitlab.com/angryblackbird/foundation), commit `fecf8e7`. Elle conserve Symfony/API Platform, Angular 22 et Spartan UI ; la connexion, User, Project et les anciennes migrations ont été retirés.
 
-## Workflow nominal
+Le but est de valider le bridge local Meridiane 3.0 avec Mercure 1.0 : ressources natives, relations par IRI, repositories, stores à signaux, services et composants.
+
+## Démarrage
+
+Prérequis : Docker Compose, Node 24.15+ et npm 11+. Les dépendances du générateur doivent être installées à la racine du dépôt (`npm ci`).
+
+Depuis `playground/` :
 
 ```bash
-docker compose up --build -d
-make lint
-make build
+make init
 ```
 
-Le flux standard du repo est Docker-first.
-Les scripts `npm run ...` restent les primitives du conteneur `webfront`, mais la DX nominale passe par le `Makefile` racine.
+Cette commande démarre la stack, prépare le schéma Conversation/Message dans sa base dédiée, crée une conversation avec deux messages si aucune conversation n'existe, puis génère le bridge avec les sources locales du dépôt. Elle ne réinitialise pas une base existante.
 
-## Bridge
+- Application via Caddy : <http://localhost:8000/conversations>.
+- Serveur Angular direct : <http://localhost:4200/conversations>.
+- Documentation API : <http://localhost:8000/api/docs>.
+- Hub Mercure : <http://localhost:8000/.well-known/mercure>.
 
-Le bridge vit dans `webfront/bridge/` et est versionne dans le repo.
-Quand le contrat backend change :
+La configuration de développement est fournie dans `compose.yaml`, sans fichier `.env` ni fournisseur de connexion à configurer. Le projet Compose `meridiane-playground` utilise ses propres volumes. Cette application anonyme est réservée aux tests locaux.
+
+## Bridge et contrôles
+
+Depuis `playground/` :
 
 ```bash
 make bridge
+make lint
+make build
+make phpstan
 ```
 
-## Conventions frontend
+`make bridge` exporte le contrat OpenAPI du backend et appelle `../packages/meridiane/cli.js` pour régénérer `webfront/bridge/`. Le générateur vient des sources locales, pas du registre npm. Ne pas modifier le bridge à la main.
 
-- Angular 22 standalone, zoneless et `OnPush` par defaut ;
-- Spartan UI comme unique kit d'interface ;
-- primitives Helm generees dans `src/app/shared/ui/`, gerees exclusivement par le CLI et jamais modifiees manuellement ;
-- pages et composites applicatifs composes hors de `src/app/shared/ui/` ;
-- une seule feuille globale `src/styles.css`, une palette neutre noire et les modes `light` / `dark` ;
-- classes Tailwind standard dans le code applicatif, sans valeurs arbitraires ;
-- icones Lucide uniquement ;
-- code compatible zoneless ;
-- architecture `store -> repository -> service -> composant` ;
-- `AppTable` pour les listes paginees standard ;
-- aucune modification manuelle du bridge.
+`make check` réunit lint, build et PHPStan. `make down` arrête la stack sans supprimer les volumes.
 
-## Documentation
+## Parcours de validation
 
-- scope frontend : `webfront/AGENTS.md`
-- guide frontend : `webfront/docs/README.md`
-- source de verite UI : `webfront/docs/ui/spartan.md`
-- docs projet durables : `docs/project/README.md`
-- pattern bridge : `.codex/patterns/bridge/contract-generation.md`
+Ouvrir deux onglets sur l'application et garder les requêtes réseau visibles pour les contrôles de chargement.
+
+| Parcours | Résultat attendu |
+| --- | --- |
+| Sélectionner une conversation | Réutilisation de sa ressource native ou GET par IRI, puis GET individuel des messages manquants. |
+| Charger un message par son IRI | Le message garde une IRI de conversation ; cette conversation peut être chargée et affichée ensuite. |
+| Revenir sur une ressource déjà chargée | Les ressources connues sont réutilisées ; les entités liées restent dans leurs stores respectifs. |
+| Créer ou modifier depuis le second onglet | Les événements Mercure alimentent les stores ; les signaux actualisent l'autre écran. |
+| Ajouter ou supprimer un message | Le backend publie aussi la conversation actualisée ; sa liste d'IRI reflète la relation courante. |
+| Supprimer depuis le second onglet | Le payload natif de suppression, reconnu par `isResourceDeletion`, retire l'entité du store par son `@id`. |
+| Désactiver le temps réel, modifier ailleurs, puis recharger | Le rafraîchissement explicite récupère les valeurs courantes, y compris les messages déjà connus. |
+| Supprimer une conversation ailleurs puis recharger la liste | La conversation absente de la réponse ne reste pas affichée à cause du cache. |
+| Changer de sélection et désactiver le temps réel | Les écoutes devenues inutiles sont libérées ; les diagnostics permettent de suivre la connexion. |
+
+La publication des topics et la cohérence Conversation/Message sont des règles de cette application de test. Meridiane assure le typage, HTTP et le temps réel ; il ne reconstruit pas les relations métier.
+
+## Structure
+
+- `core/` : entités et API Platform, publication Mercure, commande `app:seed`.
+- `webfront/` : frontend Foundation et parcours Conversation/Message.
+- `webfront/bridge/` : types et runtime générés avec les commandes locales Meridiane.
+- `@obsidiane/` : runtime Caddy/FrankenPHP et configuration Angular.
+
+Le socle `.agents/` et `.codex/` de Foundation est conservé. Ses exemples génériques ne décrivent pas les fonctionnalités installées dans le playground. La licence Foundation d'origine est conservée dans [LICENSE](LICENSE).

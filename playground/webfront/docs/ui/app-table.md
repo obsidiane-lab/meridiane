@@ -58,7 +58,7 @@ Le composant de page importe `TableComponent` et `HlmTableImports`. Les textes r
 
 - `AppTable` ignore une réponse devenue obsolète lorsqu'une requête plus récente est en cours ;
 - sans `trackBy`, le suivi essaie `id`, `@id`, `iri`, `uuid`, puis l'index ;
-- lors d'un événement SSE de collection, le repository applique `upsert/delete` au store et la page appelle `table.reload()` ;
+- lors d'un événement SSE de collection, le repository passe le payload natif à `upsert`, ou appelle `remove` par `@id` si `isResourceDeletion` le reconnaît ; la page appelle `table.reload()` ;
 - ne pas ajouter un second spinner autour de la table.
 
 Ce composant Foundation est conservé comme composition réutilisable. Le playground Conversation/Message peut afficher directement les signaux des ressources.
