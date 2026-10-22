@@ -51,7 +51,8 @@ URLs locales :
 - docs API : `http://localhost:8000/api/docs`
 - sandbox Angular : `http://localhost:4200`
 
-Le playground est anonyme et fournit une conversation avec deux messages. Son
+Le playground n'a pas de compte utilisateur ; l'abonnement Mercure passe par le cookie
+posé par `/api/mercure/authorization`. Il fournit une conversation avec deux messages. Son
 [README](playground/README.md) décrit les scénarios et la génération du bridge local.
 
 ## Utiliser le CLI Meridiane

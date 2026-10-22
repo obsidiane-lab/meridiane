@@ -1,74 +1,51 @@
-import { computed, signal, type Signal } from '@angular/core';
+import { computed, signal, type Signal, type WritableSignal } from '@angular/core';
 import type { Iri, Item } from 'bridge';
 import type { EntityResource } from '../models/entity-resource.model';
 import { iriOf } from '../utils/iri.util';
 
-type EntityResourceIndex<T extends Item> = Record<string, EntityResource<T>>;
-
+/**
+ * Stockage des entités connues : une ligne par IRI, chaque ligne est un signal.
+ * Le même IRI rend toujours le même signal, lu tel quel par les composants.
+ * Le store ne fait que stocker : chargement, HTTP et temps réel restent dans le repository.
+ */
 export abstract class BaseEntityStore<T extends Item> {
-  private readonly resources = signal<EntityResourceIndex<T>>({});
+  private readonly rows = new Map<Iri, WritableSignal<EntityResource<T>>>();
+  /** IRI des lignes écrites ; une ligne seulement lue (idle) n'y figure pas. */
+  private readonly keys = signal<readonly Iri[]>([]);
   private readonly idle = signal<EntityResource<T>>({ state: 'idle', value: null }).asReadonly();
-  private readonly signals = new Map<Iri, Signal<EntityResource<T>>>();
-  private readonly all = computed(() => {
-    const entities: T[] = [];
-
-    for (const resource of Object.values(this.resources())) {
-      if (resource.value !== null) entities.push(resource.value);
-    }
-
-    return entities;
-  });
+  private readonly all = computed(() =>
+    this.keys().flatMap((iri) => {
+      const value = this.rows.get(iri)?.().value;
+      return value ? [value] : [];
+    }),
+  );
 
   entity(iri: Iri | undefined): Signal<EntityResource<T>> {
-    if (!iri) return this.idle;
-
-    const current = this.signals.get(iri);
-    if (current) return current;
-
-    const resource = computed(() => this.resources()[iri] ?? this.idle());
-    this.signals.set(iri, resource);
-
-    return resource;
+    return iri ? this.row(iri).asReadonly() : this.idle;
   }
 
   entities(): Signal<T[]> {
     return this.all;
   }
 
-  setAll(entities: T[]): void {
-    const next: EntityResourceIndex<T> = {};
-    for (const entity of entities) {
-      const iri = iriOf(entity);
-      if (iri) next[iri] = { state: 'ready', value: entity };
-    }
-
-    this.resources.set(next);
+  set(iri: Iri | undefined, resource: EntityResource<T>): void {
+    if (!iri) return;
+    this.row(iri).set(resource);
+    if (!this.keys().includes(iri)) this.keys.update((keys) => [...keys, iri]);
   }
 
   upsert(entity: T): void {
-    const iri = iriOf(entity);
-    if (!iri) return;
-    this.set(iri, { state: 'ready', value: entity });
+    this.set(iriOf(entity), { state: 'ready', value: entity });
   }
 
   upsertMany(entities: T[]): void {
-    this.resources.update((resources) => {
-      const next = { ...resources };
-      for (const entity of entities) {
-        const iri = iriOf(entity);
-        if (iri) next[iri] = { state: 'ready', value: entity };
-      }
-
-      return next;
-    });
+    for (const entity of entities) this.upsert(entity);
   }
 
-  set(iri: Iri | undefined, resource: EntityResource<T>): void {
-    if (!iri) return;
-    this.resources.update((resources) => ({
-      ...resources,
-      [iri]: resource,
-    }));
+  /** Remplace les entités connues ; les lignes absentes repassent à `idle` (leurs signaux restent valides). */
+  setAll(entities: T[]): void {
+    this.clear();
+    this.upsertMany(entities);
   }
 
   remove(iri: Iri | undefined): void {
@@ -76,15 +53,22 @@ export abstract class BaseEntityStore<T extends Item> {
   }
 
   forget(iri: Iri): void {
-    this.resources.update((resources) => {
-      const next = { ...resources };
-      delete next[iri];
-
-      return next;
-    });
+    this.rows.get(iri)?.set({ state: 'idle', value: null });
+    this.keys.update((keys) => keys.filter((key) => key !== iri));
   }
 
   clear(): void {
-    this.resources.set({});
+    for (const iri of this.keys()) this.rows.get(iri)?.set({ state: 'idle', value: null });
+    this.keys.set([]);
+  }
+
+  /** Crée la ligne à la première lecture : sans écriture de signal, donc lisible depuis un template ou un `computed`. */
+  private row(iri: Iri): WritableSignal<EntityResource<T>> {
+    let row = this.rows.get(iri);
+    if (!row) {
+      row = signal<EntityResource<T>>({ state: 'idle', value: null });
+      this.rows.set(iri, row);
+    }
+    return row;
   }
 }

@@ -33,8 +33,9 @@ export async function loadRuntimeConfig(path = '/assets/config.json'): Promise<A
 }
 
 function resolveRuntimeConfig(overrides: RuntimeConfigOverrides): AppRuntimeConfig {
-  const apiBaseUrl = resolveUrl(overrides.app?.apiBaseUrl, '/');
-  const mercureHubUrl = resolveUrl(overrides.app?.mercureHubUrl, '/.well-known/mercure');
+  // Les URL relatives sont résolues par le bridge (contre l'URL du document pour Mercure).
+  const apiBaseUrl = resolveOptionalString(overrides.app?.apiBaseUrl) ?? '/';
+  const mercureHubUrl = resolveOptionalString(overrides.app?.mercureHubUrl) ?? '/.well-known/mercure';
   const version = resolveOptionalString(overrides.app?.version) ?? '';
 
   return {
@@ -45,16 +46,6 @@ function resolveRuntimeConfig(overrides: RuntimeConfigOverrides): AppRuntimeConf
       version,
     },
   };
-}
-
-function resolveUrl(value: string | undefined, fallbackPath: string): string {
-  const raw = resolveOptionalString(value) ?? fallbackPath;
-  if (/^https?:\/\//i.test(raw)) {
-    return raw;
-  }
-
-  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
-  return new URL(normalized, window.location.origin).toString();
 }
 
 function resolveOptionalString(value?: string): string | undefined {

@@ -210,26 +210,66 @@ L'écoute d'une ressource utilise [`URLPattern`](https://developer.mozilla.org/d
 
 Aucune connexion `EventSource` n'est ouverte côté serveur : `watch$()` y complète immédiatement.
 
-## Hub : configuration attendue (Caddyfile)
+## Backend attendu
+
+### Versions
+
+- Hub Mercure 1.x (module Mercure de Caddy / FrankenPHP).
+- symfony/mercure ≥ 0.9 et symfony/mercure-bundle ≥ 0.6 : le protocole 1.0 est leur défaut. Le bundle exige les claims `iss` (un issuer déclaré sur le hub), `sub` et `client_id` dans `jwt.claims`.
+
+### Hub (Caddyfile)
 
 ```caddyfile
 mercure {
-	issuer {$MERCURE_TRUSTED_ISSUERS} {
+	issuer {$MERCURE_JWT_ISSUER} {
 		publisher {
-			jwt {env.MERCURE_PUBLISHER_JWT_KEY} {env.MERCURE_PUBLISHER_JWT_ALG}
+			jwt {env.MERCURE_JWT_KEY} HS256
 		}
 		subscriber {
-			jwt {env.MERCURE_SUBSCRIBER_JWT_KEY} {env.MERCURE_SUBSCRIBER_JWT_ALG}
+			jwt {env.MERCURE_JWT_KEY} HS256
 		}
 	}
-	anonymous
 	cors_origins https://app.example.com
 }
 ```
 
-Côté Symfony (symfony/mercure-bundle ≥ 0.6) : `protocol_version: '1.0'` et les claims `iss` (égal à `MERCURE_TRUSTED_ISSUERS`), `sub` et `client_id` dans `jwt.claims`. Voir `playground/core/config/packages/mercure.yaml` pour une configuration complète. Le JWT abonné utilise `authorization_details` (les claims `mercure.subscribe` / `mercure.publish` ne sont acceptés qu'en mode compatibilité 0.x du hub) et doit être signé avec la clé abonné du hub.
+- symfony/mercure-bundle signe les publications **et** le cookie abonné avec la clé du hub (`jwt.secret`) : l'issuer doit vérifier les deux avec cette même clé.
+- `anonymous` seulement si des updates publiques doivent être reçues sans cookie.
+- En développement sur HTTP : `cookie_name mercure_access_token` (le préfixe `__Secure-` exige HTTPS).
 
-API Platform publie le topic d'un item en IRI absolue construite par le routeur Symfony. Pour les publications faites hors requête HTTP (commande console, worker Messenger), configurez `framework.router.default_uri` afin que l'hôte corresponde à `baseUrl`. Aucun topic de collection n'est nécessaire : `watch$()` écoute la ressource par URL Pattern.
+Voir `playground/@obsidiane/caddy/Caddyfile` et `playground/core/config/packages/mercure.yaml`.
+
+### Endpoint d'autorisation
+
+L'endpoint passé à `mercure.authorize` pose le cookie avec `Authorization::createCookie()`.
+Le JWT porte `authorization_details` (les claims `mercure.subscribe` / `mercure.publish`
+ne sont acceptés qu'en mode compatibilité 0.x du hub). Restreignez le grant aux droits de
+l'utilisateur : le hub ne livre une update privée qu'aux tokens dont un grant couvre son
+topic, et les matchers d'abonnement n'élargissent jamais les droits.
+
+```php
+#[Route('/api/mercure/authorization', methods: ['GET'])]
+public function __invoke(Request $request): Response
+{
+    $grant = new Grant([Grant::ACTION_SUBSCRIBE], [
+        'urlpattern' => ['https://api.example.com/api/books/:id'],
+    ]);
+
+    $response = new Response(null, Response::HTTP_NO_CONTENT, ['Cache-Control' => 'no-store, private']);
+    $response->headers->setCookie($this->authorization->createCookie(
+        $request, [$grant], null, ['exp' => new \DateTimeImmutable('+600 seconds')],
+    ));
+
+    return $response;
+}
+```
+
+Exemple complet : `playground/core/src/Controller/MercureAuthorizationController.php`.
+
+### Publication API Platform
+
+- Aucun topic de collection n'est nécessaire : `watch$()` écoute la ressource par URL Pattern sur les topics d'item publiés par défaut.
+- API Platform publie le topic d'un item en IRI absolue construite par le routeur Symfony. Pour les publications faites hors requête HTTP (commande console, worker Messenger), configurez `framework.router.default_uri` afin que l'hôte corresponde à `baseUrl`.
 
 ## Migration de Meridiane 2.x vers 3.0
 

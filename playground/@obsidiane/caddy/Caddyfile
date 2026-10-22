@@ -40,12 +40,17 @@
 		transport bolt {
 			path /data/mercure.db
 		}
+		# symfony/mercure-bundle signe les publications et le cookie abonné avec la même clé.
 		issuer {$MERCURE_JWT_ISSUER:http://localhost:8000} {
 			publisher {
 				jwt {env.MERCURE_PUBLISHER_JWT_KEY} HS256
 			}
+			subscriber {
+				jwt {env.MERCURE_PUBLISHER_JWT_KEY} HS256
+			}
 		}
-		anonymous
+		# Le préfixe __Secure- exige HTTPS : nom sans préfixe pour le développement en HTTP.
+		cookie_name mercure_access_token
 		cors_origins http://localhost:8000 http://localhost:4200
 	}
 

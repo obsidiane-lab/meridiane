@@ -25,7 +25,7 @@ export function createAppConfig(runtimeConfig: AppRuntimeConfig): ApplicationCon
       { provide: APP_RUNTIME_CONFIG, useValue: runtimeConfig },
       provideBridge({
         baseUrl: runtimeConfig.app.apiBaseUrl,
-        mercure: { hubUrl: runtimeConfig.app.mercureHubUrl },
+        mercure: { hubUrl: runtimeConfig.app.mercureHubUrl, authorize: '/api/mercure/authorization' },
       }),
     ],
   };

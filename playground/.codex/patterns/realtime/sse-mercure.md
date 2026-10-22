@@ -26,14 +26,14 @@ Approche recommandee : entity-driven. Une entite API Platform exposee au fronten
 - Ne pas refetch l'entite a chaque evenement Mercure si l'evenement contient deja la ressource necessaire au store.
 - Liste paginee AppTable : `watchCollection$` fait `store.upsert` pour garder les entites connues a jour, puis la page appelle `table.reload()` ; AppTable recharge sa page courante avec ses filtres/tri et ne rend pas la liste depuis le store.
 - Payload collection AppTable : entite upsertable avec `@id`. Si le payload est custom, mapper explicitement avant d'appliquer ce pattern.
-- Delete reste un cas local : apres DELETE, `unwatch` le topic item puis `store.remove(iri)`.
+- Delete reste un cas local : apres DELETE, `store.remove(iri)` ; l'abonnement se libere avec `unsubscribe()`. Un event delete recu (`isResourceDeletion`) applique aussi `store.remove(iri)`.
 
 ## Strategie obligatoire pour CRUD visible
 
 Par defaut, choisir le temps reel entity-driven :
 
 - topic item pour chaque entite affichee/editee par IRI ;
-- topic collection pour les listes AppTable qui doivent recharger leur pagination courante ;
+- URL Pattern de la ressource (`watch$()` sans IRI) pour les listes AppTable qui doivent recharger leur pagination courante ;
 - refresh manuel ou `non necessaire` seulement avec justification explicite.
 
 ## Checks

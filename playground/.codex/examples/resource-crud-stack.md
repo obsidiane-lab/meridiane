@@ -32,7 +32,7 @@ Cet exemple decrit la forme attendue d'un CRUD Foundation sans imposer de domain
 liste:
   page AppTable (composition applicative Spartan) -> service.fetchAll$ -> repository.fetchAll$ -> bridge.getCollection$ -> store.upsertMany -> Collection<T>
   AppTable garde page/filtres/tri/loading/reponse courante
-  topic collection -> repository.watchCollection$ -> store.upsert -> table.reload() sur la pagination courante
+  URL Pattern de la ressource -> repository.watchCollection$ -> store.upsert -> table.reload() sur la pagination courante
 
 detail:
   page -> service.$resource(iri) -> repository.$entity(iri) -> store.entity(iri)
@@ -41,7 +41,7 @@ detail:
 
 creation:
   page/form -> service.create(payload) -> repository.create$ -> bridge.post$ -> backend persiste
-  API Platform -> Mercure topic collection -> repository.watchCollection$ -> store.upsert -> table.reload() si liste visible
+  API Platform -> Mercure topic item (URL Pattern de la ressource) -> repository.watchCollection$ -> store.upsert -> table.reload() si liste visible
   API Platform -> Mercure topic item -> repository.watch$(iri) -> store.upsert -> signal UI si detail/edit visible
 
 edition:
@@ -51,7 +51,7 @@ edition:
 
 suppression:
   service.delete(iri) -> repository.delete$ -> bridge.delete$
-  repository.unwatch(iri) -> store.remove(iri)
+  repository.delete$ -> store.remove(iri) ; un event delete Mercure (isResourceDeletion) -> store.remove(iri)
 ```
 
 En flux realtime, `create$` et `update$` ne font pas `store.upsert` depuis la reponse HTTP. Les pages detail/edit sont mises a jour par l'evenement item Mercure. Les listes AppTable rendent la reponse paginee de la table ; l'evenement collection garde le store frais puis relance la pagination courante.

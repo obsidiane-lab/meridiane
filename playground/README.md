@@ -20,8 +20,9 @@ Cette commande démarre la stack, prépare le schéma Conversation/Message dans 
 - Serveur Angular direct : <http://localhost:4200/conversations>.
 - Documentation API : <http://localhost:8000/api/docs>.
 - Hub Mercure : <http://localhost:8000/.well-known/mercure>.
+- Autorisation Mercure : <http://localhost:8000/api/mercure/authorization> pose le cookie abonné (`mercure_access_token`, durée `MERCURE_SUBSCRIBER_TTL`, 600 s par défaut). Le hub refuse les abonnés sans cookie : le bridge l'obtient via `mercure.authorize` et le renouvelle quand le hub refuse une reconnexion (token expiré).
 
-La configuration de développement est fournie dans `compose.yaml`, sans fichier `.env` ni fournisseur de connexion à configurer. Le projet Compose `meridiane-playground` utilise ses propres volumes. Cette application anonyme est réservée aux tests locaux.
+La configuration de développement est fournie dans `compose.yaml`, sans fichier `.env` ni fournisseur de connexion à configurer. Le projet Compose `meridiane-playground` utilise ses propres volumes. Cette application sans compte utilisateur est réservée aux tests locaux.
 
 ## Bridge et contrôles
 

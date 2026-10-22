@@ -8,7 +8,7 @@ SSE, Mercure, `EventSource`, `watch$`, `watchCollection$`, topic, refresh live, 
 
 1. `.codex/patterns/realtime/sse-mercure.md`
 2. `.codex/patterns/frontend/entity-resource-signal.md` si une entite par IRI est affichee
-3. `webfront/src/app/core/realtime/mercure-session.service.ts`
+3. la configuration `provideBridge` (`mercure.authorize`) dans `webfront/src/app/app.config.ts`
 4. le repository de feature le plus proche
 5. `core/docs/api/auth.md` ou `webfront/docs/standards/auth.md` seulement si auth/session Mercure change
 

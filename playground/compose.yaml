@@ -16,6 +16,7 @@ services:
       MERCURE_PUBLIC_URL: http://localhost:8000/.well-known/mercure
       MERCURE_PUBLISHER_JWT_KEY: '!ChangeThisMercureHubJWTSecretKey!'
       MERCURE_JWT_ISSUER: http://localhost:8000
+      MERCURE_SUBSCRIBER_TTL: ${MERCURE_SUBSCRIBER_TTL:-600}
     volumes:
       - ./core:/app
       - ./@obsidiane/caddy/Caddyfile:/etc/frankenphp/Caddyfile:ro

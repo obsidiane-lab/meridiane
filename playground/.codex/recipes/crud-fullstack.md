@@ -44,15 +44,15 @@ Frontend :
 
 ## Parcours CRUD attendu
 
-- Liste : page avec AppTable (composition applicative Spartan) -> service `fetchAll$` -> repository `fetchAll$` -> bridge `getCollection$` -> `store.upsertMany(collection.member)` -> collection rendue par AppTable. AppTable garde son propre etat local ; `watchCollection$` ecoute le topic collection, garde le store frais avec `store.upsert`, puis la page relance `table.reload()` sur la pagination courante.
+- Liste : page avec AppTable (composition applicative Spartan) -> service `fetchAll$` -> repository `fetchAll$` -> bridge `getCollection$` -> `store.upsertMany(collection.member)` -> collection rendue par AppTable. AppTable garde son propre etat local ; `watchCollection$` ecoute la ressource (bridge `watch$()` sans IRI, URL Pattern `{url}/:id`), garde le store frais avec `store.upsert`, puis la page relance `table.reload()` sur la pagination courante.
 - Detail : page derive l'IRI -> service `$resource(iri)` -> repository `$entity(iri)` -> store `EntityResource<T>` ; si `idle`, fetch initial silencieux ; `watch$(iri)` met ensuite le meme signal a jour via Mercure.
 - Creation : page/form appelle `service.create(payload)` -> repository `create$` -> bridge `post$` -> backend persiste -> API Platform publie Mercure. Si une AppTable est visible, `watchCollection$` applique `store.upsert` puis declenche `table.reload()` ; si une page detail/edit ecoute l'item, `watch$(iri)` applique `store.upsert`. La reponse HTTP sert a l'UX immediate, a recuperer l'IRI creee ou a naviguer, pas a synchroniser le store en flux realtime.
 - Edition : page/form hydrate depuis `$entity(iri)`, appelle `service.update(iri, payload)` -> repository `update$` -> bridge `patch$` -> backend persiste -> Mercure publie -> `watch$(iri)` applique `store.upsert`.
-- Suppression : page confirme -> `service.delete(iri)` -> repository `delete$` -> bridge `delete$` -> `unwatch(iri)` -> `store.remove(iri)` ; ne pas attendre un event delete.
+- Suppression : page confirme -> `service.delete(iri)` -> repository `delete$` -> bridge `delete$` -> `store.remove(iri)` ; ne pas attendre un event delete. Un event delete recu par `watch$` (`isResourceDeletion`) applique aussi `store.remove`.
 
 Garde-fous :
 - Backend = source persistante ; store = source reactive des entites connues ; AppTable = source locale de la vue paginee courante ; Mercure = canal de synchronisation.
-- Les topics collection AppTable doivent publier une entite upsertable avec `@id`. Si le payload est custom, adapter explicitement le repository.
+- Les events Mercure ecoutes par `watchCollection$` doivent porter une entite upsertable avec `@id`. Si le payload est custom, adapter explicitement le repository.
 - Eviter d'etendre la documentation durable : cette recette est la verite operationnelle Codex pour les CRUD standards.
 
 ## Fichiers probables
