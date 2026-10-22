@@ -30,9 +30,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Runtime tests
-        run: npm -w packages/meridiane test
-
       - name: CLI help
         run: node packages/meridiane/cli.js --help
 
@@ -43,7 +40,7 @@ jobs:
         run: node packages/meridiane/cli.js build --help
 
       - name: Bridge and entity models smoke build
-        run: node packages/meridiane/cli.js build @obsidiane/ci-bridge --version 3.0.0 --spec packages/meridiane/test/fixtures/entity-first.openapi.json
+        run: node packages/meridiane/cli.js build @obsidiane/ci-bridge --version 3.0.0 --spec examples/entity-first.openapi.json
 
       - name: Pack check
         run: npm -w packages/meridiane run pack:check

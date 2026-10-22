@@ -72,6 +72,28 @@ cohérence entre entités, ainsi que le chargement différé des relations.
 
 Le playground peut dépendre du générateur. Le générateur ne doit jamais dépendre du playground.
 
+## Validation
+
+Aucun test unitaire n'est utilisé dans ce dépôt. Ne pas en créer, en ajouter ni en
+régénérer, et ne pas ajouter de dépendance dédiée aux tests unitaires.
+
+La CI et la release vérifient la compilation du bridge et des modèles depuis
+`examples/entity-first.openapi.json`, puis le contenu du package npm. Ces contrôles
+peuvent être lancés depuis la racine :
+
+```bash
+node packages/meridiane/cli.js build @obsidiane/check-bridge --version 0.0.0 --spec examples/entity-first.openapi.json
+npm -w packages/meridiane run pack:check
+```
+
+Pour le playground, lancer les contrôles adaptés depuis `playground/` :
+
+- `make bridge` pour régénérer le bridge depuis le contrat backend ;
+- `make lint` et `make build` pour le frontend ;
+- `make phpstan` pour l'analyse statique du backend ;
+- des vérifications ciblées dans le navigateur pour les parcours HTTP et Mercure,
+  avec deux clients lorsque la synchronisation temps réel est concernée.
+
 ## Documentation
 
 `docs/` décrit le produit et son API publique. Les informations propres au développement du dépôt vivent sous `docs/contributing/` ou `playground/`.

@@ -75,6 +75,11 @@ npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.
 
 Les commandes historiques `npm run sandbox:bridge`, `npm run sandbox:dev` et `npm run sandbox:build` restent disponibles avec le même comportement.
 
+Le projet n'utilise aucun test unitaire ; ne pas en ajouter. La validation repose sur
+la compilation, les contrôles de package npm, le lint, PHPStan et des vérifications
+ciblées dans le navigateur selon le périmètre. Le workflow est décrit dans
+[l'architecture du dépôt](docs/contributing/architecture.md#validation).
+
 ## Documentation
 
 - Guide bridge : `docs/guide-bridge.md`

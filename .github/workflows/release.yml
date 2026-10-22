@@ -89,11 +89,8 @@ jobs:
           npm pkg set version="${RELEASE_TAG}"
           npm pkg set repository.url="git+https://github.com/obsidiane-lab/meridiane.git"
 
-      - name: Tests
-        run: npm -w packages/meridiane test
-
       - name: Bridge smoke build
-        run: node packages/meridiane/cli.js build @obsidiane/release-check --version "${RELEASE_TAG}" --spec packages/meridiane/test/fixtures/entity-first.openapi.json
+        run: node packages/meridiane/cli.js build @obsidiane/release-check --version "${RELEASE_TAG}" --spec examples/entity-first.openapi.json
 
       - name: Pack check
         run: npm -w packages/meridiane run pack:check
