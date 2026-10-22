@@ -8,6 +8,8 @@ import { ExitCodeError, runCommand } from '../infrastructure/exec.js';
 import { ensureCleanDir } from '../infrastructure/files.js';
 
 const ngPackagrPath = fileURLToPath(import.meta.resolve('ng-packagr/src/cli/main.js'));
+/** `node_modules` holding the CLI's Angular toolchain (wherever npx installed it). */
+const toolchainModules = path.resolve(fileURLToPath(import.meta.resolve('@angular/core/package.json')), '../../..');
 
 /** Generates the bridge in an isolated workspace under `dist/`, builds it with ng-packagr and packs it. */
 export async function buildBridgePackage({ config, repoRoot, tsconfigPath, log }) {
@@ -15,6 +17,8 @@ export async function buildBridgePackage({ config, repoRoot, tsconfigPath, log }
   const buildRoot = path.join(distRoot, '.meridiane-workspace');
   const projectDir = path.join(buildRoot, 'projects', config.libName);
   await ensureCleanDir(buildRoot);
+  // The bridge compiles against the CLI's Angular and RxJS, not the dependencies of the current project.
+  await fs.symlink(toolchainModules, path.join(buildRoot, 'node_modules'), 'junction');
   log.info(`workspace: ${path.relative(repoRoot, buildRoot)}`);
 
   await generateBridge({ config, root: repoRoot, projectDir, distRoot, log });

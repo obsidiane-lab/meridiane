@@ -100,10 +100,10 @@ this.projects.post$(payload).pipe(
 |---|---|
 | `Accept` | `application/ld+json` si absent |
 | `Content-Type` | `application/ld+json` en POST/PUT, `application/merge-patch+json` en PATCH, rien pour un `FormData` |
-| `defaults.headers` | ajoutés s'ils sont absents |
+| `defaults.headers` | ajoutés s'ils sont absents ; priment sur `Accept` et `Content-Type` du bridge |
 | `defaults.timeoutMs` | interrompt la requête (option `timeout` native d'Angular) |
 | `defaults.retries` | rejoue GET/HEAD/OPTIONS sur erreur réseau, 429 ou 5xx ; jamais sur 4xx |
-| `singleFlight` | deux GET identiques simultanés ne partent qu'une fois |
+| `singleFlight` | deux GET identiques simultanés ne partent qu'une fois (comparés après vos `extraInterceptors`) |
 | `auth` | ajoute `Authorization: Bearer …` |
 | `debug` | journalise chaque requête, réponse et durée |
 

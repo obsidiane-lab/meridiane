@@ -8,13 +8,21 @@ export function trimTrailingSlash(path: string): string {
   return path.replace(/\/+$/, '');
 }
 
+const URL_ORIGIN = /^(?:https?:)?\/\/[^/?#]*/i;
+
 /**
- * Resolves an API IRI (e.g. `/api/books/1`) to a full URL using the API base.
- * Absolute (`http(s)://`) and protocol-relative (`//host`) URLs are returned as-is.
+ * Resolves a path against the API base, with one rule for requests and Mercure topics:
+ * - an absolute (`http(s)://`) or protocol-relative (`//host`) URL is returned as-is;
+ * - a path starting with `/` is relative to the origin of the base, like the IRIs API Platform returns
+ *   (`/api/books/1` against `https://example.com/backend` → `https://example.com/api/books/1`);
+ * - any other path is relative to the base (`books/1` → `https://example.com/backend/books/1`).
+ *
+ * Plain string operations: URL Pattern syntax (`:id`, `{…}`, `*`) is kept unencoded.
  */
 export function resolveUrl(base: string, path: string): string {
   if (isAbsoluteHttpUrl(path) || path.startsWith('//')) return path;
-  return `${trimTrailingSlash(base)}${path.startsWith('/') ? path : `/${path}`}`;
+  if (path.startsWith('/')) return `${URL_ORIGIN.exec(base)?.[0] ?? ''}${path}`;
+  return `${trimTrailingSlash(base)}/${path}`;
 }
 
 /**

@@ -98,6 +98,8 @@ Le hub n'évalue les droits qu'à l'ouverture d'une connexion. Après un login o
 inject(BridgeFacade).reconnectRealtime();   // renouvelle le cookie et rouvre les connexions
 ```
 
+Une autorisation encore en cours au moment de l'appel (celle de l'ancienne identité) est laissée finir, puis une nouvelle est demandée : le cookie posé en dernier est celui de l'utilisateur courant, et aucune connexion ne s'ouvre avant.
+
 ## Afficher l'état de la connexion
 
 ```ts

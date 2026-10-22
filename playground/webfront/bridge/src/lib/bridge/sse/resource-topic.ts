@@ -1,5 +1,6 @@
 import type {Item} from '../../ports/resource-repository.port';
 import type {MercureSubscription} from '../../ports/realtime.port';
+import {resolveUrl} from '../../utils/url';
 
 /** Payload API Platform publishes on deletion: `{"@id"}`, plus `@type` with `mercure.include_type`. */
 export interface ResourceDeletion {
@@ -44,7 +45,7 @@ export class ResourceTopic implements MercureSubscription {
 
   forIri(iri: string): ResourceTopic {
     if (!iri.trim()) throw new Error('ResourceFacade.watch$(): missing resource IRI');
-    return new ResourceTopic(new URL(iri, this.apiBaseUrl).toString(), this.apiBaseUrl, 'exact');
+    return new ResourceTopic(resolveUrl(this.apiBaseUrl, iri), this.apiBaseUrl, 'exact');
   }
 
   /** Returns the original payload, or `undefined` when it belongs to another resource. */
@@ -58,12 +59,7 @@ export class ResourceTopic implements MercureSubscription {
   }
 
   private matches(iri: string): boolean {
-    let url: string;
-    try {
-      url = new URL(iri, this.apiBaseUrl).toString();
-    } catch {
-      return false;
-    }
+    const url = resolveUrl(this.apiBaseUrl, iri);
     if (this.type === 'exact') return url === this.match;
     this.pattern ??= compileUrlPattern(this.match);
     return this.pattern.test(url);

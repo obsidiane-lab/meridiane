@@ -39,13 +39,15 @@ export function provideBridge(options: BridgeOptions): EnvironmentProviders {
   const scopeToBridge = (interceptor: HttpInterceptorFn) => scopeInterceptor(baseUrl, interceptor);
   const authInterceptor = createAuthInterceptor(auth);
 
+  // Configured defaults come before the bridge headers, which are only added when absent.
+  // Single-flight comes after the application interceptors, so it compares the final requests.
   const interceptors: HttpInterceptorFn[] = [
-    scopeToBridge(contentTypeInterceptor),
     scopeToBridge(bridgeDefaultsInterceptor),
+    scopeToBridge(contentTypeInterceptor),
     ...(authInterceptor ? [scopeToBridge(authInterceptor)] : []),
+    ...extraInterceptors,
     ...(singleFlight ? [scopeToBridge(singleFlightInterceptor)] : []),
     ...(debug ? [scopeToBridge(bridgeDebugInterceptor)] : []),
-    ...extraInterceptors,
   ];
 
   return makeEnvironmentProviders([

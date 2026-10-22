@@ -56,6 +56,7 @@ provideBridge({
 | `FacadeConfig.repo`, `ApiPlatformRestRepository` | supprimés |
 | `HttpRequestConfig.options` | supprimé : `headers`, `query`, `body`, `responseType`, `withCredentials` |
 | `joinUrl`, `resolveUrl` exportés | internes au bridge |
+| chemin concaténé à `baseUrl` (`https://x/backend` + `/api/p` → `/backend/api/p`) | un chemin commençant par `/` part de la racine de l'origine, comme un `@id` (→ `/api/p`) ; `api/p` reste relatif à `baseUrl` |
 | `RealtimeDiagnostics` (une connexion) | `{status, connections: [...]}` |
 
 ## 5. Vérifier

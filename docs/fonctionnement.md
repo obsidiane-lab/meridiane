@@ -35,14 +35,24 @@ Types pris en charge (OpenAPI 3.0 et JSON Schema 2020-12 d'OpenAPI 3.1) : primit
 
 ```text
 projects.get$('/api/projects/1')
-  → URL : baseUrl + IRI                      (une URL absolue est gardée telle quelle)
-  → Accept / Content-Type JSON-LD ou merge-patch
+  → URL résolue contre baseUrl               (voir ci-dessous)
   → défauts : en-têtes, timeout, retry
+  → Accept / Content-Type JSON-LD ou merge-patch, s'ils sont absents
   → auth : Bearer ou intercepteur fourni
-  → singleFlight : une seule requête pour deux GET identiques simultanés
   → extraInterceptors de l'application
+  → singleFlight : une seule requête pour deux GET identiques simultanés
   → HttpClient (fetch)
 ```
+
+`singleFlight` compare les requêtes après vos intercepteurs : deux GET qui diffèrent par un en-tête ajouté depuis un `HttpContext` partent tous les deux.
+
+Les requêtes, l'endpoint `authorize` et les topics Mercure suivent la même règle d'URL :
+
+| Chemin | Avec `baseUrl: 'https://example.com/backend'` |
+|---|---|
+| `/api/projects/1` (comme un `@id` d'API Platform) | `https://example.com/api/projects/1` : depuis la racine de l'origine |
+| `projects/1` | `https://example.com/backend/projects/1` : relatif à `baseUrl` |
+| `https://cdn.example.com/x` | inchangée |
 
 Les étapes du bridge ne s'appliquent qu'aux requêtes vers `baseUrl`. Vos autres appels HTTP (CDN, service tiers) ne reçoivent ni en-têtes JSON-LD ni token. Les `extraInterceptors` s'appliquent, eux, à toutes les requêtes.
 

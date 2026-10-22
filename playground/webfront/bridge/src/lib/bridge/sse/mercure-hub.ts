@@ -134,7 +134,7 @@ export class MercureHub implements RealtimePort, OnDestroy {
 
   reconnect(): void {
     if (!this.enabled || this.destroyed) return;
-    void this.authorize(true).then(() => {
+    void this.authorize('restart').then(() => {
       if (this.destroyed || this.suspended) return;
       for (const connection of this.connections) {
         if (connection.subscriptions.size > 0) this.open(connection, this.subscribeUrl(connection.subscriptions));
@@ -299,7 +299,7 @@ export class MercureHub implements RealtimePort, OnDestroy {
   }
 
   private async retry(connection: HubConnection): Promise<void> {
-    await this.authorize(true);
+    await this.authorize('renew');
     connection.retryTimer = undefined;
     if (this.destroyed || this.suspended || !this.connections.includes(connection)) return;
 
@@ -308,28 +308,47 @@ export class MercureHub implements RealtimePort, OnDestroy {
     this.publishDiagnostics();
   }
 
-  /** Obtains the authorization cookie once, or again with `renew` (deduplicated while a request is in flight). */
-  private authorize(renew = false): Promise<void> {
-    const authorize = this.options?.authorize;
-    if (!authorize) return Promise.resolve();
-    if (this.authorization && (!renew || this.authorizing)) return this.authorization;
+  /**
+   * Obtains the authorization cookie.
+   * - `once`: the first time only.
+   * - `renew` (refused connection): again, sharing the request in flight.
+   * - `restart` (e.g. after a login or logout): again, once the request in flight is over, so the cookie set last
+   *   belongs to the current identity.
+   *
+   * Resolves once the latest request is over: a request started meanwhile (e.g. by `reconnect()`) supersedes this one.
+   */
+  private async authorize(mode: 'once' | 'renew' | 'restart' = 'once'): Promise<void> {
+    let authorization = this.requestAuthorization(mode);
+    while (authorization) {
+      await authorization;
+      if (authorization === this.authorization) return;
+      authorization = this.authorization;
+    }
+  }
 
-    this.authorizing = true;
-    const request = typeof authorize === 'function'
+  private requestAuthorization(mode: 'once' | 'renew' | 'restart'): Promise<void> | undefined {
+    const authorize = this.options?.authorize;
+    if (!authorize) return undefined;
+    if (this.authorization && (mode === 'once' || (mode === 'renew' && this.authorizing))) return this.authorization;
+
+    const request = () => typeof authorize === 'function'
       ? authorize()
       : firstValueFrom(
         this.http.get(resolveUrl(this.apiBaseUrl, authorize), {withCredentials: this.httpWithCredentials}),
         {defaultValue: undefined}
       );
-    this.authorization = request
+    const authorization: Promise<void> = (this.authorizing ? this.authorization! : Promise.resolve())
+      .then(request)
       .then(
         () => undefined,
         (error: unknown) => this.logger?.warn?.('[Mercure] authorization failed', error)
       )
       .finally(() => {
-        this.authorizing = false;
+        if (this.authorization === authorization) this.authorizing = false;
       });
-    return this.authorization;
+    this.authorization = authorization;
+    this.authorizing = true;
+    return authorization;
   }
 
   private remove(connection: HubConnection): void {

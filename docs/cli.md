@@ -33,6 +33,8 @@ npm publish dist/api-bridge
 
 Compile le bridge (ng-packagr, mode partiel) dans `dist/<nom>/` et le compresse en `.tgz`. Le package est consommable par Angular 20, 21 et 22.
 
+La compilation utilise l'Angular, le RxJS et le TypeScript du CLI : le projet courant n'a pas besoin de `node_modules`, ni de `npm ci` en CI.
+
 ### `dev`
 
 ```bash

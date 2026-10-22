@@ -13,12 +13,12 @@ Tout ce qui est exporté par le bridge (`public-api.ts`).
 | `mercure.authorize` | `string` \| `() => Promise<unknown>` | — | Endpoint (GET) ou fonction qui pose le cookie Mercure, avant la première connexion et après chaque refus. |
 | `mercure.withCredentials` | `boolean` | `true` | Envoie les cookies au hub. |
 | `mercure.maxUrlLength` | `number` | `4000` | Longueur maximale d'une URL d'abonnement avant d'ouvrir une autre connexion. |
-| `defaults.headers` | `Record<string, string>` | — | En-têtes ajoutés s'ils sont absents. |
+| `defaults.headers` | `Record<string, string>` | — | En-têtes ajoutés s'ils sont absents. Priment sur `Accept` et `Content-Type` du bridge. |
 | `defaults.timeoutMs` | `number` | — | Interrompt la requête au-delà de ce délai. |
 | `defaults.retries` | `number` \| `{count, delayMs?, methods?}` | — | Rejoue les erreurs réseau, 429 et 5xx. Méthodes par défaut : GET, HEAD, OPTIONS ; délai par défaut : 250 ms. |
-| `singleFlight` | `boolean` | `true` | Fusionne les GET/HEAD/OPTIONS identiques en cours. |
+| `singleFlight` | `boolean` | `true` | Fusionne les GET/HEAD/OPTIONS identiques en cours, comparés après `extraInterceptors`. |
 | `debug` | `boolean` | `false` | Journalise HTTP et Mercure dans la console. |
-| `extraInterceptors` | `HttpInterceptorFn[]` | `[]` | Ajoutés après ceux du bridge, appliqués à toutes les requêtes. |
+| `extraInterceptors` | `HttpInterceptorFn[]` | `[]` | Exécutés après l'auth et avant `singleFlight`, sur toutes les requêtes. |
 
 ## `FacadeFactory`
 
@@ -57,7 +57,7 @@ inject(FacadeFactory).create<Project>({url: '/api/projects'});
 | `get$`, `getCollection$`, `post$`, `put$`, `patch$`, `delete$` | Mêmes méthodes que `ResourceFacade`, avec l'URL en premier argument. |
 | `request$(config)` | Requête libre ; `url` obligatoire. |
 | `watch$<T>({match, type?}, {connection?})` | Flux JSON brut d'un topic explicite. `type` : `'exact'` (défaut) ou `'urlpattern'`. Connexion `'dedicated'` par défaut. |
-| `reconnectRealtime()` | Renouvelle l'autorisation et rouvre les connexions (login, logout). |
+| `reconnectRealtime()` | Demande une nouvelle autorisation, une fois celle en cours terminée, puis rouvre les connexions (login, logout). |
 | `realtimeStatus$()` | `Observable<RealtimeStatus>`. |
 | `realtimeDiagnostics$()` | `Observable<RealtimeDiagnostics>`. |
 
