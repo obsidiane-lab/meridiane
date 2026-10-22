@@ -7,7 +7,6 @@ import {quoteKeyIfNeeded} from './utils.js';
 
 /**
  * @typedef {{
- *   requiredMode?: 'all'|'spec',
  *   includeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
  *   excludeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
  * }} BuildOptions
@@ -29,11 +28,7 @@ import {quoteKeyIfNeeded} from './utils.js';
 
 const JSON_LD_KEYWORDS = new Set(['@id', '@type', '@context']);
 
-function normalizeRequiredMode(value) {
-  return String(value ?? '').trim().toLowerCase() === 'spec' ? 'spec' : 'all';
-}
-
-function createModelBuilder({spec, schemas, schemaNames, typeNames, requiredMode}) {
+function createModelBuilder({spec, schemas, schemaNames, typeNames}) {
   const knownTypeNames = new Set(typeNames.values());
   const interfaceTypeNames = collectInterfaceTypeNames(schemas, schemaNames, typeNames);
 
@@ -44,7 +39,7 @@ function createModelBuilder({spec, schemas, schemaNames, typeNames, requiredMode
   }
 
   function resolverFor(dependencies) {
-    return createTypeResolver({dependencies, typeNames, requiredMode, spec});
+    return createTypeResolver({dependencies, typeNames, spec});
   }
 
   function buildAlias(raw, typeName) {
@@ -71,10 +66,8 @@ function createModelBuilder({spec, schemas, schemaNames, typeNames, requiredMode
       .map(([propertyName, propertySchema]) => ({
         name: propertyName,
         tsKey: quoteKeyIfNeeded(propertyName),
-        type: requiredMode === 'spec'
-          ? resolver.typeOf(propertySchema)
-          : resolver.nullableTypeOf(propertySchema),
-        optional: requiredMode === 'spec' ? !requiredProperties.has(propertyName) : true,
+        type: resolver.typeOf(propertySchema),
+        optional: !requiredProperties.has(propertyName),
       }));
 
     return {
@@ -128,9 +121,8 @@ function signatureOf(model) {
  * @returns {{models: ModelDefinition[]}}
  */
 export function buildModelsFromOpenAPI(spec, options = {}) {
-  const requiredMode = normalizeRequiredMode(options.requiredMode);
   const {schemas, schemaNames} = selectModelSchemas(spec, options);
-  const builderFor = (typeNames) => createModelBuilder({spec, schemas, schemaNames, typeNames, requiredMode});
+  const builderFor = (typeNames) => createModelBuilder({spec, schemas, schemaNames, typeNames});
 
   // Representations of a resource are compared with the resource name, so references do not tell them apart.
   const buildWithResourceNames = builderFor(new Map(schemaNames.map((name) => [name, resourceTypeName(name)])));

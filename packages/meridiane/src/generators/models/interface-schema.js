@@ -1,4 +1,4 @@
-import {hasOwn, isObject, mergeAllOf, schemaNameFromRef} from './schema-utils.js';
+import {hasOwn, isObject, schemaNameFromRef} from './schema-utils.js';
 
 function hasPropertyConflict(left, right) {
   return Object.keys(right).some((propertyName) => hasOwn(left, propertyName));
@@ -55,28 +55,11 @@ export function collectInterfaceTypeNames(schemas, schemaNames, typeNames) {
 
 /**
  * Flattens object-only allOf parts and keeps component references as interface
- * inheritance. Unsafe or conflicting compositions fall back to a type alias.
+ * inheritance (Hydra base schemas are covered by `Item`). Unsafe or conflicting
+ * compositions fall back to a type alias.
  */
 export function resolveInterfaceSchema(raw, currentTypeName, typeNames, interfaceTypeNames) {
   if (!raw?.allOf) return {schema: raw, extendsTypes: [], compatible: true};
-
-  const merged = mergeAllOf(raw.allOf);
-  if (merged) {
-    const ownProperties = raw.properties ?? {};
-    if (hasPropertyConflict(merged.properties, ownProperties)) {
-      return {schema: raw, extendsTypes: [], compatible: false};
-    }
-
-    return {
-      schema: {
-        ...merged,
-        properties: {...ownProperties, ...merged.properties},
-        required: [...new Set([...(raw.required ?? []), ...merged.required])],
-      },
-      extendsTypes: [],
-      compatible: true,
-    };
-  }
 
   const properties = {...(raw.properties ?? {})};
   const required = new Set(raw.required ?? []);

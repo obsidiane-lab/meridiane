@@ -1,28 +1,20 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ensureCleanDir } from '../../infrastructure/files.js';
 import { renderTemplateToFile } from './handlebars.js';
 import { buildModelsFromOpenAPI } from './openapi-to-models.js';
-import { ensureCleanDir } from './utils.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const templatesDir = path.join(currentDir, 'templates');
 
-export async function writeModelFiles({ projectDir, spec, requiredMode, include, exclude, debug, log }) {
+export async function writeModelFiles({ projectDir, spec, include, exclude, log }) {
   const outputDir = path.resolve(projectDir, 'src', 'models');
-  if (debug) {
-    log?.debug?.('[meridiane] generate models', {
-      outputDir,
-      requiredMode,
-      includeCount: include.length,
-      excludeCount: exclude.length,
-    });
-  }
+  log.debug('[meridiane] generate models', { outputDir, includeCount: include.length, excludeCount: exclude.length });
 
   await ensureCleanDir(outputDir);
 
   const { models } = buildModelsFromOpenAPI(spec, {
-    requiredMode,
     includeSchemaNames: include,
     excludeSchemaNames: exclude,
   });
@@ -35,7 +27,7 @@ export async function writeModelFiles({ projectDir, spec, requiredMode, include,
         name: model.name,
         props: model.props,
         imports: model.imports,
-        extendsTypes: model.extendsTypes || [],
+        extendsTypes: model.extendsTypes,
         extendsItem: model.extendsItem === true,
         type: model.type,
         separator: model.imports.length > 0 ? '\n' : '',
@@ -49,5 +41,5 @@ export async function writeModelFiles({ projectDir, spec, requiredMode, include,
     ctx: { models: models.map(({ name }) => ({ name })) },
   });
 
-  if (debug) log?.debug?.(`[meridiane] ${models.length} model(s) generated`);
+  log.debug(`[meridiane] ${models.length} model(s) generated`);
 }

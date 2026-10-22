@@ -1,6 +1,3 @@
-/** Hydra base schemas to ignore in safe `allOf` merges */
-const HYDRA_BASE_RE = /^Hydra(?:Item|Collection)BaseSchema$/;
-
 /**
  * Détermine si une valeur est un objet simple (non tableau)
  * @param {unknown} v
@@ -39,35 +36,4 @@ export function resolveLocalRef(document, ref) {
 export function schemaNameFromRef($ref) {
   const match = String($ref ?? '').match(/^#\/components\/schemas\/([^/]+)$/);
   return match ? decodeJsonPointerSegment(match[1]) : undefined;
-}
-
-/**
- * Essaie d'aplatir un allOf en un objet unique.
- * Ignore HydraItemBaseSchema/HydraCollectionBaseSchema quand rencontré.
- * Retourne null si l'aplatissement n'est pas possible de manière sûre.
- * @param {any[]} schemas
- * @returns {any|null}
- */
-export function mergeAllOf(schemas) {
-  const out = {type: 'object', properties: {}, required: []};
-  for (const s of schemas) {
-    if (s.$ref) {
-      const ref = schemaNameFromRef(s.$ref);
-      if (ref && HYDRA_BASE_RE.test(ref)) {
-        continue;
-      }
-      return null;
-    }
-    if (s.type === 'object') {
-      for (const [name, property] of Object.entries(s.properties ?? {})) {
-        if (hasOwn(out.properties, name)) return null;
-        out.properties[name] = property;
-      }
-      if (Array.isArray(s.required)) out.required.push(...s.required);
-    } else {
-      return null;
-    }
-  }
-  out.required = [...new Set(out.required)];
-  return out;
 }

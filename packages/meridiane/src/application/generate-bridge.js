@@ -2,48 +2,45 @@ import path from 'node:path';
 
 import { configureBridgeOutput, writeBridgeFiles } from '../generators/bridge/write-bridge-files.js';
 import { writeModelFiles } from '../generators/models/write-model-files.js';
+import { readOpenApiSpec } from '../infrastructure/spec-loader.js';
 
-/** Generates the Angular bridge sources in a workspace project. */
-export async function generateBridgeWorkspace({
-  cwd,
-  libName,
-  packageName,
-  version,
-  noModels,
-  spec,
-  requiredMode,
-  include,
-  exclude,
-  debug,
-  log,
-  distRoot,
-  projectDir: configuredProjectDir,
-  projectReadmePath,
-}) {
-  const projectDir = configuredProjectDir ?? path.resolve(cwd, 'projects', libName);
+/** Logs the command title and its configuration. */
+export function logConfig(log, title, config, details) {
+  log.title(title);
+  for (const [label, value] of Object.entries(details)) log.info(`${label}: ${value}`);
+  log.info(`package: ${config.packageName}@${config.version}`);
+  log.info(`lib: ${config.libName}`);
+  log.info(config.noModels ? 'models: désactivés (--no-models)' : `spec: ${config.specSource}`);
+}
 
-  log?.step?.(`génération de la librairie (${path.relative(cwd, projectDir)})`);
+/**
+ * Generates the Angular bridge sources (library files and models) in `projectDir`.
+ * The project README of `root` is appended to the bridge README.
+ */
+export async function generateBridge({ config, root, projectDir, distRoot, log }) {
+  const spec = config.noModels ? undefined : await loadSpec(config.specSource, log);
+
+  log.step(`génération de la librairie (${path.relative(root, projectDir)})`);
   await writeBridgeFiles({
     projectDir,
-    libName,
-    packageName,
-    version,
-    projectReadmePath,
-    debug,
+    libName: config.libName,
+    packageName: config.packageName,
+    version: config.version,
+    projectReadmePath: path.join(root, 'README.md'),
     log,
   });
+  if (distRoot) await configureBridgeOutput({ projectDir, distRoot, libName: config.libName, log });
 
-  if (distRoot) await configureBridgeOutput({ projectDir, distRoot, libName, log });
+  if (!spec) return;
+  log.step('génération des models (OpenAPI)');
+  await writeModelFiles({ projectDir, spec, include: config.include, exclude: config.exclude, log });
+}
 
-  if (noModels) {
-    log?.info?.('models ignorés (--no-models)');
-    if (debug) log?.debug?.('[meridiane] --no-models enabled, skipping models generation');
-    return;
-  }
+async function loadSpec(specSource, log) {
+  if (!specSource) throw new Error('Missing --spec (url or JSON file path)');
 
-  if (!spec) throw new Error('Internal error: spec is required when noModels=false');
-
-  log?.step?.('génération des models (OpenAPI)');
-  await writeModelFiles({ projectDir, spec, requiredMode, include, exclude, debug, log });
-  log?.success?.('génération terminée');
+  log.step('lecture de la spec OpenAPI');
+  const spec = await readOpenApiSpec(specSource);
+  log.success('spec chargée');
+  return spec;
 }

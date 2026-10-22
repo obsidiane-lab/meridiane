@@ -25,17 +25,7 @@ export function parseOpenApiSchemaName(originalName) {
     groupRaw = groupRaw.replace(/\.jsonmergepatch$/i, '');
   }
 
-  const basePath = baseRaw;
-  const groupPath = groupRaw;
-
-  return {
-    originalName: raw,
-    basePath,
-    groupPath,
-    baseVariant,
-    isMergePatch,
-    key: `${basePath.toLowerCase()}|${groupPath.toLowerCase()}`,
-  };
+  return {basePath: baseRaw, groupPath: groupRaw, baseVariant, isMergePatch};
 }
 
 export function baseTsNameFromBasePath(basePath) {
