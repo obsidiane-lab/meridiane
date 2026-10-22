@@ -1,0 +1,13 @@
+mercure:
+    hubs:
+        default:
+            url: '%env(string:MERCURE_URL)%'
+            public_url: '%env(string:MERCURE_PUBLIC_URL)%'
+            protocol_version: '1.0'
+            jwt:
+                secret: '%env(string:MERCURE_PUBLISHER_JWT_KEY)%'
+                publish: ['*']
+                claims:
+                    iss: '%env(string:MERCURE_JWT_ISSUER)%'
+                    sub: 'meridiane-playground'
+                    client_id: 'meridiane-playground'

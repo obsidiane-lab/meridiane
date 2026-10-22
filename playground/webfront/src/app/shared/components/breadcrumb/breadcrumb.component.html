@@ -1,0 +1,18 @@
+@if (items().length > 0) {
+  <nav hlmBreadcrumb [aria-label]="'layout.nav.breadcrumb' | translate">
+    <ol hlmBreadcrumbList class="flex-nowrap overflow-hidden">
+      @for (item of items(); track $index) {
+        @if (item.current) {
+          <li hlmBreadcrumbItem class="min-w-0">
+            <span hlmBreadcrumbPage class="truncate">{{ item.label | translate }}</span>
+          </li>
+        } @else {
+          <li hlmBreadcrumbItem class="hidden shrink-0 sm:inline-flex">
+            <a hlmBreadcrumbLink [link]="item.url">{{ item.label | translate }}</a>
+          </li>
+          <li hlmBreadcrumbSeparator class="hidden sm:block"></li>
+        }
+      }
+    </ol>
+  </nav>
+}

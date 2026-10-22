@@ -1,0 +1,1 @@
+reverse_proxy {$WEBFRONT_UPSTREAM:webfront:80}

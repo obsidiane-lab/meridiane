@@ -1,0 +1,53 @@
+<button
+  hlmBtn
+  class="hidden w-full max-w-sm justify-start md:flex"
+  variant="outline"
+  size="lg"
+  type="button"
+  aria-keyshortcuts="Control+K Meta+K"
+  aria-haspopup="dialog"
+  [attr.aria-expanded]="state() === 'open'"
+  (click)="open()">
+  <ng-icon name="lucideSearch" />
+  <span>{{ 'layout.command.open' | translate }}</span>
+  <span class="ml-auto text-xs text-muted-foreground">Ctrl K</span>
+</button>
+
+<button
+  hlmBtn
+  class="md:hidden"
+  variant="ghost"
+  size="icon"
+  type="button"
+  aria-keyshortcuts="Control+K Meta+K"
+  aria-haspopup="dialog"
+  [attr.aria-expanded]="state() === 'open'"
+  [attr.aria-label]="'layout.command.open' | translate"
+  (click)="open()">
+  <ng-icon name="lucideSearch" />
+</button>
+
+<hlm-command-dialog
+  [state]="state()"
+  [title]="'layout.command.title' | translate"
+  [description]="'layout.command.description' | translate"
+  (stateChange)="setState($event)">
+  <hlm-command [search]="search()" (searchChange)="search.set($event)">
+    <label class="sr-only" for="navigation-command-search">{{ 'layout.command.placeholder' | translate }}</label>
+    <hlm-command-input inputId="navigation-command-search" [placeholder]="'layout.command.placeholder' | translate" />
+    <hlm-command-list>
+      <div *hlmCommandEmptyState hlmCommandEmpty>{{ 'layout.command.empty' | translate }}</div>
+
+      @for (group of commandGroups(); track group.labelKey) {
+        <hlm-command-group>
+          <hlm-command-group-label>{{ group.labelKey | translate }}</hlm-command-group-label>
+          @for (item of group.items; track item.route) {
+            <button hlmCommandItem type="button" [value]="item.labelKey | translate" (selected)="navigate(item.route)">
+              {{ item.labelKey | translate }}
+            </button>
+          }
+        </hlm-command-group>
+      }
+    </hlm-command-list>
+  </hlm-command>
+</hlm-command-dialog>

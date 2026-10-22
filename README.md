@@ -15,40 +15,31 @@ demande et la cohérence entre ressources appartiennent à l'application.
 
 - `packages/meridiane` : le produit publié, package npm `@obsidiane/meridiane` et CLI de génération
 - `playground` : l'environnement interne utilisé pour développer et valider le générateur
-  - `playground/api-platform` : API Symfony/API Platform + Mercure de référence
-  - `playground/angular-app` : application Angular qui consomme un bridge généré
+  - `playground/core` : API Symfony/API Platform + Mercure 1.0
+  - `playground/webfront` : application Angular Foundation qui consomme le bridge local généré
 - `docs` : documentation produit (CLI, guide d'intégration, HTTP, SSE, API publique)
 
 Le package publié ne dépend pas du playground. Le playground fournit uniquement un contrat OpenAPI et des scénarios réels pour développer le générateur.
 
 ## Pré-requis
 
-- Node.js `>=24` (LTS)
-- npm
-- Docker + Docker Compose v2 (pour le backend)
+- Node.js `>=24.15`
+- npm `>=11`
+- Docker + Docker Compose v2
 
 ## Démarrage local rapide
 
 1. Installer les dépendances du workspace :
 
 ```bash
-npm install
+npm ci
 ```
 
-2. Démarrer le backend :
+2. Démarrer et initialiser le playground Foundation :
 
 ```bash
-cd playground/api-platform
-docker compose up -d --build
-# optionnel mais recommandé au premier démarrage :
-docker compose exec php php bin/console app:dev:reset --no-interaction
-```
-
-3. Lancer la sandbox Angular depuis la racine du repo :
-
-```bash
-cd ../..
-npm run sandbox:dev
+cd playground
+make init
 ```
 
 URLs locales :
@@ -56,9 +47,8 @@ URLs locales :
 - docs API : `http://localhost:8000/api/docs`
 - sandbox Angular : `http://localhost:4200`
 
-Comptes de dev (fixtures) :
-- `dev@meridiane.local` / `dev`
-- `admin@meridiane.local` / `admin`
+Le playground est anonyme et fournit une conversation avec deux messages. Son
+[README](playground/README.md) décrit les scénarios et la génération du bridge local.
 
 ## Utiliser le CLI Meridiane
 
@@ -75,9 +65,9 @@ npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.
 
 ## Scripts utiles (racine)
 
-- `npm run playground:bridge` : regénère le bridge du playground
-- `npm run playground:dev` : bridge du playground + `ng serve`
-- `npm run playground:build` : bridge du playground + build Angular
+- `npm run playground:bridge` : régénère le bridge depuis l'export OpenAPI local (`make bridge` réexporte aussi le contrat)
+- `npm run playground:dev` : lance `ng serve` sur le port 4200, en remplacement du conteneur webfront
+- `npm run playground:build` : compile le frontend avec son bridge généré
 
 Les commandes historiques `npm run sandbox:bridge`, `npm run sandbox:dev` et `npm run sandbox:build` restent disponibles avec le même comportement.
 
@@ -91,6 +81,6 @@ Les commandes historiques `npm run sandbox:bridge`, `npm run sandbox:dev` et `np
 - FAQ : `docs/fonctionnalites/questions-frequentes.md`
 - Package npm : `packages/meridiane/README.md`
 - Environnement de développement : `playground/README.md`
-- Application Angular : `playground/angular-app/README.md`
-- API Symfony : `playground/api-platform/README.md`
+- Application Angular : `playground/webfront/README.md`
+- API Symfony : `playground/core/README.md`
 - Architecture interne : `docs/contributing/architecture.md`

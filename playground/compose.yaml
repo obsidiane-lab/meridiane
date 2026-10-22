@@ -1,0 +1,65 @@
+name: meridiane-playground
+
+services:
+  core:
+    build:
+      context: .
+      target: frankenphp_dev
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: '1'
+      APP_BASE_URL: http://localhost:8000
+      APP_SECRET: meridiane-playground-local
+      ALLOWED_ORIGINS: '^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$'
+      DATABASE_URL: mysql://app:ChangeMe@database:3306/app?serverVersion=11.8.3-MariaDB&charset=utf8mb4
+      MERCURE_URL: http://core/.well-known/mercure
+      MERCURE_PUBLIC_URL: http://localhost:8000/.well-known/mercure
+      MERCURE_PUBLISHER_JWT_KEY: '!ChangeThisMercureHubJWTSecretKey!'
+      MERCURE_JWT_ISSUER: http://localhost:8000
+    volumes:
+      - ./core:/app
+      - ./@obsidiane/caddy/Caddyfile:/etc/frankenphp/Caddyfile:ro
+      - ./@obsidiane/caddy/webfront.dev.caddy:/etc/frankenphp/webfront.caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - '8000:80'
+    depends_on:
+      database:
+        condition: service_healthy
+      webfront:
+        condition: service_started
+
+  webfront:
+    build:
+      context: .
+      target: angular-dev
+    environment:
+      APP_ENV: dev
+      APP_BASE_URL: http://localhost:8000
+      MERCURE_PUBLIC_URL: http://localhost:8000/.well-known/mercure
+      APP_VERSION: 3.0.0-playground
+    volumes:
+      - ./webfront:/app
+    ports:
+      - '4200:80'
+
+  database:
+    image: mariadb:11.8
+    environment:
+      MYSQL_DATABASE: app
+      MYSQL_PASSWORD: ChangeMe
+      MYSQL_USER: app
+      MYSQL_RANDOM_ROOT_PASSWORD: 'true'
+    volumes:
+      - database_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  database_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,182 @@
+<div hlmSidebarWrapper class="h-svh overflow-hidden">
+  <hlm-sidebar variant="inset" collapsible="icon">
+    <div class="flex h-full flex-col">
+      <div hlmSidebarHeader>
+        <ul hlmSidebarMenu>
+          <li hlmSidebarMenuItem>
+            <a
+              hlmSidebarMenuButton
+              size="lg"
+              routerLink="/"
+              [closeMobileSidebarOnClick]="true"
+              [tooltip]="config().brandingName"
+              [attr.aria-label]="config().brandingName">
+              <span
+                class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <ng-icon name="lucideBlocks" />
+              </span>
+              <span>{{ config().brandingName }}</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <nav id="primary-navigation" hlmSidebarContent [attr.aria-label]="'layout.nav.primary' | translate">
+        @for (menu of menuService.pagesMenu(); track menu.group) {
+          @if (menu.separator) {
+            <hlm-sidebar-separator />
+          }
+
+          <div hlmSidebarGroup>
+            <div hlmSidebarGroupLabel>{{ menu.group | translate }}</div>
+            <div hlmSidebarGroupContent>
+              <ul hlmSidebarMenu>
+                @for (item of menu.items; track item.route ?? item.label) {
+                  <li
+                    hlmSidebarMenuItem
+                    hlmCollapsible
+                    [expanded]="item.children?.length ? (item.active ?? false) : false">
+                    @if (item.route) {
+                      <a
+                        #itemLinkActive="routerLinkActive"
+                        hlmSidebarMenuButton
+                        [routerLink]="item.route"
+                        routerLinkActive=""
+                        [routerLinkActiveOptions]="{ exact: true }"
+                        [closeMobileSidebarOnClick]="true"
+                        [isActive]="item.active ?? false"
+                        [attr.aria-current]="itemLinkActive.isActive ? 'page' : null"
+                        [tooltip]="item.label! | translate">
+                        <ng-icon [name]="menuIconName(item.icon)" />
+                        <span>{{ item.label | translate }}</span>
+                      </a>
+                    } @else {
+                      <button
+                        hlmSidebarMenuButton
+                        type="button"
+                        [isActive]="item.active ?? false"
+                        [tooltip]="item.label! | translate">
+                        <ng-icon [name]="menuIconName(item.icon)" />
+                        <span>{{ item.label | translate }}</span>
+                      </button>
+                    }
+
+                    @if (item.children?.length) {
+                      <button
+                        hlmSidebarMenuAction
+                        hlmCollapsibleTrigger
+                        class="group/collapse"
+                        type="button"
+                        [attr.aria-label]="('layout.nav.toggleSubmenu' | translate) + ' ' + (item.label! | translate)">
+                        <ng-icon
+                          name="lucideChevronRight"
+                          class="transition-transform group-aria-expanded/collapse:rotate-90" />
+                      </button>
+
+                      <hlm-collapsible-content>
+                        <ul hlmSidebarMenuSub>
+                          @for (child of item.children; track child.route ?? child.label) {
+                            <li hlmSidebarMenuSubItem>
+                              @if (child.route) {
+                                <a
+                                  #childLinkActive="routerLinkActive"
+                                  hlmSidebarMenuSubButton
+                                  [routerLink]="child.route"
+                                  routerLinkActive=""
+                                  [routerLinkActiveOptions]="{ exact: true }"
+                                  [closeMobileSidebarOnClick]="true"
+                                  [isActive]="child.active ?? false"
+                                  [attr.aria-current]="childLinkActive.isActive ? 'page' : null">
+                                  @if (child.icon) {
+                                    <ng-icon [name]="menuIconName(child.icon)" />
+                                  }
+                                  <span>{{ child.label | translate }}</span>
+                                </a>
+                              } @else {
+                                <button hlmSidebarMenuSubButton type="button" [isActive]="child.active ?? false">
+                                  @if (child.icon) {
+                                    <ng-icon [name]="menuIconName(child.icon)" />
+                                  }
+                                  <span>{{ child.label | translate }}</span>
+                                </button>
+                              }
+                            </li>
+                          }
+                        </ul>
+                      </hlm-collapsible-content>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          </div>
+        }
+      </nav>
+
+      <div hlmSidebarFooter>
+        <ul hlmSidebarMenu>
+          <li hlmSidebarMenuItem>
+            <a
+              hlmSidebarMenuButton
+              size="sm"
+              href="https://github.com/obsidiane-lab/meridiane"
+              target="_blank"
+              rel="noopener noreferrer"
+              [tooltip]="'v' + config().app.version">
+              <ng-icon name="lucideInfo" />
+              <span>v{{ config().app.version }}</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <button
+      hlmSidebarRail
+      type="button"
+      aria-controls="primary-navigation"
+      [aria-label]="sidebarToggleLabelKey() | translate"
+      [attr.aria-expanded]="isSidebarOpen()"></button>
+  </hlm-sidebar>
+
+  <div hlmSidebarInset class="min-h-0 overflow-hidden">
+    <header class="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/40 px-4">
+      <button
+        hlmSidebarTrigger
+        size="icon-lg"
+        type="button"
+        aria-controls="primary-navigation"
+        [srOnlyText]="sidebarToggleLabelKey() | translate"
+        [attr.aria-label]="sidebarToggleLabelKey() | translate"
+        [attr.aria-expanded]="isSidebarOpen()"></button>
+      <span class="mx-2 flex h-4 shrink-0">
+        <hlm-separator orientation="vertical" />
+      </span>
+
+      <app-breadcrumb class="min-w-0 flex-1" />
+
+      <app-navigation-command
+        class="shrink-0 md:w-48 lg:w-56 xl:w-72"
+        [groups]="menuService.pagesMenu()"
+        (navigated)="navigate($event)" />
+
+      <div class="ml-auto flex items-center gap-2">
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon"
+          type="button"
+          [attr.aria-label]="(isDark() ? 'layout.profileMenu.lightMode' : 'layout.profileMenu.darkMode') | translate"
+          (click)="toggleTheme()">
+          <ng-icon [name]="isDark() ? 'lucideSun' : 'lucideMoon'" />
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content" #mainContent class="min-h-0 flex-1 overflow-y-auto bg-muted/40">
+      <div class="w-full p-4">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+</div>

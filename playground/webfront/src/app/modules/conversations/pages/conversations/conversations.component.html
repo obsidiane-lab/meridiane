@@ -1,0 +1,283 @@
+<section class="flex flex-col gap-4">
+  <app-page-header [title]="'playground.title' | translate" [description]="'playground.description' | translate">
+    <div class="flex flex-wrap items-center gap-2">
+      <span hlmBadge [variant]="diagnostics()?.status === 'connected' ? 'default' : 'secondary'" aria-live="polite">
+        {{ 'playground.status.' + (diagnostics()?.status ?? 'closed') | translate }}
+      </span>
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-pressed]="realtime()"
+        (click)="realtime.set(!realtime())">
+        {{ (realtime() ? 'playground.pause' : 'playground.resume') | translate }}
+      </button>
+      <button hlmBtn variant="outline" type="button" [disabled]="busy()" (click)="refresh()">
+        <ng-icon name="lucideRefreshCw" />
+        {{ 'playground.refresh' | translate }}
+      </button>
+    </div>
+  </app-page-header>
+
+  @if (error()) {
+    <div hlmAlert variant="destructive">
+      <h2 hlmAlertTitle>{{ 'playground.errorTitle' | translate }}</h2>
+      <p hlmAlertDescription>{{ 'playground.error' | translate }}</p>
+    </div>
+  }
+
+  <div class="grid items-start gap-4 lg:grid-cols-3" [attr.aria-busy]="busy()">
+    <section hlmCard>
+      <header hlmCardHeader>
+        <h2 hlmCardTitle>{{ 'playground.conversations' | translate }}</h2>
+        <p hlmCardDescription>{{ 'playground.conversationsHelp' | translate }}</p>
+      </header>
+      <div hlmCardContent class="flex flex-col gap-2">
+        @for (conversation of conversations(); track conversation['@id']) {
+          <button
+            hlmBtn
+            type="button"
+            class="w-full"
+            [variant]="selectedIri() === iriOf(conversation) ? 'secondary' : 'ghost'"
+            [attr.aria-pressed]="selectedIri() === iriOf(conversation)"
+            (click)="select(iriOf(conversation))">
+            <span class="flex w-full items-center justify-between gap-2">
+              <span class="truncate">{{ conversation.title }}</span>
+              <span class="text-xs text-muted-foreground">{{ conversation.messages?.length ?? 0 }}</span>
+            </span>
+          </button>
+        } @empty {
+          <div hlmEmpty>
+            <div hlmEmptyHeader>
+              <p hlmEmptyTitle>{{ 'playground.noConversations' | translate }}</p>
+            </div>
+          </div>
+        }
+      </div>
+      <footer hlmCardFooter>
+        <form class="flex w-full flex-col gap-3" (submit)="createConversation($event)">
+          <div hlmField>
+            <label hlmFieldLabel for="new-conversation">{{ 'playground.newConversation' | translate }}</label>
+            <input hlmInput id="new-conversation" [formField]="conversationForm.title" autocomplete="off" />
+            @if (conversationForm.title().touched() && conversationForm.title().invalid()) {
+              <hlm-field-error forceShow>{{ 'playground.titleValidation' | translate }}</hlm-field-error>
+            }
+          </div>
+          <button hlmBtn type="submit" [disabled]="busy() || conversationForm().invalid()">
+            <ng-icon name="lucidePlus" />{{ 'playground.create' | translate }}
+          </button>
+        </form>
+      </footer>
+    </section>
+
+    <div class="flex flex-col gap-4 lg:col-span-2">
+      <section hlmCard>
+        @let resource = selected();
+        @if (resource.value; as conversation) {
+          <header hlmCardHeader>
+            <h2 hlmCardTitle>{{ conversation.title }}</h2>
+            <p hlmCardDescription class="break-all">{{ conversation['@id'] }}</p>
+            <div hlmCardAction class="flex gap-1">
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon"
+                type="button"
+                [disabled]="busy()"
+                (click)="startRename(conversation)">
+                <ng-icon name="lucidePencil" /><span class="sr-only">{{ 'playground.rename' | translate }}</span>
+              </button>
+              <hlm-alert-dialog>
+                <button hlmAlertDialogTrigger hlmBtn variant="ghost" size="icon" type="button" [disabled]="busy()">
+                  <ng-icon name="lucideTrash2" /><span class="sr-only">{{
+                    'playground.deleteConversation' | translate
+                  }}</span>
+                </button>
+                <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                  <hlm-alert-dialog-header>
+                    <h2 hlmAlertDialogTitle>{{ 'playground.deleteConversation' | translate }}</h2>
+                    <p hlmAlertDialogDescription>{{ 'playground.deleteConversationHelp' | translate }}</p>
+                  </hlm-alert-dialog-header>
+                  <hlm-alert-dialog-footer>
+                    <button hlmAlertDialogCancel type="button">{{ 'common.cancel' | translate }}</button>
+                    <button
+                      hlmAlertDialogAction
+                      variant="destructive"
+                      type="button"
+                      (click)="deleteConversation(); ctx.close()">
+                      {{ 'playground.delete' | translate }}
+                    </button>
+                  </hlm-alert-dialog-footer>
+                </hlm-alert-dialog-content>
+              </hlm-alert-dialog>
+            </div>
+          </header>
+          <div hlmCardContent class="flex flex-col gap-4">
+            @if (renaming()) {
+              <form class="flex flex-wrap items-end gap-2" (submit)="rename($event)">
+                <div hlmField class="min-w-0 flex-1">
+                  <label hlmFieldLabel for="conversation-title">{{ 'playground.rename' | translate }}</label>
+                  <input hlmInput id="conversation-title" [formField]="renameForm.title" />
+                </div>
+                <button hlmBtn type="submit" [disabled]="busy() || renameForm().invalid()">
+                  {{ 'common.save' | translate }}
+                </button>
+                <button hlmBtn variant="outline" type="button" (click)="renaming.set(false)">
+                  {{ 'common.cancel' | translate }}
+                </button>
+              </form>
+            }
+            @for (entry of messages(); track entry.iri) {
+              @if (entry.resource.value; as message) {
+                <article class="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
+                  <div class="min-w-0 flex-1">
+                    <p class="break-words whitespace-pre-wrap">{{ message.content }}</p>
+                    <p class="mt-2 text-xs break-all text-muted-foreground">
+                      {{ entry.iri }} · {{ message.createdAt | date: 'short' }}
+                    </p>
+                  </div>
+                  <div class="flex gap-1">
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="editMessage(message)">
+                      <ng-icon name="lucidePencil" /><span class="sr-only">{{
+                        'playground.editMessage' | translate
+                      }}</span>
+                    </button>
+                    <hlm-alert-dialog>
+                      <button
+                        hlmAlertDialogTrigger
+                        hlmBtn
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        [disabled]="busy()">
+                        <ng-icon name="lucideTrash2" /><span class="sr-only">{{
+                          'playground.deleteMessage' | translate
+                        }}</span>
+                      </button>
+                      <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+                        <hlm-alert-dialog-header>
+                          <h2 hlmAlertDialogTitle>{{ 'playground.deleteMessage' | translate }}</h2>
+                          <p hlmAlertDialogDescription>{{ 'playground.deleteMessageHelp' | translate }}</p>
+                        </hlm-alert-dialog-header>
+                        <hlm-alert-dialog-footer>
+                          <button hlmAlertDialogCancel type="button">{{ 'common.cancel' | translate }}</button>
+                          <button
+                            hlmAlertDialogAction
+                            variant="destructive"
+                            type="button"
+                            (click)="deleteMessage(message); ctx.close()">
+                            {{ 'playground.delete' | translate }}
+                          </button>
+                        </hlm-alert-dialog-footer>
+                      </hlm-alert-dialog-content>
+                    </hlm-alert-dialog>
+                  </div>
+                </article>
+              } @else {
+                <div class="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                  @if (entry.resource.state === 'idle' || entry.resource.state === 'loading') {
+                    <hlm-spinner [aria-label]="'common.loading' | translate" />
+                  }
+                  <span>{{ entry.iri }} · {{ 'playground.entityState.' + entry.resource.state | translate }}</span>
+                </div>
+              }
+            } @empty {
+              <div hlmEmpty>
+                <div hlmEmptyHeader>
+                  <p hlmEmptyTitle>{{ 'playground.noMessages' | translate }}</p>
+                </div>
+              </div>
+            }
+            <form class="flex flex-col gap-3" (submit)="saveMessage($event)">
+              <div hlmField>
+                <label hlmFieldLabel for="message-content">{{
+                  (editedMessageIri() ? 'playground.editMessage' : 'playground.newMessage') | translate
+                }}</label>
+                <textarea hlmTextarea id="message-content" [formField]="messageForm.content" rows="3"></textarea>
+              </div>
+              <div class="flex gap-2">
+                <button hlmBtn type="submit" [disabled]="busy() || messageForm().invalid()">
+                  {{ (editedMessageIri() ? 'common.save' : 'playground.send') | translate }}
+                </button>
+                @if (editedMessageIri()) {
+                  <button hlmBtn variant="outline" type="button" (click)="cancelEdit()">
+                    {{ 'common.cancel' | translate }}
+                  </button>
+                }
+              </div>
+            </form>
+            <div hlmCollapsible>
+              <button hlmBtn hlmCollapsibleTrigger variant="ghost" type="button">
+                {{ 'playground.nativeResource' | translate }}
+              </button>
+              <hlm-collapsible-content>
+                <pre class="overflow-auto text-xs">{{ conversation | json }}</pre>
+              </hlm-collapsible-content>
+            </div>
+          </div>
+        } @else {
+          <div hlmEmpty class="min-h-64">
+            <div hlmEmptyHeader>
+              <h2 hlmEmptyTitle>{{ 'playground.selectConversation' | translate }}</h2>
+              <p hlmEmptyDescription>{{ 'playground.entityState.' + resource.state | translate }}</p>
+            </div>
+          </div>
+        }
+      </section>
+
+      <section hlmCard>
+        <header hlmCardHeader>
+          <h2 hlmCardTitle>{{ 'playground.lookup' | translate }}</h2>
+          <p hlmCardDescription>{{ 'playground.lookupHelp' | translate }}</p>
+        </header>
+        <div hlmCardContent class="flex flex-col gap-4">
+          <form class="flex flex-wrap items-end gap-2" (submit)="lookupMessage($event)">
+            <div hlmField class="min-w-0 flex-1">
+              <label hlmFieldLabel for="message-iri">{{ 'playground.messageIri' | translate }}</label>
+              <input
+                hlmInput
+                id="message-iri"
+                [formField]="lookupForm.iri"
+                placeholder="/api/messages/1"
+                autocomplete="off" />
+              @if (lookupForm.iri().touched() && lookupForm.iri().invalid()) {
+                <hlm-field-error forceShow>{{ 'playground.iriValidation' | translate }}</hlm-field-error>
+              }
+            </div>
+            <button hlmBtn variant="outline" type="submit" [disabled]="lookupForm().invalid()">
+              {{ 'playground.load' | translate }}
+            </button>
+          </form>
+          @if (inspectedIri()) {
+            @if (inspected().value; as message) {
+              <p class="break-words whitespace-pre-wrap">{{ message.content }}</p>
+              <button hlmBtn variant="link" class="max-w-full" type="button" (click)="select(message.conversation)">
+                <span class="truncate">{{ 'playground.openConversation' | translate }} {{ message.conversation }}</span>
+              </button>
+              <pre class="overflow-auto text-xs">{{ message | json }}</pre>
+            } @else {
+              <p role="status" class="text-sm text-muted-foreground">
+                {{ 'playground.entityState.' + inspected().state | translate }}
+              </p>
+            }
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div hlmCollapsible>
+    <button hlmBtn hlmCollapsibleTrigger type="button" variant="outline">
+      {{ 'playground.diagnostics' | translate }}
+    </button>
+    <hlm-collapsible-content>
+      <pre class="mt-3 overflow-auto text-xs">{{ diagnostics() | json }}</pre>
+    </hlm-collapsible-content>
+  </div>
+</section>

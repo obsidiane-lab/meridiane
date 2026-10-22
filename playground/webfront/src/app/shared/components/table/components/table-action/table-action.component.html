@@ -1,0 +1,61 @@
+@let action = actionTemplate();
+@let filter = filterTemplate();
+@let form = filtersForm();
+<div class="flex flex-col gap-3 px-2 py-3 md:flex-row md:items-center">
+  @if (action) {
+    <div class="flex flex-wrap items-center gap-2">
+      <ng-container [ngTemplateOutlet]="action" />
+    </div>
+  }
+
+  <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center md:ml-auto md:w-auto">
+    <div hlmField class="w-full sm:flex-1 md:w-72 md:flex-none">
+      <label hlmFieldLabel class="sr-only" [for]="searchInputId">{{ 'table.search' | translate }}</label>
+      <input
+        hlmInput
+        class="w-full"
+        [id]="searchInputId"
+        type="search"
+        [formControl]="searchControl"
+        [placeholder]="'table.search' | translate" />
+    </div>
+
+    @if (filter && form) {
+      <hlm-popover align="end" [state]="filterState()" (stateChanged)="onFilterStateChange($event)">
+        <button hlmBtn hlmPopoverTrigger class="w-full sm:w-auto" type="button" variant="outline">
+          <ng-icon name="lucideListFilter" />
+          <span>{{ 'table.filters' | translate }}</span>
+          @if (hasActiveFilters()) {
+            <span hlmBadge variant="secondary">
+              {{ 'table.active' | translate }}
+            </span>
+          }
+        </button>
+
+        <hlm-popover-content *hlmPopoverPortal class="w-72 sm:w-96">
+          <div hlmPopoverHeader>
+            <h2 hlmPopoverTitle>{{ 'table.filters' | translate }}</h2>
+          </div>
+
+          <div class="flex max-h-96 flex-col gap-3 overflow-hidden">
+            <div class="flex-1 overflow-y-auto">
+              <ng-container [ngTemplateOutlet]="filter" [ngTemplateOutletContext]="{ filters: filters(), form }" />
+            </div>
+
+            <hlm-separator />
+
+            <div class="flex justify-end gap-2">
+              <button hlmBtn type="button" variant="outline" (click)="onResetFilters()">
+                {{ 'table.reset_filters' | translate }}
+              </button>
+              <button hlmBtn type="button" (click)="onApplyFilters()">
+                {{ 'table.apply_filters' | translate }}
+              </button>
+            </div>
+          </div>
+        </hlm-popover-content>
+      </hlm-popover>
+    }
+  </div>
+</div>
+<hlm-separator />

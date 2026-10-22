@@ -1,0 +1,7 @@
+root * /app/public/app
+try_files {path} /index.html
+templates {
+	mime text/html
+	between [[ ]]
+}
+file_server

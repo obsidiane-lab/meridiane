@@ -1,0 +1,13 @@
+.idea
+/openapi.json
+/dist
+.env
+!core/.env
+/auth/
+
+tmp/*
+!tmp/.gitkeep
+!tmp/README.md
+!tmp/templates/
+tmp/templates/*
+!tmp/templates/*.md

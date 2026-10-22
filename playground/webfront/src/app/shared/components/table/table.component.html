@@ -1,0 +1,79 @@
+<ng-template #tableContent>
+  <div class="flex min-w-full flex-col">
+    <app-table-action
+      (filterChange)="onSearchChange($event)"
+      (filtersChange)="onFiltersChange($event)"
+      [filterTemplate]="filtersTemplate() ?? null"
+      [filters]="filtersState()"
+      [filtersForm]="filtersForm()"
+      [searchTerm]="searchPageState()"
+      [actionTemplate]="actionTemplate() ?? null" />
+
+    <div hlmTableContainer class="min-h-80">
+      @if (isLoading() && displayData().length === 0) {
+        <div
+          class="flex min-h-80 items-center justify-center gap-2 text-sm text-muted-foreground"
+          role="status"
+          aria-live="polite">
+          <hlm-spinner aria-hidden="true" />
+          <span>{{ 'common.loading' | translate }}</span>
+        </div>
+      } @else {
+        @if (isLoading()) {
+          <div
+            class="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground"
+            role="status"
+            aria-live="polite">
+            <hlm-spinner aria-hidden="true" />
+            <span>{{ 'common.loading' | translate }}</span>
+          </div>
+          <hlm-separator />
+        }
+
+        <table hlmTable [attr.aria-busy]="isLoading()">
+          <thead hlmTHead>
+            <ng-container [ngTemplateOutlet]="headerTemplate()" />
+          </thead>
+          <tbody hlmTBody>
+            @if (displayData().length > 0) {
+              @for (item of displayData(); track trackRow(item, $index)) {
+                <ng-container [ngTemplateOutlet]="rowTemplate()" [ngTemplateOutletContext]="{ $implicit: item }" />
+              }
+            } @else {
+              <tr hlmTr>
+                <td hlmTd colspan="100">
+                  <div hlmEmpty class="min-h-72">
+                    <div hlmEmptyHeader>
+                      <span hlmEmptyMedia variant="icon">
+                        <ng-icon name="lucideInbox" />
+                      </span>
+                      <p hlmEmptyTitle>{{ 'table.no_data_found' | translate }}</p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+
+    <app-table-footer
+      [maxItems]="totalItems()"
+      [currentPage]="currentPageState()"
+      [itemsPerPage]="itemsPerPageState()"
+      (pageChange)="onPageChange($event)"
+      (itemsPerPageChange)="onItemsPerPageChange($event)"
+      [actionTemplate]="actionTemplate() ?? null" />
+  </div>
+</ng-template>
+
+@if (framed()) {
+  <div hlmCard size="sm">
+    <div hlmCardContent>
+      <ng-container [ngTemplateOutlet]="tableContent" />
+    </div>
+  </div>
+} @else {
+  <ng-container [ngTemplateOutlet]="tableContent" />
+}
