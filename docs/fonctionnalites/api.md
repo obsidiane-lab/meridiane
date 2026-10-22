@@ -5,7 +5,7 @@ Surface exposée par le bridge généré avec Meridiane 3.0 (`src/public-api.ts`
 ## Exports principaux
 
 - Runtime/config : `provideBridge`, `BridgeOptions`, `BridgeAuth`, `BridgeHttpOptions`, `BridgeMercureOptions`
-- Types bridge : `BridgeDefaults`, `BridgeLogger`, `RealtimeStatus`, `RealtimeDiagnostics`, `RealtimeSubscriptionDiagnostics`
+- Types bridge : `BridgeDefaults`, `BridgeLogger`, `RealtimeStatus`, `RealtimeDiagnostics`, `RealtimeConnectionDiagnostics`, `RealtimeSubscriptionDiagnostics`
 - Facades : `FacadeFactory`, `ResourceFacade<T>`, `BridgeFacade`
 - Types utilitaires facades : `FacadeConfig<T>`, `ResourceDeletion`
 - Types HTTP/Hydra : `Item`, `Iri`, `IriRequired`, `Collection<T>`, `Query`, `AnyQuery`, `HttpCallOptions`, `HttpRequestConfig`, `HttpMethod`
@@ -19,10 +19,12 @@ Surface exposée par le bridge généré avec Meridiane 3.0 (`src/public-api.ts`
 `baseUrl` est requis.
 
 Options notables :
-- `auth` : string bearer, objet bearer (token/getToken), ou `HttpInterceptorFn`
+- `auth` : string bearer, objet bearer (token/getToken), ou `HttpInterceptorFn` ; appliqué uniquement aux requêtes du `baseUrl`
 - `http.withCredentials` : credentials/cookies HTTP par défaut (`false` par défaut)
 - `mercure.hubUrl` : active le realtime (hub Mercure 1.0)
 - `mercure.withCredentials` : envoie le cookie d'abonné au hub (`true` par défaut)
+- `mercure.authorize` : endpoint (ou fonction) qui pose le cookie d'autorisation Mercure, appelé avant la première connexion et après chaque refus du hub
+- `mercure.maxUrlLength` : longueur maximale d'une URL d'abonnement avant d'ouvrir une autre connexion (`4000` par défaut)
 - `defaults` : headers/timeout/retries appliqués aux requêtes du `baseUrl`
 - `singleFlight` : déduplication HTTP in-flight sur le `baseUrl` (`true` par défaut)
 - `debug` : logs runtime
@@ -62,4 +64,4 @@ Realtime :
 - `watch$()` conserve le JSON reçu, sans expansion des relations ni GET complémentaire ; le repository de l'application décide comment l'appliquer à son store
 - `Collection<T>` expose `member`, `totalItems`, `view`, `search`
 - `HttpRequestConfig` sert d'escape hatch pour les endpoints non standards
-- `RealtimeDiagnostics` expose l'état de la connexion SSE unique (statut, URL, abonnements, `lastEventId`, échecs)
+- `RealtimeDiagnostics` expose le statut global et, par connexion SSE (`RealtimeConnectionDiagnostics`), statut, URL, abonnements, `lastEventId` et échecs

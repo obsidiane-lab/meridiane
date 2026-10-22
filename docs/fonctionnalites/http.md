@@ -16,8 +16,8 @@ Si un header est déjà défini, le bridge ne le remplace pas.
 `provideBridge({ defaults: ... })` permet d’appliquer :
 
 - headers communs (ajoutés si absents)
-- timeout (`timeoutMs`)
-- retries “safe” (`retries`) sur `GET/HEAD/OPTIONS`
+- timeout (`timeoutMs`) : option `timeout` native d'Angular, qui interrompt la requête ; un `timeout` déjà défini sur la requête est conservé
+- retries “safe” (`retries`) sur `GET/HEAD/OPTIONS`, uniquement pour les erreurs transitoires : réseau ou timeout (statut `0`), `429` et `5xx`. Les autres réponses (`401`, `403`, `404`, `422`…) ne sont pas rejouées.
 
 Exemple :
 

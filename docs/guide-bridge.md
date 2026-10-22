@@ -68,7 +68,10 @@ export const appConfig: ApplicationConfig = {
       baseUrl: 'https://api.example.com',
       http: {withCredentials: true},
       auth: {type: 'bearer', getToken: () => localStorage.getItem('token') ?? undefined},
-      mercure: {hubUrl: 'https://api.example.com/.well-known/mercure'},
+      mercure: {
+        hubUrl: 'https://api.example.com/.well-known/mercure',
+        authorize: '/api/mercure/authorization',
+      },
       defaults: {
         timeoutMs: 15_000,
         retries: {count: 2, delayMs: 250, methods: ['GET']},
@@ -151,9 +154,9 @@ allBooks.unsubscribe();
 oneBook.unsubscribe();
 ```
 
-- une seule connexion SSE pour toute l'application, partagée par tous les `watch$()`
+- connexions SSE partagées par tous les `watch$()`, découpées automatiquement au-delà de `mercure.maxUrlLength` (4000 par défaut) ou de 100 abonnements
 - chaque abonnement dure tant que son Observable est souscrit
-- authentification par le cookie HttpOnly `__Secure-mercure_access_token` posé par le backend
+- authentification par le cookie HttpOnly `__Secure-mercure_access_token` posé par le backend ; `mercure.authorize` le fait obtenir et renouveler par le bridge
 - état : `ResourceFacade.connectionStatus`, `BridgeFacade.realtimeStatus$()`, `BridgeFacade.realtimeDiagnostics$()`
 - SSR : aucune connexion `EventSource` côté serveur
 

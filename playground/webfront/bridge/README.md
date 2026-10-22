@@ -65,15 +65,15 @@ export class AppModule {}
 - `baseUrl` (requis) ;
 - `auth` (Bearer ou interceptor custom) ;
 - `http` (`withCredentials` HTTP par défaut) ;
-- `mercure` (`hubUrl` d'un hub Mercure 1.0, `withCredentials`) ;
-- `defaults` (headers/timeout/retries) ;
+- `mercure` (`hubUrl` d'un hub Mercure 1.0, `withCredentials`, `authorize`, `maxUrlLength`) ;
+- `defaults` (headers, timeout natif, retries des erreurs transitoires : réseau, `429`, `5xx`) ;
 - `singleFlight` (déduplication “in-flight” des requêtes HTTP identiques `GET/HEAD/OPTIONS`) ;
 - `debug` (logs runtime) ;
 - `extraInterceptors` (interceptors Angular additionnels).
 
-Les comportements HTTP internes du bridge s'appliquent uniquement aux requêtes
-appartenant à l'origine et au chemin de `baseUrl`. Les interceptors personnalisés
-restent responsables de leur propre périmètre.
+Les comportements HTTP internes du bridge et `auth` s'appliquent uniquement aux
+requêtes appartenant à l'origine et au chemin de `baseUrl`. Les interceptors de
+`extraInterceptors` restent responsables de leur propre périmètre.
 
 ### Cookies / `withCredentials`
 
@@ -100,10 +100,10 @@ provideBridge({
 - `{ type: 'bearer', getToken }` (sync ou async),
 - ou un `HttpInterceptorFn` custom.
 
-Le Bearer intégré est ajouté uniquement aux requêtes dont l’origine et le chemin
-appartiennent au `baseUrl` configuré. Une requête vers un autre service conserve
-donc ses en-têtes d’origine. Un interceptor custom garde le comportement Angular
-standard et reste responsable de son propre périmètre.
+L'auth, Bearer intégré ou interceptor custom, s'applique uniquement aux requêtes
+dont l’origine et le chemin appartiennent au `baseUrl` configuré. Une requête vers
+un autre service conserve donc ses en-têtes d’origine. Un interceptor global se
+déclare dans `extraInterceptors`.
 
 ```ts
 import {provideBridge} from '@app/bridge';
@@ -222,11 +222,11 @@ exposés par un service. Configurez API Platform pour publier la même représen
 complète que GET : le bridge ne fait pas de GET complémentaire et n'expanse pas les
 relations. Les relations par IRI sont chargées à la demande par l'application.
 
-- Une seule connexion SSE est partagée par toute l’application ; elle est rouverte avec `last_event_id`, s'il est disponible, quand les abonnements changent. La reprise dépend de l'historique du hub et du curseur disponible ; l'application organise sa synchronisation initiale et ses éventuelles resynchronisations.
+- Les connexions SSE sont partagées par toute l’application : les abonnements sont répartis sur le moins de connexions possible, une nouvelle connexion s'ouvrant quand l'URL dépasserait `mercure.maxUrlLength` (4000 par défaut) ou 100 abonnements. Une connexion est rouverte avec `last_event_id`, s'il est disponible, quand ses abonnements changent. La reprise dépend de l'historique du hub et du curseur disponible ; l'application organise sa synchronisation initiale et ses éventuelles resynchronisations.
 - Le désabonnement se fait avec `unsubscribe()`.
 - `ResourceDeletion` décrit le payload de suppression d'API Platform : `@id: string` requis et `@type?: string | string[]`. `isResourceDeletion(payload: object): payload is ResourceDeletion` reconnaît un payload limité à `@id` et à l'éventuel `@type` (une création ou modification JSON-LD porte toujours `@context`) ; le repository retire l'entité du store par son `@id`.
 - Les publications et topics nécessaires à la cohérence entre entités liées sont configurés par le développeur côté backend.
-- Authentification : cookie HttpOnly `__Secure-mercure_access_token` posé par le backend (jamais de token dans l’URL ni en JavaScript).
+- Authentification : cookie HttpOnly `__Secure-mercure_access_token` posé par le backend (jamais de token dans l’URL ni en JavaScript). Avec `mercure.authorize` (ex. `'/api/mercure/authorization'`), le bridge appelle cet endpoint avant la première connexion et après chaque refus du hub (ex. token expiré), puis rouvre la connexion.
 - IRIs d’item non standard : `factory.create<Book>({url: '/api/books', topic: '/api/library/books/:isbn'})`.
 - État : `ResourceFacade.connectionStatus`, `BridgeFacade.realtimeStatus$()`, `BridgeFacade.realtimeDiagnostics$()`.
 - Navigateurs : l'écoute par pattern nécessite `URLPattern` (sinon chargez `urlpattern-polyfill` dans l'application).

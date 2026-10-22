@@ -23,8 +23,8 @@ Les commandes, arguments et options du CLI constituent le contrat d'utilisation.
 
 Le compilateur de modèles suit un pipeline unidirectionnel. Chaque module porte une seule décision :
 
-- `oas-contract.js` trouve les schémas atteignables depuis les opérations OpenAPI ;
-- `model-selection.js` applique les formats et filtres, puis attribue les noms TypeScript ;
+- `oas-contract.js` suit les dépendances `$ref` entre schémas ;
+- `model-selection.js` sélectionne les schémas de `components.schemas` (filtres `--include` / `--exclude`), puis attribue les noms TypeScript en fusionnant les représentations de même forme d'une ressource ;
 - `interface-schema.js` décide si un schéma objet peut rester une interface sans perte de sens ;
 - `type-resolver.js` traduit récursivement un schéma en expression TypeScript ;
 - `type-expression.js` compose les unions, intersections et tableaux avec leur priorité syntaxique ;
@@ -66,8 +66,8 @@ cohérence entre entités, ainsi que le chargement différé des relations.
 
 `playground/` ne fait pas partie du produit publié :
 
-- `api-platform/` est l'API Symfony de référence ;
-- `angular-app/` est l'application de validation manuelle ;
+- `core/` est l'API Symfony / API Platform de référence ;
+- `webfront/` est l'application Angular de validation manuelle ;
 - `README.md` documente le workflow commun.
 
 Le playground peut dépendre du générateur. Le générateur ne doit jamais dépendre du playground.

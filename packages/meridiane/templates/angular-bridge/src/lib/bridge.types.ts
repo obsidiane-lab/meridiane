@@ -25,10 +25,10 @@ export interface BridgeDefaults {
 }
 
 /**
- * State of the Mercure connection.
+ * State of the Mercure connections.
  * - `closed`: no active subscription (or realtime disabled)
- * - `connecting`: opening, reconnecting, or waiting before a retry
- * - `connected`: the hub accepted the subscription and the stream is open
+ * - `connecting`: at least one connection is opening, reconnecting, or waiting before a retry
+ * - `connected`: the hub accepted every connection and the streams are open
  */
 export type RealtimeStatus = 'closed' | 'connecting' | 'connected';
 
@@ -39,13 +39,19 @@ export interface RealtimeSubscriptionDiagnostics {
   consumers: number;
 }
 
-export interface RealtimeDiagnostics {
+export interface RealtimeConnectionDiagnostics {
   status: RealtimeStatus;
-  /** Current subscribe URL (without `last_event_id`). */
+  /** Subscribe URL (without `last_event_id`). */
   url?: string;
   subscriptions: RealtimeSubscriptionDiagnostics[];
-  /** Last update ID received, used to request replay after a reconnection. */
+  /** Last update ID received on this connection, used to request replay after a reconnection. */
   lastEventId?: string;
-  /** Consecutive connections refused by the hub (authentication, authorization or network). */
+  /** Consecutive connections refused by the hub (authentication, authorization, limits). */
   failures: number;
+}
+
+export interface RealtimeDiagnostics {
+  status: RealtimeStatus;
+  /** One entry per `EventSource`: subscriptions are split when a subscribe URL would exceed the limits. */
+  connections: RealtimeConnectionDiagnostics[];
 }

@@ -17,6 +17,17 @@ export interface BridgeMercureOptions {
    * cookie set by the backend (`EventSource` cannot send an `Authorization` header).
    */
   withCredentials?: boolean;
+  /**
+   * Obtains the Mercure authorization cookie: an API endpoint called with `GET` (e.g. `/api/mercure/authorization`),
+   * or a function. Called before the first connection and after each connection refused by the hub
+   * (e.g. expired token), before reconnecting.
+   */
+  authorize?: string | (() => Promise<unknown>);
+  /**
+   * Maximum length of a subscribe URL (without `last_event_id`). Beyond it, or beyond 100 subscriptions,
+   * the bridge opens another connection. Default: `4000`.
+   */
+  maxUrlLength?: number;
 }
 
 export interface BridgeHttpOptions {

@@ -1,42 +1,16 @@
-import {
-  canonicalizeMediaType,
-  collectUsedSchemasForMediaType,
-  expandWithSchemaDependencies,
-} from './oas-contract.js';
+import {expandWithSchemaDependencies} from './oas-contract.js';
 import {
   baseTsNameFromBasePath,
-  formatSuffixToken,
   groupTsNameFromGroupPath,
   parseOpenApiSchemaName,
 } from './oas-schema-name.js';
 import {sanitizeTypeName} from './utils.js';
 
-export const DEFAULT_MODEL_FORMAT = 'application/ld+json';
+const HYDRA_SCHEMA = /^Hydra/i;
 
-function normalizeFormats(values) {
-  const formats = [];
-  for (const value of Array.isArray(values) ? values : []) {
-    const format = canonicalizeMediaType(value);
-    if (format && !formats.includes(format)) formats.push(format);
-  }
-  return formats.length > 0 ? formats : [DEFAULT_MODEL_FORMAT];
-}
-
-function indexFormatsBySchema(spec, formats) {
-  const formatsBySchema = new Map();
-
-  for (const format of formats) {
-    const schemaNames = collectUsedSchemasForMediaType(spec, {mediaType: format});
-    for (const schemaName of schemaNames) {
-      if (!schemaName) continue;
-      const schemaFormats = formatsBySchema.get(schemaName) ?? new Set();
-      schemaFormats.add(format);
-      formatsBySchema.set(schemaName, schemaFormats);
-    }
-  }
-
-  return formatsBySchema;
-}
+/** Representations of one resource, in emission order: the JSON-LD one is what the bridge reads. */
+const VARIANT_ORDER = ['jsonld', 'none', 'multipart'];
+const VARIANT_SUFFIX = {jsonld: 'JsonLd', none: 'Json', multipart: 'Multipart'};
 
 function matchesRule(value, rule) {
   if (rule instanceof RegExp) return rule.test(value);
@@ -55,94 +29,81 @@ function isSelected(schemaName, include, exclude) {
   return (include.length === 0 || matchesAny(include)) && !matchesAny(exclude);
 }
 
-function selectCandidates(schemas, formatsBySchema, include, exclude) {
-  const selected = [...formatsBySchema.keys()]
-    .filter((name) => name && !/^Hydra/i.test(name))
-    .sort((left, right) => left.localeCompare(right))
-    .filter((name) => isSelected(name, include, exclude));
-
-  const candidates = include.length > 0 || exclude.length > 0
-    ? expandWithSchemaDependencies(selected, schemas)
-    : new Set(selected);
-
-  return [...candidates]
-    .filter((name) => name && !/^Hydra/i.test(name))
-    .sort((left, right) => left.localeCompare(right));
+/** Hydra schemas are covered by the runtime `Item`/`Collection` types; merge-patch bodies by `Partial<T>`. */
+function isModelSchema(schemaName) {
+  return !HYDRA_SCHEMA.test(schemaName) && !parseOpenApiSchemaName(schemaName).isMergePatch;
 }
 
-function choosePreferredFormats(schemaNames, formats, formatsBySchema) {
-  const formatPriority = new Map(formats.map((format, index) => [format, index]));
-  const preferredFormats = new Map();
-
-  for (const schemaName of schemaNames) {
-    const schemaFormats = [...(formatsBySchema.get(schemaName) ?? [])];
-    const preferred = schemaFormats.sort(
-      (left, right) => (formatPriority.get(left) ?? 999) - (formatPriority.get(right) ?? 999)
-    )[0] ?? formats[0];
-    preferredFormats.set(schemaName, preferred);
-  }
-
-  return {preferredFormats, formatPriority};
+function variantRank(schemaName) {
+  const rank = VARIANT_ORDER.indexOf(parseOpenApiSchemaName(schemaName).baseVariant);
+  return rank < 0 ? VARIANT_ORDER.length : rank;
 }
 
-function desiredTypeName(schemaName) {
+/** Name shared by every representation of a resource (`Book`, `Book.jsonld`, `Book.multipart` → `Book`). */
+export function resourceTypeName(schemaName) {
   const parsed = parseOpenApiSchemaName(schemaName);
-  if (parsed.isMergePatch) return undefined;
-
-  const base = baseTsNameFromBasePath(parsed.basePath);
-  const group = groupTsNameFromGroupPath(parsed.groupPath);
-  return `${base}${group}` || 'Model';
+  return `${baseTsNameFromBasePath(parsed.basePath)}${groupTsNameFromGroupPath(parsed.groupPath)}` || 'Model';
 }
 
-function assignTypeNames(schemaNames, preferredFormats, formatPriority) {
-  const schemasByDesiredName = new Map();
+/** Selects the component schemas of the contract, optionally filtered by `include` / `exclude`. */
+export function selectModelSchemas(spec, options = {}) {
+  const schemas = spec?.components?.schemas ?? {};
+  const include = Array.isArray(options.includeSchemaNames) ? options.includeSchemaNames : [];
+  const exclude = Array.isArray(options.excludeSchemaNames) ? options.excludeSchemaNames : [];
 
+  const selected = Object.keys(schemas)
+    .filter(isModelSchema)
+    .filter((schemaName) => isSelected(schemaName, include, exclude));
+  const schemaNames = include.length > 0 || exclude.length > 0
+    ? [...expandWithSchemaDependencies(selected, schemas)]
+    : selected;
+
+  return {
+    schemas,
+    schemaNames: schemaNames.filter(isModelSchema).sort((left, right) => left.localeCompare(right)),
+  };
+}
+
+/**
+ * Names the models: the representations of one resource that have the same TypeScript shape share one model,
+ * named after the resource. A representation with a different shape gets its variant as suffix.
+ *
+ * @param {string[]} schemaNames
+ * @param {Map<string, string>} signatures shape of each schema, computed with resource names
+ * @returns {{typeNames: Map<string, string>, emitted: string[]}}
+ */
+export function assignTypeNames(schemaNames, signatures) {
+  const representations = new Map();
   for (const schemaName of schemaNames) {
-    const desiredName = desiredTypeName(schemaName);
-    if (!desiredName) continue;
-
-    const entries = schemasByDesiredName.get(desiredName) ?? [];
-    entries.push({schemaName, preferredFormat: preferredFormats.get(schemaName)});
-    schemasByDesiredName.set(desiredName, entries);
+    const resourceName = resourceTypeName(schemaName);
+    representations.set(resourceName, [...(representations.get(resourceName) ?? []), schemaName]);
   }
 
   const usedNames = new Set();
   const typeNames = new Map();
-  const sortedGroups = [...schemasByDesiredName.entries()]
-    .sort(([left], [right]) => left.localeCompare(right));
+  const emitted = [];
+  const sortedResources = [...representations.entries()].sort(([left], [right]) => left.localeCompare(right));
 
-  for (const [desiredName, entries] of sortedGroups) {
-    entries.sort((left, right) => {
-      const byFormat =
-        (formatPriority.get(left.preferredFormat) ?? 999) -
-        (formatPriority.get(right.preferredFormat) ?? 999);
-      return byFormat || left.schemaName.localeCompare(right.schemaName);
-    });
+  for (const [resourceName, names] of sortedResources) {
+    names.sort((left, right) => variantRank(left) - variantRank(right) || left.localeCompare(right));
+    const typeNameBySignature = new Map();
 
-    entries.forEach((entry, index) => {
-      const candidateName = index === 0
-        ? desiredName
-        : `${desiredName}${formatSuffixToken(entry.preferredFormat)}`;
-      typeNames.set(entry.schemaName, sanitizeTypeName(candidateName, usedNames));
-    });
+    for (const schemaName of names) {
+      const signature = signatures.get(schemaName);
+      const sameShape = typeNameBySignature.get(signature);
+      if (sameShape) {
+        typeNames.set(schemaName, sameShape);
+        continue;
+      }
+
+      const variant = parseOpenApiSchemaName(schemaName).baseVariant;
+      const candidate = typeNameBySignature.size === 0 ? resourceName : `${resourceName}${VARIANT_SUFFIX[variant] ?? ''}`;
+      const typeName = sanitizeTypeName(candidate, usedNames);
+      typeNameBySignature.set(signature, typeName);
+      typeNames.set(schemaName, typeName);
+      emitted.push(schemaName);
+    }
   }
 
-  return typeNames;
-}
-
-export function selectModelSchemas(spec, options = {}) {
-  const schemas = spec?.components?.schemas ?? {};
-  const formats = normalizeFormats(options.formats);
-  const include = Array.isArray(options.includeSchemaNames) ? options.includeSchemaNames : [];
-  const exclude = Array.isArray(options.excludeSchemaNames) ? options.excludeSchemaNames : [];
-  const formatsBySchema = indexFormatsBySchema(spec, formats);
-  const schemaNames = selectCandidates(schemas, formatsBySchema, include, exclude);
-  const {preferredFormats, formatPriority} = choosePreferredFormats(
-    schemaNames,
-    formats,
-    formatsBySchema
-  );
-  const typeNames = assignTypeNames(schemaNames, preferredFormats, formatPriority);
-
-  return {schemas, formats, schemaNames, preferredFormats, typeNames};
+  return {typeNames, emitted};
 }

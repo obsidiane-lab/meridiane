@@ -26,7 +26,7 @@ export async function runGenerate(packageName, opts) {
   log.info(`lib: ${config.libName}`);
   log.info(`target: ${path.relative(cwd, projectDir)}`);
   if (config.noModels) log.info('models: désactivés (--no-models)');
-  else log.info(`spec: ${specSource} | formats: ${config.formats.join(', ')} | nullableMode: ${config.requiredMode}`);
+  else log.info(`spec: ${specSource}`);
 
   let spec;
   if (!config.noModels) {
@@ -45,7 +45,6 @@ export async function runGenerate(packageName, opts) {
     noModels: config.noModels,
     spec,
     requiredMode: config.requiredMode,
-    formats: config.formats,
     include: config.include,
     exclude: config.exclude,
     debug: config.debug,

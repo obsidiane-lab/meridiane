@@ -1,6 +1,6 @@
-import {canonicalizeMediaType} from './oas-contract.js';
 import {collectInterfaceTypeNames, resolveInterfaceSchema} from './interface-schema.js';
-import {DEFAULT_MODEL_FORMAT, selectModelSchemas} from './model-selection.js';
+import {assignTypeNames, resourceTypeName, selectModelSchemas} from './model-selection.js';
+import {parseOpenApiSchemaName} from './oas-schema-name.js';
 import {isObject} from './schema-utils.js';
 import {createTypeResolver} from './type-resolver.js';
 import {quoteKeyIfNeeded} from './utils.js';
@@ -8,7 +8,6 @@ import {quoteKeyIfNeeded} from './utils.js';
 /**
  * @typedef {{
  *   requiredMode?: 'all'|'spec',
- *   formats?: string[],
  *   includeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
  *   excludeSchemaNames?: Array<RegExp|string|((name: string) => boolean)>,
  * }} BuildOptions
@@ -28,12 +27,15 @@ import {quoteKeyIfNeeded} from './utils.js';
  * }} ModelDefinition
  */
 
+const JSON_LD_KEYWORDS = new Set(['@id', '@type', '@context']);
+
 function normalizeRequiredMode(value) {
   return String(value ?? '').trim().toLowerCase() === 'spec' ? 'spec' : 'all';
 }
 
-function createModelBuilder({spec, schemas, typeNames, interfaceTypeNames, requiredMode}) {
+function createModelBuilder({spec, schemas, schemaNames, typeNames, requiredMode}) {
   const knownTypeNames = new Set(typeNames.values());
+  const interfaceTypeNames = collectInterfaceTypeNames(schemas, schemaNames, typeNames);
 
   function importsFor(dependencies, currentTypeName) {
     return [...dependencies]
@@ -58,14 +60,14 @@ function createModelBuilder({spec, schemas, typeNames, interfaceTypeNames, requi
     };
   }
 
-  function buildInterface(schema, typeName, extendsTypes, preferredFormat) {
-    const isJsonLd = canonicalizeMediaType(preferredFormat) === DEFAULT_MODEL_FORMAT;
+  /** A JSON-LD representation extends the runtime `Item`, which carries `@id`, `@type` and `@context`. */
+  function buildInterface(schema, typeName, extendsTypes, isJsonLd) {
     const requiredProperties = new Set(schema.required ?? []);
     const dependencies = new Set(extendsTypes);
     const resolver = resolverFor(dependencies);
 
     const props = Object.entries(schema.properties ?? {})
-      .filter(([propertyName]) => !isJsonLd || !['@id', '@type', '@context'].includes(propertyName))
+      .filter(([propertyName]) => !isJsonLd || !JSON_LD_KEYWORDS.has(propertyName))
       .map(([propertyName, propertySchema]) => ({
         name: propertyName,
         tsKey: quoteKeyIfNeeded(propertyName),
@@ -84,7 +86,7 @@ function createModelBuilder({spec, schemas, typeNames, interfaceTypeNames, requi
     };
   }
 
-  return function buildModel(schemaName, preferredFormat) {
+  return function buildModel(schemaName) {
     const raw = schemas[schemaName];
     const typeName = typeNames.get(schemaName);
     if (!typeName || raw === undefined) return undefined;
@@ -100,37 +102,42 @@ function createModelBuilder({spec, schemas, typeNames, interfaceTypeNames, requi
       return buildAlias(raw, typeName);
     }
 
-    return buildInterface(schema, typeName, extendsTypes, preferredFormat);
+    const isJsonLd = parseOpenApiSchemaName(schemaName).baseVariant === 'jsonld';
+    return buildInterface(schema, typeName, extendsTypes, isJsonLd);
   };
 }
 
+/** TypeScript shape of a model, independent of its name and of the `Item` base. */
+function signatureOf(model) {
+  if (!model) return '';
+  return JSON.stringify([
+    model.isAlias ? model.type : null,
+    model.extendsTypes,
+    model.props.map(({name, type, optional}) => [name, type, optional]),
+  ]);
+}
+
 /**
- * Builds TypeScript model definitions from OpenAPI `components.schemas`.
+ * Builds TypeScript model definitions from the OpenAPI `components.schemas`.
+ *
+ * API Platform describes one resource several times (`Book.jsonld`, `Book`, `Book.multipart`). Representations
+ * with the same shape produce a single model, built from the JSON-LD one when present.
+ *
  * @param {any} spec
  * @param {BuildOptions} [options]
  * @returns {{models: ModelDefinition[]}}
  */
 export function buildModelsFromOpenAPI(spec, options = {}) {
   const requiredMode = normalizeRequiredMode(options.requiredMode);
-  const {schemas, formats, schemaNames, preferredFormats, typeNames} = selectModelSchemas(
-    spec,
-    options
-  );
-  const interfaceTypeNames = collectInterfaceTypeNames(schemas, schemaNames, typeNames);
-  const buildModel = createModelBuilder({
-    spec,
-    schemas,
-    typeNames,
-    interfaceTypeNames,
-    requiredMode,
-  });
+  const {schemas, schemaNames} = selectModelSchemas(spec, options);
+  const builderFor = (typeNames) => createModelBuilder({spec, schemas, schemaNames, typeNames, requiredMode});
 
-  const models = [];
-  for (const schemaName of schemaNames) {
-    const preferredFormat = preferredFormats.get(schemaName) ?? formats[0];
-    const model = buildModel(schemaName, preferredFormat);
-    if (model) models.push(model);
-  }
+  // Representations of a resource are compared with the resource name, so references do not tell them apart.
+  const buildWithResourceNames = builderFor(new Map(schemaNames.map((name) => [name, resourceTypeName(name)])));
+  const signatures = new Map(schemaNames.map((name) => [name, signatureOf(buildWithResourceNames(name))]));
 
-  return {models};
+  const {typeNames, emitted} = assignTypeNames(schemaNames, signatures);
+  const buildModel = builderFor(typeNames);
+
+  return {models: emitted.map(buildModel).filter(Boolean)};
 }

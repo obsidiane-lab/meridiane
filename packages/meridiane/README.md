@@ -63,7 +63,6 @@ Sorties :
 ## Options
 
 - `--spec <url|file>` : URL OpenAPI ou fichier JSON local (requis sauf `--no-models`)
-- `--formats <mimeTypes>` : répétable ou liste `,` ; défaut `application/ld+json`
 - `--include <substr>` / `--exclude <substr>` : filtres de noms de schémas (répétables, support `,`)
 - `--no-models` : runtime only
 - `--version <semver>` : `build` et `generate` (défaut `0.0.0`)
@@ -73,8 +72,8 @@ Sorties :
 ## Notes importantes
 
 - fallback automatique `.../api/docs.json` -> `.../api/docs.jsonopenapi` si nécessaire
-- mode contract-driven : uniquement les schémas atteignables via `paths` et `webhooks` pour les formats sélectionnés
-- modèles `*jsonMergePatch*` non générés (`PATCH` typé `Partial<T>`)
+- le contrat est lu tel quel : tous les schémas de `components.schemas` sont générés, sans sélection de format (les formats se configurent dans API Platform) ; les représentations de même forme d'une ressource (`Book.jsonld`, `Book`, `Book.multipart`) donnent un seul modèle `Book`, qui étend `Item`
+- modèles `Hydra*` et `*jsonMergePatch*` non générés (`PATCH` typé `Partial<T>`)
 - `generate`, `dev` et `build` produisent les mêmes modèles pour une même spec et les mêmes options ; les propriétés requises et la nullabilité suivent le contrat OpenAPI
 - Meridiane ne publie pas : publication via `npm publish` côté CI
 
@@ -88,13 +87,9 @@ Le compilateur suit les types d’[OpenAPI 3.0](https://spec.openapis.org/oas/v3
 - `enum` et `const`, y compris les valeurs JSON structurées ;
 - `allOf`, `oneOf`, `anyOf`, `nullable` et références locales vers `components.schemas` ou `$defs` ;
 - schémas racine objets sous forme d’interfaces et autres schémas sous forme d’aliases TypeScript ;
-- contrats atteignables depuis les bodies, paramètres, en-têtes, callbacks et webhooks.
+- tous les schémas déclarés dans `components.schemas`.
 
 Les règles de validation sans équivalent structurel TypeScript (`pattern`, bornes numériques,
 `uniqueItems`, `contains`, `not`, conditions, fermeture exacte des propriétés, etc.) restent à la
 charge de la validation runtime. Les références externes doivent être préalablement regroupées dans
 le document OpenAPI fourni à Meridiane.
-
-## Spécifique à ce repo
-
-Dans ce monorepo, `meridiane dev` peut être exécuté sans `packageName` et cible alors `@obsidiane/bridge-sandbox` (app `playground/angular-app`).

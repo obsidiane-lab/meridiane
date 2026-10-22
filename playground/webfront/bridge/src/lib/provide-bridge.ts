@@ -2,21 +2,19 @@ import {EnvironmentProviders, makeEnvironmentProviders} from '@angular/core';
 import {HttpInterceptorFn, provideHttpClient, withFetch, withInterceptors} from '@angular/common/http';
 import {BridgeOptions} from './bridge-options';
 import {BridgeLogger} from './bridge.types';
-import {createAuthInterceptors} from './interceptors/bearer-auth.interceptor';
+import {createAuthInterceptor} from './interceptors/bearer-auth.interceptor';
 import {bridgeDebugInterceptor} from './interceptors/bridge-debug.interceptor';
 import {bridgeDefaultsInterceptor} from './interceptors/bridge-defaults.interceptor';
 import {contentTypeInterceptor} from './interceptors/content-type.interceptor';
 import {scopeInterceptor} from './interceptors/scoped.interceptor';
-import {createSingleFlightInterceptor} from './interceptors/singleflight.interceptor';
+import {singleFlightInterceptor} from './interceptors/singleflight.interceptor';
 import {
   API_BASE_URL,
   BRIDGE_DEFAULTS,
   BRIDGE_HTTP_WITH_CREDENTIALS,
   BRIDGE_LOGGER,
-  BRIDGE_MERCURE_WITH_CREDENTIALS,
-  MERCURE_HUB_URL,
+  BRIDGE_MERCURE,
 } from './tokens';
-import {resolveUrl} from './utils/url';
 
 export type {BridgeAuth, BridgeHttpOptions, BridgeMercureOptions, BridgeOptions} from './bridge-options';
 
@@ -39,12 +37,13 @@ export function provideBridge(options: BridgeOptions): EnvironmentProviders {
 
   const loggerProvider: BridgeLogger = createBridgeLogger(debug);
   const scopeToBridge = (interceptor: HttpInterceptorFn) => scopeInterceptor(baseUrl, interceptor);
+  const authInterceptor = createAuthInterceptor(auth);
 
   const interceptors: HttpInterceptorFn[] = [
     scopeToBridge(contentTypeInterceptor),
     scopeToBridge(bridgeDefaultsInterceptor),
-    ...createAuthInterceptors(auth, baseUrl),
-    ...(singleFlight ? [scopeToBridge(createSingleFlightInterceptor())] : []),
+    ...(authInterceptor ? [scopeToBridge(authInterceptor)] : []),
+    ...(singleFlight ? [scopeToBridge(singleFlightInterceptor)] : []),
     ...(debug ? [scopeToBridge(bridgeDebugInterceptor)] : []),
     ...extraInterceptors,
   ];
@@ -56,8 +55,7 @@ export function provideBridge(options: BridgeOptions): EnvironmentProviders {
     ),
     {provide: API_BASE_URL, useValue: baseUrl},
     {provide: BRIDGE_HTTP_WITH_CREDENTIALS, useValue: http?.withCredentials ?? false},
-    {provide: BRIDGE_MERCURE_WITH_CREDENTIALS, useValue: mercure?.withCredentials ?? true},
-    ...(mercure?.hubUrl ? [{provide: MERCURE_HUB_URL, useValue: resolveUrl(baseUrl, mercure.hubUrl)}] : []),
+    ...(mercure?.hubUrl ? [{provide: BRIDGE_MERCURE, useValue: mercure}] : []),
     {provide: BRIDGE_DEFAULTS, useValue: defaults ?? {}},
     {provide: BRIDGE_LOGGER, useValue: loggerProvider},
   ]);

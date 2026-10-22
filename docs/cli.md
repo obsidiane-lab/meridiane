@@ -24,7 +24,7 @@ Génère les sources du bridge dans le workspace courant.
 npx meridiane generate @acme/backend-bridge --spec ./openapi.json
 ```
 
-### `meridiane dev [packageName]`
+### `meridiane dev <packageName>`
 
 Workflow dev complet :
 
@@ -37,9 +37,7 @@ Workflow dev complet :
 npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json
 ```
 
-Particularité de ce repo :
-- `packageName` est optionnel et vaut alors `@obsidiane/bridge-sandbox`
-- Meridiane applique les defaults sandbox (`playground/angular-app`)
+La commande se lance depuis la racine de l'application Angular (dossier contenant `package.json`).
 
 ### `meridiane build <packageName>`
 
@@ -61,22 +59,6 @@ Source OpenAPI : URL HTTP(S) ou fichier JSON local.
 
 Règle :
 - requis sauf `--no-models`
-
-### `--formats <mimeTypes>`
-
-Option répétable ou liste séparée par `,`.
-
-Exemples :
-
-```bash
---formats application/ld+json
---formats application/ld+json,application/json
-```
-
-Comportement :
-- active le mode contract-driven
-- seuls les schémas réellement atteignables depuis `paths` pour les formats demandés sont générés
-- valeur par défaut si absent : `application/ld+json`
 
 ### `--include <substr>` / `--exclude <substr>`
 
@@ -107,15 +89,14 @@ Disponible uniquement sur `generate`.
 
 Active les logs détaillés du CLI.
 
-## Résolution de la spec en mode `dev` (sandbox)
+## Modèles générés
 
-Quand vous lancez `meridiane dev` sans `packageName` dans ce repo, la spec est résolue dans cet ordre :
+Meridiane lit le contrat tel quel : tous les schémas de `components.schemas` sont générés, sans sélection de format. Les formats exposés se configurent côté API Platform (`api_platform.formats`) ; le runtime du bridge parle JSON-LD.
 
-1. valeur explicite `--spec`
-2. `playground/api-platform/var/openapi.json` si le fichier existe
-3. `http://localhost:8000/api/docs.json`
-
-Si la spec par défaut est indisponible et que `--spec` n'a pas été fourni, Meridiane bascule en `--no-models` (warning non bloquant).
+- API Platform décrit une ressource plusieurs fois (`Book.jsonld`, `Book`, `Book.multipart`). Les représentations de même forme TypeScript donnent **un seul** modèle `Book`, construit depuis la représentation JSON-LD, qui étend `Item` (`@id`, `@type`, `@context`).
+- Une représentation de forme différente garde un modèle distinct, suffixé par sa variante : `Json` pour le schéma sans suffixe, `Multipart` pour `.multipart` (ex. `Error` en JSON-LD et `ErrorJson` en `application/problem+json`).
+- Les schémas `Hydra*` sont couverts par les types du runtime (`Item`, `Collection<T>`) et ne sont pas générés.
+- Les schémas merge-patch (`PATCH`) n'ont pas de modèle dédié : typage en `Partial<T>`.
 
 ## Chargement d'URL OpenAPI
 
@@ -124,6 +105,6 @@ Pour une URL finissant par `/api/docs.json`, Meridiane tente automatiquement un 
 ## Notes utiles
 
 - `generate`, `dev` et `build` produisent les mêmes types pour une même spec et les mêmes options. Les propriétés requises et la nullabilité suivent OpenAPI, y compris en développement.
-- `PATCH` sur schémas merge-patch : pas de modèle dédié, typage en `Partial<T>`.
-- Les noms de modèles sont normalisés et désambiguïsés selon le format si nécessaire.
+- Les noms de modèles sont normalisés (PascalCase, mots réservés évités).
 - `meridiane generate` ne modifie pas `angular.json`.
+- Migration depuis 2.x : `--formats` est supprimé (configurer les formats dans API Platform) et `dev` exige un `packageName`.

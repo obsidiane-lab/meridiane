@@ -18,12 +18,6 @@ function collect(value, previous = []) {
 function commonOptions(cmd) {
   return cmd
     .option('--spec <urlOrFile>', 'OpenAPI spec source (URL or local JSON file)')
-    .option(
-      '--formats <mimeTypes>',
-      'Generate only selected media types (repeatable, supports commas). Enables contract-driven mode from paths.',
-      collect,
-      []
-    )
     .option('--include <substr>', 'Include schema names containing substring (repeatable, supports commas)', collect, [])
     .option('--exclude <substr>', 'Exclude schema names containing substring (repeatable, supports commas)', collect, [])
     .option('--no-models', 'Skip models generation (then --spec is not required)')
@@ -47,10 +41,7 @@ function action(run) {
 commonOptions(
   program
     .command('dev')
-    .argument(
-      '[packageName]',
-      'NPM package name of the generated bridge (e.g. @acme/backend-bridge). Optional in this repo (defaults to @obsidiane/bridge-sandbox).'
-    )
+    .argument('<packageName>', 'NPM package name of the generated bridge (e.g. @acme/backend-bridge)')
     .action(action(runDev))
 );
 

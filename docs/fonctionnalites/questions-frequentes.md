@@ -4,13 +4,12 @@
 
 Chaque backend garde sa propre spec OpenAPI, ses modèles et son cycle de release. Cela évite de mélanger plusieurs contrats dans un seul package.
 
-## `meridiane dev` peut-il être lancé sans `packageName` ?
+## Comment choisir les formats des modèles générés ?
 
-Oui, dans ce repo uniquement. Sans argument, il cible `@obsidiane/bridge-sandbox` et applique les defaults de `playground/angular-app`.
-
-## Que se passe-t-il si la spec est indisponible en mode `dev` sandbox ?
-
-Si vous n'avez pas passé `--spec` explicitement, Meridiane tente une résolution automatique puis bascule en `--no-models` si la spec reste inaccessible.
+Meridiane lit le contrat OpenAPI tel quel, sans sélection de format. Les formats
+exposés se configurent dans API Platform (`api_platform.formats`) ; les
+représentations de même forme d'une ressource donnent un seul modèle. Les
+endpoints au format particulier passent par `request$`.
 
 ## Mercure est-il obligatoire ?
 
@@ -56,10 +55,10 @@ du store.
 - `{ type: 'bearer', getToken }` (sync/async),
 - `HttpInterceptorFn` custom.
 
-Le Bearer intégré est limité à l’origine et au chemin du `baseUrl` fourni à
-`provideBridge()`. Les requêtes HTTP de l’application vers d’autres services ne
-reçoivent pas ce token. Le périmètre d’un interceptor custom reste à la charge de
-son implémentation.
+L'auth, Bearer intégré ou interceptor custom, est limitée à l’origine et au chemin
+du `baseUrl` fourni à `provideBridge()`. Les requêtes HTTP de l’application vers
+d’autres services ne reçoivent pas ce token ; un interceptor global se déclare
+dans `extraInterceptors`.
 
 ## Comment gérer les cookies (`withCredentials`) ?
 
@@ -82,5 +81,5 @@ La partie SSE n'est jamais ouverte côté serveur. Le reste du runtime HTTP dép
 
 ## Limites connues de génération de modèles
 
-- génération contract-driven : seuls les schémas atteignables via `paths` et formats sélectionnés sont conservés
+- tous les schémas de `components.schemas` sont générés, hors `Hydra*` ; les représentations de même forme d'une ressource sont fusionnées
 - les schémas `*jsonMergePatch*` ne génèrent pas de modèle dédié (`PATCH` est typé `Partial<T>`)

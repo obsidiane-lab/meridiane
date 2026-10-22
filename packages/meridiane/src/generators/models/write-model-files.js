@@ -8,13 +8,12 @@ import { ensureCleanDir } from './utils.js';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const templatesDir = path.join(currentDir, 'templates');
 
-export async function writeModelFiles({ projectDir, spec, requiredMode, formats, include, exclude, debug, log }) {
+export async function writeModelFiles({ projectDir, spec, requiredMode, include, exclude, debug, log }) {
   const outputDir = path.resolve(projectDir, 'src', 'models');
   if (debug) {
     log?.debug?.('[meridiane] generate models', {
       outputDir,
       requiredMode,
-      formats: Array.isArray(formats) ? formats : [],
       includeCount: include.length,
       excludeCount: exclude.length,
     });
@@ -24,7 +23,6 @@ export async function writeModelFiles({ projectDir, spec, requiredMode, formats,
 
   const { models } = buildModelsFromOpenAPI(spec, {
     requiredMode,
-    formats: Array.isArray(formats) ? formats : [],
     includeSchemaNames: include,
     excludeSchemaNames: exclude,
   });

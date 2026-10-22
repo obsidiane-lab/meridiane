@@ -1,6 +1,6 @@
-import {HttpInterceptorFn, HttpRequest} from '@angular/common/http';
+import {HttpErrorResponse, HttpInterceptorFn, HttpRequest} from '@angular/common/http';
 import {inject} from '@angular/core';
-import {retry, timeout, timer} from 'rxjs';
+import {retry, throwError, timer} from 'rxjs';
 import {BridgeDefaults} from '../bridge.types';
 import {BRIDGE_DEFAULTS, BRIDGE_LOGGER} from '../tokens';
 
@@ -18,22 +18,18 @@ type RetryPolicy = {
 export const bridgeDefaultsInterceptor: HttpInterceptorFn = (req, next) => {
   const defaults = inject(BRIDGE_DEFAULTS, {optional: true}) ?? {};
   const logger = inject(BRIDGE_LOGGER, {optional: true});
-  const request = applyDefaultHeaders(req, defaults.headers);
-
-  let response$ = next(request);
-  if (typeof defaults.timeoutMs === 'number' && defaults.timeoutMs > 0) {
-    response$ = response$.pipe(timeout({first: defaults.timeoutMs}));
-  }
+  const request = applyTimeout(applyDefaultHeaders(req, defaults.headers), defaults.timeoutMs);
 
   const retryPolicy = resolveRetryPolicy(defaults.retries);
   if (!retryPolicy || !retryPolicy.methods.has(req.method.toUpperCase())) {
-    return response$;
+    return next(request);
   }
 
-  return response$.pipe(
+  return next(request).pipe(
     retry({
       count: retryPolicy.count,
-      delay: (_error, retryIndex) => {
+      delay: (error, retryIndex) => {
+        if (!isRetryable(error)) return throwError(() => error);
         logger?.debug?.('[Bridge] retry', {url: req.urlWithParams, method: req.method, retryIndex});
         return timer(retryPolicy.delayMs);
       },
@@ -50,6 +46,18 @@ function applyDefaultHeaders(request: HttpRequest<unknown>, defaults?: Record<st
   }
 
   return headers === request.headers ? request : request.clone({headers});
+}
+
+/** Uses the native request timeout, which aborts the request; an explicit per-request timeout wins. */
+function applyTimeout(request: HttpRequest<unknown>, timeoutMs?: number): HttpRequest<unknown> {
+  if (typeof timeoutMs !== 'number' || timeoutMs <= 0 || request.timeout !== undefined) return request;
+  return request.clone({timeout: timeoutMs});
+}
+
+/** Network errors (status 0), rate limiting and server errors are transient; other responses are final. */
+function isRetryable(error: unknown): boolean {
+  if (!(error instanceof HttpErrorResponse)) return false;
+  return error.status === 0 || error.status === 429 || error.status >= 500;
 }
 
 function resolveRetryPolicy(retries: BridgeDefaults['retries']): RetryPolicy | undefined {

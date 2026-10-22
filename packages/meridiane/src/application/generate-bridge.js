@@ -12,7 +12,6 @@ export async function generateBridgeWorkspace({
   noModels,
   spec,
   requiredMode,
-  formats,
   include,
   exclude,
   debug,
@@ -45,6 +44,6 @@ export async function generateBridgeWorkspace({
   if (!spec) throw new Error('Internal error: spec is required when noModels=false');
 
   log?.step?.('génération des models (OpenAPI)');
-  await writeModelFiles({ projectDir, spec, requiredMode, formats, include, exclude, debug, log });
+  await writeModelFiles({ projectDir, spec, requiredMode, include, exclude, debug, log });
   log?.success?.('génération terminée');
 }
