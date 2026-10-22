@@ -40,6 +40,8 @@ export interface RealtimeSubscriptionDiagnostics {
 }
 
 export interface RealtimeConnectionDiagnostics {
+  /** `shared`, `dedicated`, or the name given with `watch$(..., {connection})`. */
+  connection: string;
   status: RealtimeStatus;
   /** Subscribe URL (without `last_event_id`). */
   url?: string;

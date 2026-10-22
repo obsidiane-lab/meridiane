@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom, merge } from 'rxjs';
-import { BridgeFacade, type Conversation, type Iri, type IriRequired, type Message } from 'bridge';
+import { BridgeFacade, type Conversation, type Iri, type Message } from 'bridge';
 import { iriOf } from 'src/app/core/utils/iri.util';
 import { ConversationRepository } from '../repositories/conversation.repository';
 import { MessageRepository } from '../repositories/message.repository';
@@ -15,11 +15,11 @@ export class ConversationService {
   readonly all = this.conversations.entities;
   readonly diagnostics = toSignal(this.bridge.realtimeDiagnostics$());
 
-  $conversation(iri: Iri) {
+  $conversation(iri: Iri | undefined) {
     return this.conversations.$entity(iri);
   }
 
-  $message(iri: Iri) {
+  $message(iri: Iri | undefined) {
     return this.messages.$entity(iri);
   }
 
@@ -27,7 +27,7 @@ export class ConversationService {
     return (conversation?.messages ?? []).map((iri) => ({ iri, resource: this.messages.$entity(iri)() }));
   }
 
-  loadConversation(iri: IriRequired): void {
+  loadConversation(iri: Iri): void {
     this.conversations.ensure(iri);
   }
 
@@ -35,7 +35,7 @@ export class ConversationService {
     for (const iri of conversation?.messages ?? []) this.messages.ensure(iri);
   }
 
-  loadMessage(iri: IriRequired): void {
+  loadMessage(iri: Iri): void {
     this.messages.ensure(iri);
   }
 
@@ -43,7 +43,7 @@ export class ConversationService {
     return merge(this.conversations.watch$(), this.messages.watch$());
   }
 
-  watchMessage$(iri: IriRequired) {
+  watchMessage$(iri: Iri) {
     return this.messages.watch$(iri);
   }
 
@@ -60,22 +60,22 @@ export class ConversationService {
     return firstValueFrom(this.conversations.create$({ title }));
   }
 
-  renameConversation(iri: IriRequired, title: string): Promise<Conversation> {
+  renameConversation(iri: Iri, title: string): Promise<Conversation> {
     return firstValueFrom(this.conversations.update$(iri, { title }));
   }
 
-  async deleteConversation(iri: IriRequired): Promise<void> {
+  async deleteConversation(iri: Iri): Promise<void> {
     await firstValueFrom(this.conversations.delete$(iri));
     this.messages.removeConversationMessages(iri);
   }
 
-  async createMessage(conversation: IriRequired, content: string): Promise<Message> {
+  async createMessage(conversation: Iri, content: string): Promise<Message> {
     const message = await firstValueFrom(this.messages.create$({ conversation, content }));
     await firstValueFrom(this.conversations.fetch$(conversation));
     return message;
   }
 
-  updateMessage(iri: IriRequired, content: string): Promise<Message> {
+  updateMessage(iri: Iri, content: string): Promise<Message> {
     return firstValueFrom(this.messages.update$(iri, { content }));
   }
 

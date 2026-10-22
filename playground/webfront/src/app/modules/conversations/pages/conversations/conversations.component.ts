@@ -54,9 +54,9 @@ export class ConversationsComponent {
 
   protected readonly conversations = this.service.all;
   protected readonly diagnostics = this.service.diagnostics;
-  protected readonly selectedIri = signal<Iri>(undefined);
-  protected readonly inspectedIri = signal<Iri>(undefined);
-  protected readonly editedMessageIri = signal<Iri>(undefined);
+  protected readonly selectedIri = signal<Iri | undefined>(undefined);
+  protected readonly inspectedIri = signal<Iri | undefined>(undefined);
+  protected readonly editedMessageIri = signal<Iri | undefined>(undefined);
   protected readonly renaming = signal(false);
   protected readonly realtime = signal(true);
   protected readonly busy = signal(false);
@@ -90,7 +90,7 @@ export class ConversationsComponent {
     void this.refresh();
   }
 
-  protected select(iri: Iri): void {
+  protected select(iri: Iri | undefined): void {
     this.selectedIri.set(iri);
     this.renaming.set(false);
     this.cancelEdit();

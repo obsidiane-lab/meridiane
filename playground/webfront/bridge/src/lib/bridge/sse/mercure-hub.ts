@@ -1,13 +1,17 @@
-import {inject, Injectable, OnDestroy, PLATFORM_ID} from '@angular/core';
+import {inject, Injectable, OnDestroy, PLATFORM_ID, signal} from '@angular/core';
 import {DOCUMENT, isPlatformBrowser} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
 import {BehaviorSubject, EMPTY, firstValueFrom, Observable, Subject} from 'rxjs';
-import {distinctUntilChanged, map} from 'rxjs/operators';
+import {distinctUntilChanged, filter, map} from 'rxjs/operators';
 import {API_BASE_URL, BRIDGE_HTTP_WITH_CREDENTIALS, BRIDGE_LOGGER, BRIDGE_MERCURE} from '../../tokens';
 import {RealtimeDiagnostics, RealtimeStatus} from '../../bridge.types';
-import {MercureSubscription, MercureUpdate, RealtimePort} from '../../ports/realtime.port';
-import {toAbsoluteUrl} from '../../utils/absolute-url';
-import {resolveUrl} from '../../utils/url';
+import {
+  MercureSubscription,
+  MercureUpdate,
+  RealtimePort,
+  RealtimeSubscribeOptions,
+} from '../../ports/realtime.port';
+import {resolveUrl, toAbsoluteUrl} from '../../utils/url';
 import {buildSubscribeUrl, subscriptionKey} from './mercure-url';
 
 const RETRY_MIN_DELAY_MS = 1_000;
@@ -15,9 +19,14 @@ const RETRY_MAX_DELAY_MS = 30_000;
 /** Maximum number of `match*` parameters the reference hub accepts in one subscription request. */
 const MAX_MATCHERS = 100;
 const DEFAULT_MAX_URL_LENGTH = 4_000;
+const SHARED_GROUP = 'shared';
 
 /** One `EventSource` and the subscriptions it carries. */
 type HubConnection = {
+  /** Subscriptions only share connections of the same group. */
+  group: string;
+  /** `shared`, `dedicated` or the connection name, as exposed in the diagnostics. */
+  label: string;
   subscriptions: Map<string, MercureSubscription>;
   source?: EventSource;
   /** Subscribe URL of the open source (without `last_event_id`). */
@@ -34,13 +43,19 @@ type ActiveSubscription = {
   connection: HubConnection;
 };
 
+type GroupedUpdate = {
+  group: string;
+  update: MercureUpdate;
+};
+
 /**
- * Mercure connections shared by the whole application.
+ * Mercure connections of the whole application.
  *
- * Active `watch$()` subscriptions are spread over as few connections as possible: a connection takes
- * subscriptions until its subscribe URL would exceed `maxUrlLength` or 100 matchers. Mercure cannot change
- * the subscriptions of an open stream, so a connection is reopened when its own subscriptions change, with
- * `last_event_id` set to its last received update to request replay from the hub's retained history.
+ * Subscriptions are spread over as few connections as possible within their group (`shared` by default, a name,
+ * or one connection per `dedicated` subscription): a connection takes subscriptions until its subscribe URL would
+ * exceed `maxUrlLength` or 100 matchers. Mercure cannot change the subscriptions of an open stream, so a connection
+ * is reopened when its own subscriptions change, with `last_event_id` set to its last received update to request
+ * replay from the hub's retained history.
  */
 @Injectable({providedIn: 'root'})
 export class MercureHub implements RealtimePort, OnDestroy {
@@ -58,13 +73,17 @@ export class MercureHub implements RealtimePort, OnDestroy {
 
   private readonly subscriptions = new Map<string, ActiveSubscription>();
   private readonly connections: HubConnection[] = [];
-  private readonly updates = new Subject<MercureUpdate>();
+  private readonly updates = new Subject<GroupedUpdate>();
   private readonly diagnostics = new BehaviorSubject<RealtimeDiagnostics>(this.snapshot());
+  private readonly statusSignal = signal<RealtimeStatus>('closed');
+
+  readonly status = this.statusSignal.asReadonly();
 
   private authorization?: Promise<void>;
   private authorizing = false;
   private destroyed = false;
   private suspended = false;
+  private dedicatedSequence = 0;
   private syncTimer?: ReturnType<typeof setTimeout>;
 
   private readonly onPageHide = (event: PageTransitionEvent) => {
@@ -91,19 +110,36 @@ export class MercureHub implements RealtimePort, OnDestroy {
     }
   }
 
-  subscribe$(subscription: MercureSubscription): Observable<MercureUpdate> {
+  subscribe$(subscription: MercureSubscription, options?: RealtimeSubscribeOptions): Observable<MercureUpdate> {
     if (!this.enabled || this.destroyed) {
       if (!this.hubUrl) this.logger?.debug?.('[Mercure] hubUrl not configured: realtime disabled');
       return EMPTY;
     }
 
     return new Observable<MercureUpdate>((subscriber) => {
-      const updates = this.updates.subscribe(subscriber);
-      this.retain(subscription);
+      const {group, label} = this.groupOf(options?.connection);
+      const updates = this.updates
+        .pipe(
+          filter((grouped) => grouped.group === group),
+          map((grouped) => grouped.update)
+        )
+        .subscribe(subscriber);
+      const key = this.retain(group, label, subscription);
       return () => {
         updates.unsubscribe();
-        this.release(subscription);
+        this.release(key);
       };
+    });
+  }
+
+  reconnect(): void {
+    if (!this.enabled || this.destroyed) return;
+    void this.authorize(true).then(() => {
+      if (this.destroyed || this.suspended) return;
+      for (const connection of this.connections) {
+        if (connection.subscriptions.size > 0) this.open(connection, this.subscribeUrl(connection.subscriptions));
+      }
+      this.publishDiagnostics();
     });
   }
 
@@ -129,23 +165,30 @@ export class MercureHub implements RealtimePort, OnDestroy {
     this.diagnostics.complete();
   }
 
-  private retain(subscription: MercureSubscription): void {
-    const key = subscriptionKey(subscription);
+  private groupOf(connection: RealtimeSubscribeOptions['connection'] = SHARED_GROUP): {group: string; label: string} {
+    if (connection === 'dedicated') return {group: `dedicated:${++this.dedicatedSequence}`, label: connection};
+    if (connection === SHARED_GROUP) return {group: SHARED_GROUP, label: connection};
+    return {group: `named:${connection}`, label: connection};
+  }
+
+  /** Returns the key of the subscription, shared by its consumers within the group. */
+  private retain(group: string, label: string, subscription: MercureSubscription): string {
+    const key = `${group} ${subscriptionKey(subscription)}`;
     const active = this.subscriptions.get(key);
     if (active) {
       active.consumers++;
       this.publishDiagnostics();
-      return;
+      return key;
     }
 
-    const connection = this.connectionFor(key, subscription);
+    const connection = this.connectionFor(group, label, key, subscription);
     connection.subscriptions.set(key, subscription);
     this.subscriptions.set(key, {subscription, consumers: 1, connection});
     this.scheduleSync();
+    return key;
   }
 
-  private release(subscription: MercureSubscription): void {
-    const key = subscriptionKey(subscription);
+  private release(key: string): void {
     const active = this.subscriptions.get(key);
     if (!active) return;
 
@@ -159,16 +202,16 @@ export class MercureHub implements RealtimePort, OnDestroy {
     this.scheduleSync();
   }
 
-  /** First connection that stays within the limits with this subscription, or a new connection. */
-  private connectionFor(key: string, subscription: MercureSubscription): HubConnection {
+  /** First connection of the group that stays within the limits with this subscription, or a new connection. */
+  private connectionFor(group: string, label: string, key: string, subscription: MercureSubscription): HubConnection {
     const fitting = this.connections.find((connection) => {
-      if (connection.subscriptions.size >= MAX_MATCHERS) return false;
+      if (connection.group !== group || connection.subscriptions.size >= MAX_MATCHERS) return false;
       const subscriptions = new Map(connection.subscriptions).set(key, subscription);
       return this.subscribeUrl(subscriptions).length <= this.maxUrlLength;
     });
     if (fitting) return fitting;
 
-    const connection: HubConnection = {subscriptions: new Map(), status: 'closed', failures: 0};
+    const connection: HubConnection = {group, label, subscriptions: new Map(), status: 'closed', failures: 0};
     this.connections.push(connection);
     return connection;
   }
@@ -231,7 +274,7 @@ export class MercureHub implements RealtimePort, OnDestroy {
         this.logger?.debug?.('[Mercure] non-JSON update ignored', {id: event.lastEventId});
         return;
       }
-      this.updates.next({id: event.lastEventId || undefined, data});
+      this.updates.next({group: connection.group, update: {id: event.lastEventId || undefined, data}});
     };
 
     source.onerror = () => {
@@ -316,13 +359,16 @@ export class MercureHub implements RealtimePort, OnDestroy {
   }
 
   private publishDiagnostics(): void {
-    this.diagnostics.next(this.snapshot());
+    const diagnostics = this.snapshot();
+    this.statusSignal.set(diagnostics.status);
+    this.diagnostics.next(diagnostics);
   }
 
   private snapshot(): RealtimeDiagnostics {
     return {
       status: aggregateStatus(this.connections.map((connection) => connection.status)),
       connections: this.connections.map((connection) => ({
+        connection: connection.label,
         status: connection.status,
         url: connection.url,
         subscriptions: [...connection.subscriptions.entries()].map(([key, subscription]) => ({

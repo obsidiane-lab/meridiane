@@ -7,10 +7,9 @@ Surface exposée par le bridge généré avec Meridiane 3.0 (`src/public-api.ts`
 - Runtime/config : `provideBridge`, `BridgeOptions`, `BridgeAuth`, `BridgeHttpOptions`, `BridgeMercureOptions`
 - Types bridge : `BridgeDefaults`, `BridgeLogger`, `RealtimeStatus`, `RealtimeDiagnostics`, `RealtimeConnectionDiagnostics`, `RealtimeSubscriptionDiagnostics`
 - Facades : `FacadeFactory`, `ResourceFacade<T>`, `BridgeFacade`
-- Types utilitaires facades : `FacadeConfig<T>`, `ResourceDeletion`
-- Types HTTP/Hydra : `Item`, `Iri`, `IriRequired`, `Collection<T>`, `Query`, `AnyQuery`, `HttpCallOptions`, `HttpRequestConfig`, `HttpMethod`
-- Ports : `ResourceRepository<T>`, `RealtimePort`, `MercureSubscription`, `MercureUpdate`, `Facade<T>`
-- Utils URL : `joinUrl`, `resolveUrl`
+- Types utilitaires facades : `FacadeConfig`, `ResourceDeletion`, `RealtimeSelector`
+- Types HTTP/Hydra : `Item`, `Iri`, `Collection<T>`, `Query`, `AnyQuery`, `HttpCallOptions`, `HttpRequestConfig`, `HttpMethod`
+- Ports : `ResourceRepository<T>`, `RealtimePort`, `RealtimeConnection`, `RealtimeSubscribeOptions`, `MercureSubscription`, `MercureUpdate`, `Facade<T>`
 - Helper ressources : `isResourceDeletion`
 - Models générés : exports de `./models`
 
@@ -38,21 +37,24 @@ Construction :
 const factory = inject(FacadeFactory);
 const books = factory.create<Book>({url: '/api/books'});
 // topic Mercure par défaut : {baseUrl}/api/books/:id, surchargeable avec `topic`
+// FacadeConfig : {url, topic?, realtime?}
 ```
 
 API principale `ResourceFacade<T>` :
 - `getCollection$(query?, opts?)`, `get$(iri, opts?)`
 - `post$(payload, opts?)`, `patch$(iri, changes, opts?)`, `put$(iri, payload, opts?)`, `delete$(iri, opts?)`
-- `request$({method, url?, query?, body?, headers?, responseType?, withCredentials?, options?})`
-- `watch$(iri?: IriRequired)` : `Observable<T | ResourceDeletion>`. Émet directement la ressource JSON reçue pour une création ou modification et le payload `{"@id": ...}` (plus `@type` si `mercure.include_type` est activé) pour une suppression. Sans IRI, écoute la ressource via `match_urlpattern` ; avec une IRI relative ou absolue, écoute cet item via `match`. Le désabonnement se fait avec `unsubscribe()`.
-- `connectionStatus` (`'connecting' | 'connected' | 'closed'`)
+- `request$({method, url?, query?, body?, headers?, responseType?, withCredentials?})` : `url` vaut par défaut le chemin de la collection
+- `watch$(iri?: Iri, options?: {connection?})` : `Observable<T | ResourceDeletion>`. Émet directement la ressource JSON reçue pour une création ou modification et le payload `{"@id": ...}` (plus `@type` si `mercure.include_type` est activé) pour une suppression. Sans IRI, écoute la ressource via `match_urlpattern` ; avec une IRI relative ou absolue, écoute cet item via `match`. `connection` choisit la connexion SSE : `'shared'` (défaut), `'dedicated'` ou un nom. Le désabonnement se fait avec `unsubscribe()`.
+- `connectionStatus` : signal `'connecting' | 'connected' | 'closed'`, partagé par toutes les façades
 
 ## `BridgeFacade`
 
-HTTP ad-hoc :
+HTTP ad-hoc (client HTTP unique du bridge, utilisé aussi par `ResourceFacade<T>`) :
 - `get$`, `getCollection$`, `post$`, `patch$`, `put$`, `delete$`, `request$`
 
 Realtime :
+- `watch$<T>({match, type?}, {connection?})` : flux JSON brut d'un abonnement Mercure explicite (IRI exacte par défaut, ou `type: 'urlpattern'`), sans filtre sur `@id` ; connexion `'dedicated'` par défaut
+- `reconnectRealtime()` : renouvelle l'autorisation et rouvre toutes les connexions (après login / logout)
 - `realtimeStatus$()`
 - `realtimeDiagnostics$()`
 

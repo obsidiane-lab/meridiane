@@ -1,5 +1,5 @@
 import { computed, signal, type Signal } from '@angular/core';
-import type { Iri, IriRequired, Item } from 'bridge';
+import type { Iri, Item } from 'bridge';
 import type { EntityResource } from '../models/entity-resource.model';
 import { iriOf } from '../utils/iri.util';
 
@@ -8,7 +8,7 @@ type EntityResourceIndex<T extends Item> = Record<string, EntityResource<T>>;
 export abstract class BaseEntityStore<T extends Item> {
   private readonly resources = signal<EntityResourceIndex<T>>({});
   private readonly idle = signal<EntityResource<T>>({ state: 'idle', value: null }).asReadonly();
-  private readonly signals = new Map<IriRequired, Signal<EntityResource<T>>>();
+  private readonly signals = new Map<Iri, Signal<EntityResource<T>>>();
   private readonly all = computed(() => {
     const entities: T[] = [];
 
@@ -19,7 +19,7 @@ export abstract class BaseEntityStore<T extends Item> {
     return entities;
   });
 
-  entity(iri: Iri): Signal<EntityResource<T>> {
+  entity(iri: Iri | undefined): Signal<EntityResource<T>> {
     if (!iri) return this.idle;
 
     const current = this.signals.get(iri);
@@ -63,7 +63,7 @@ export abstract class BaseEntityStore<T extends Item> {
     });
   }
 
-  set(iri: Iri, resource: EntityResource<T>): void {
+  set(iri: Iri | undefined, resource: EntityResource<T>): void {
     if (!iri) return;
     this.resources.update((resources) => ({
       ...resources,
@@ -71,11 +71,11 @@ export abstract class BaseEntityStore<T extends Item> {
     }));
   }
 
-  remove(iri: Iri): void {
+  remove(iri: Iri | undefined): void {
     this.set(iri, { state: 'deleted', value: null });
   }
 
-  forget(iri: IriRequired): void {
+  forget(iri: Iri): void {
     this.resources.update((resources) => {
       const next = { ...resources };
       delete next[iri];

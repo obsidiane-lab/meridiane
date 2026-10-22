@@ -39,7 +39,7 @@ Un `baseUrl` relatif (ex. `/`) est accepté : les topics Mercure sont absolus, l
 
 ## Écouter une ressource
 
-`ResourceFacade<T>.watch$(iri?: IriRequired)` retourne un
+`ResourceFacade<T>.watch$(iri?: Iri)` retourne un
 `Observable<T | ResourceDeletion>` et émet directement le JSON reçu : la ressource
 pour une création ou modification, ou le payload de suppression d'API Platform.
 `ResourceDeletion` est le type exporté du payload qu'API Platform publie à la
@@ -63,7 +63,7 @@ ressources au store de l'application :
 ```ts
 import {inject, Injectable} from '@angular/core';
 import {Observable, tap} from 'rxjs';
-import {Book, FacadeFactory, IriRequired, isResourceDeletion, ResourceDeletion} from '@acme/backend-bridge';
+import {Book, FacadeFactory, Iri, isResourceDeletion, ResourceDeletion} from '@acme/backend-bridge';
 import {BookStore} from './book.store';
 
 @Injectable({providedIn: 'root'})
@@ -71,7 +71,7 @@ export class BookRepository {
   private readonly store = inject(BookStore);
   private readonly books = inject(FacadeFactory).create<Book>({url: '/api/books'});
 
-  watch$(iri?: IriRequired): Observable<Book | ResourceDeletion> {
+  watch$(iri?: Iri): Observable<Book | ResourceDeletion> {
     return this.books.watch$(iri).pipe(
       tap((resource) => {
         if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
@@ -110,13 +110,41 @@ factory.create<Book>({url: '/api/books', topic: '/api/library/books/:isbn'});
 
 ## Connexions
 
-Toute l'application partage les connexions SSE : les abonnements des `watch$()`
-actifs (patterns de ressources et IRI exactes) sont répartis sur le moins de
-connexions possible. Une connexion prend des abonnements tant que son URL reste
+Par défaut, toute l'application partage les connexions SSE : les abonnements des
+`watch$()` actifs (patterns de ressources et IRI exactes) sont répartis sur le moins
+de connexions possible. Une connexion prend des abonnements tant que son URL reste
 sous `maxUrlLength` (4000 caractères par défaut, hors `last_event_id`) et sous
 100 abonnements, la limite du hub de référence. Au-delà, le bridge ouvre une autre
 connexion. Les proxys et CDN refusent souvent les URL de plus de 4 à 8 Ko : baissez
 `maxUrlLength` si votre infrastructure est plus stricte.
+
+L'option `connection` choisit la connexion d'un abonnement :
+
+```ts
+books.watch$();                                  // 'shared' : connexions partagées (défaut)
+books.watch$('/api/books/1', {connection: 'dedicated'}); // connexion propre à cet abonnement
+books.watch$(undefined, {connection: 'admin'});  // connexions partagées par les abonnements nommés 'admin'
+```
+
+Une connexion dédiée ou nommée isole un flux des reconnexions des autres (ex. un
+écran temps réel critique). Les limites de longueur s'appliquent à chaque groupe.
+
+### Abonnement explicite
+
+Pour un topic qui n'est pas l'IRI d'un item (topic alternatif publié avec l'option
+`topics` d'API Platform, topic d'un autre service), `BridgeFacade.watch$()` s'abonne
+à un sélecteur Mercure et émet le JSON reçu sans filtre sur `@id` :
+
+```ts
+const bridge = inject(BridgeFacade);
+bridge.watch$<Notification>({match: '/users/42/notifications'}).subscribe(...);
+bridge.watch$({match: '/api/orders/:id', type: 'urlpattern'}).subscribe(...);
+```
+
+`match` relatif est résolu contre `baseUrl` ; `type` vaut `exact` par défaut. La
+connexion est `dedicated` par défaut : tout événement reçu appartient à cet
+abonnement. Sur une connexion partagée ou nommée, le flux contient aussi les
+événements des autres abonnements de cette connexion.
 
 Mercure ne permet pas de modifier les abonnements d'un flux ouvert : quand les
 abonnements d'une connexion changent, seule cette connexion est rouverte, avec
@@ -156,6 +184,10 @@ Sans cookie, le hub n'accepte l'abonné que si la directive `anonymous` est acti
 l'abonné ne reçoit alors que les updates publiques. Un token invalide ou expiré est
 refusé (`401`) même avec `anonymous`.
 
+Le hub n'évalue les droits qu'à l'ouverture d'une connexion. Après un login ou un
+logout sans rechargement de page, appelez `BridgeFacade.reconnectRealtime()` : le
+bridge renouvelle l'autorisation puis rouvre toutes les connexions.
+
 Le paramètre de requête `authorization` a été supprimé en Mercure 1.0. Le bridge ne met jamais de token dans l'URL.
 
 ## Erreurs et reconnexion
@@ -166,9 +198,9 @@ Le paramètre de requête `authorization` a été supprimé en Mercure 1.0. Le b
 
 ## État et diagnostics
 
-- `ResourceFacade.connectionStatus` : signal `'closed' | 'connecting' | 'connected'` ; `connected` quand toutes les connexions sont ouvertes
+- `ResourceFacade.connectionStatus` : signal `'closed' | 'connecting' | 'connected'`, partagé par toutes les façades ; `connected` quand toutes les connexions sont ouvertes
 - `BridgeFacade.realtimeStatus$()`
-- `BridgeFacade.realtimeDiagnostics$()` : statut global et, par connexion, statut, URL d'abonnement, abonnements actifs (`match`, `type`, nombre de consommateurs), `lastEventId`, nombre d'échecs consécutifs
+- `BridgeFacade.realtimeDiagnostics$()` : statut global et, par connexion, groupe (`shared`, `dedicated` ou nom), statut, URL d'abonnement, abonnements actifs (`match`, `type`, nombre de consommateurs), `lastEventId`, nombre d'échecs consécutifs
 
 ## Compatibilité navigateur
 
@@ -208,8 +240,12 @@ migration de Meridiane accompagne le passage du hub de Mercure 0.x à Mercure 1.
 |---|---|
 | `resource.watch$(iri \| iri[])` + `unwatch(iri)` | `resource.watch$(iri)` pour un item ou `watch$()` pour la ressource ; un abonnement par IRI pour plusieurs items, libéré avec `unsubscribe()` |
 | `resource.watchSubResource$(parentIri, field)` | chargement des IRI liées et abonnements explicites dans le repository de l'application |
-| `bridge.watch$()`, `bridge.watchTypes$()`, `bridge.unwatch()` | supprimés : écouter chaque ressource avec `watch$()` |
-| `mercure.connectionMode`, `newConnection` | supprimés : connexions partagées, découpées automatiquement |
+| `bridge.watch$(iris)`, `bridge.watchTypes$()`, `bridge.unwatch()` | `resource.watch$()` par ressource ; `bridge.watch$({match, type?})` pour un sélecteur explicite, sur connexion dédiée et sans filtre |
+| `mercure.connectionMode: 'single'`, `{newConnection: true}` | `{connection: 'dedicated'}` sur `watch$()`, ou un nom de connexion partagée |
+| `IriRequired`, `Iri = string \| undefined` | `Iri = string` |
+| `FacadeConfig.repo`, `ApiPlatformRestRepository` | supprimés : `ResourceFacade<T>` s'appuie sur `BridgeFacade` |
+| `HttpRequestConfig.options` | supprimé : `headers`, `query`, `body`, `responseType`, `withCredentials` |
+| `joinUrl`, `resolveUrl` exportés | internes au bridge |
 | `mercure.maxUrlLength` (1900 par défaut) | `mercure.maxUrlLength` (4000 par défaut), plus 100 abonnements maximum par connexion |
 | cookie Mercure obtenu par l'application | `mercure.authorize` : le bridge obtient et renouvelle le cookie |
 | `mercure.topicMode` | supprimé (topics absolus, comme API Platform) |

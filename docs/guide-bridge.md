@@ -154,7 +154,9 @@ allBooks.unsubscribe();
 oneBook.unsubscribe();
 ```
 
-- connexions SSE partagées par tous les `watch$()`, découpées automatiquement au-delà de `mercure.maxUrlLength` (4000 par défaut) ou de 100 abonnements
+- connexions SSE partagées par tous les `watch$()`, découpées automatiquement au-delà de `mercure.maxUrlLength` (4000 par défaut) ou de 100 abonnements ; `{connection: 'dedicated'}` ou un nom isole un flux sur ses propres connexions
+- topic explicite : `BridgeFacade.watch$({match, type?})`, sans filtre sur `@id`
+- après login / logout sans rechargement : `BridgeFacade.reconnectRealtime()`
 - chaque abonnement dure tant que son Observable est souscrit
 - authentification par le cookie HttpOnly `__Secure-mercure_access_token` posé par le backend ; `mercure.authorize` le fait obtenir et renouveler par le bridge
 - état : `ResourceFacade.connectionStatus`, `BridgeFacade.realtimeStatus$()`, `BridgeFacade.realtimeDiagnostics$()`
@@ -175,7 +177,7 @@ Le repository alimente le même store depuis HTTP et Mercure. Exemple avec un
 ```ts
 import {inject, Injectable} from '@angular/core';
 import {tap} from 'rxjs';
-import {Book, FacadeFactory, IriRequired, isResourceDeletion} from '@acme/backend-bridge';
+import {Book, FacadeFactory, Iri, isResourceDeletion} from '@acme/backend-bridge';
 import {BookStore} from './book.store';
 
 @Injectable({providedIn: 'root'})
@@ -184,11 +186,11 @@ export class BookRepository {
   private readonly api = inject(FacadeFactory).create<Book>({url: '/api/books'});
   readonly books = this.store.entities(); // Signal<readonly Book[]>
 
-  fetch$(iri: IriRequired) {
+  fetch$(iri: Iri) {
     return this.api.get$(iri).pipe(tap((book) => this.store.upsert(book)));
   }
 
-  watch$(iri?: IriRequired) {
+  watch$(iri?: Iri) {
     return this.api.watch$(iri).pipe(tap((resource) => {
       if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
       else this.store.upsert(resource);

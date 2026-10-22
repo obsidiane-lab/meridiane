@@ -195,7 +195,7 @@ pour une suppression (plus `@type` si `mercure.include_type` est activé).
 ```ts
 import {inject, Injectable} from '@angular/core';
 import {tap} from 'rxjs';
-import {Book, FacadeFactory, IriRequired, isResourceDeletion} from '@app/bridge';
+import {Book, FacadeFactory, Iri, isResourceDeletion} from '@app/bridge';
 import {BookStore} from './book.store';
 
 @Injectable({providedIn: 'root'})
@@ -203,11 +203,11 @@ export class BooksRepository {
   private readonly store = inject(BookStore);
   private readonly books = inject(FacadeFactory).create<Book>({url: '/api/books'});
 
-  fetch$(iri: IriRequired) {
+  fetch$(iri: Iri) {
     return this.books.get$(iri).pipe(tap((book) => this.store.upsert(book)));
   }
 
-  watch$(iri?: IriRequired) {
+  watch$(iri?: Iri) {
     return this.books.watch$(iri).pipe(tap((resource) => {
       if (isResourceDeletion(resource)) this.store.remove(resource['@id']);
       else this.store.upsert(resource);
@@ -223,6 +223,9 @@ complète que GET : le bridge ne fait pas de GET complémentaire et n'expanse pa
 relations. Les relations par IRI sont chargées à la demande par l'application.
 
 - Les connexions SSE sont partagées par toute l’application : les abonnements sont répartis sur le moins de connexions possible, une nouvelle connexion s'ouvrant quand l'URL dépasserait `mercure.maxUrlLength` (4000 par défaut) ou 100 abonnements. Une connexion est rouverte avec `last_event_id`, s'il est disponible, quand ses abonnements changent. La reprise dépend de l'historique du hub et du curseur disponible ; l'application organise sa synchronisation initiale et ses éventuelles resynchronisations.
+- `watch$(iri, {connection: 'dedicated'})` ouvre une connexion propre à l'abonnement ; un autre nom (`{connection: 'admin'}`) regroupe les abonnements de ce nom sur leurs propres connexions.
+- Topic explicite (topic alternatif, autre service) : `BridgeFacade.watch$({match, type?})` émet le JSON reçu sans filtre sur `@id`, sur une connexion dédiée par défaut.
+- Après un login ou un logout sans rechargement : `BridgeFacade.reconnectRealtime()` renouvelle l'autorisation et rouvre les connexions.
 - Le désabonnement se fait avec `unsubscribe()`.
 - `ResourceDeletion` décrit le payload de suppression d'API Platform : `@id: string` requis et `@type?: string | string[]`. `isResourceDeletion(payload: object): payload is ResourceDeletion` reconnaît un payload limité à `@id` et à l'éventuel `@type` (une création ou modification JSON-LD porte toujours `@context`) ; le repository retire l'entité du store par son `@id`.
 - Les publications et topics nécessaires à la cohérence entre entités liées sont configurés par le développeur côté backend.

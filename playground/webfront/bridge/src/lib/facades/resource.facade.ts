@@ -1,73 +1,69 @@
 import {Signal} from '@angular/core';
-import {
-  ResourceRepository,
-  AnyQuery,
-  HttpCallOptions,
-  IriRequired,
-  Collection,
-  Item,
-  HttpRequestConfig,
-} from '../ports/resource-repository.port';
-import {RealtimePort} from '../ports/realtime.port';
-import {toSignal} from '@angular/core/rxjs-interop';
 import {filter, map, Observable, share} from 'rxjs';
-import {Facade} from './facade.interface';
+import {AnyQuery, Collection, HttpCallOptions, HttpRequestConfig, Iri, Item} from '../ports/resource-repository.port';
+import {RealtimePort, RealtimeSubscribeOptions} from '../ports/realtime.port';
 import {RealtimeStatus} from '../bridge.types';
 import {ResourceDeletion, ResourceTopic} from '../bridge/sse/resource-topic';
+import {BridgeFacade} from './bridge.facade';
+import {Facade} from './facade.interface';
 
 export {isResourceDeletion} from '../bridge/sse/resource-topic';
 export type {ResourceDeletion} from '../bridge/sse/resource-topic';
 
+/** API of one API Platform resource: its collection path for HTTP, its URL Pattern for Mercure. */
 export class ResourceFacade<T extends Item> implements Facade<T> {
   readonly connectionStatus: Signal<RealtimeStatus>;
 
   constructor(
-    protected readonly repo: ResourceRepository<T>,
+    protected readonly bridge: BridgeFacade,
+    protected readonly url: Iri,
     protected readonly realtime: RealtimePort,
     protected readonly topic: ResourceTopic,
   ) {
-    this.connectionStatus = toSignal(this.realtime.status$(), {initialValue: 'closed'});
+    this.connectionStatus = realtime.status;
   }
 
   getCollection$(query?: AnyQuery, options?: HttpCallOptions): Observable<Collection<T>> {
-    return this.repo.getCollection$(query, options);
+    return this.bridge.getCollection$<T>(this.url, query, options);
   }
 
-  get$(iri: IriRequired, options?: HttpCallOptions): Observable<T> {
-    return this.repo.get$(iri, options);
-  }
-
-  patch$(iri: IriRequired, changes: Partial<T>, options?: HttpCallOptions): Observable<T> {
-    return this.repo.patch$(iri, changes, options);
+  get$(iri: Iri, options?: HttpCallOptions): Observable<T> {
+    return this.bridge.get$<T>(iri, options);
   }
 
   post$(payload: Partial<T>, options?: HttpCallOptions): Observable<T> {
-    return this.repo.post$(payload, options);
+    return this.bridge.post$<T, Partial<T>>(this.url, payload, options);
   }
 
-  put$(iri: IriRequired, payload: Partial<T>, options?: HttpCallOptions): Observable<T> {
-    return this.repo.put$(iri, payload, options);
+  patch$(iri: Iri, changes: Partial<T>, options?: HttpCallOptions): Observable<T> {
+    return this.bridge.patch$<T, Partial<T>>(iri, changes, options);
   }
 
-  delete$(iri: IriRequired, options?: HttpCallOptions): Observable<void> {
-    return this.repo.delete$(iri, options);
+  put$(iri: Iri, payload: Partial<T>, options?: HttpCallOptions): Observable<T> {
+    return this.bridge.put$<T, Partial<T>>(iri, payload, options);
   }
 
+  delete$(iri: Iri, options?: HttpCallOptions): Observable<void> {
+    return this.bridge.delete$(iri, options);
+  }
+
+  /** Low-level escape hatch; `url` defaults to the collection path of the resource. */
   request$<R = unknown, B = unknown>(request: HttpRequestConfig<B>): Observable<R> {
-    return this.repo.request$<R, B>(request);
+    return this.bridge.request$<R, B>({...request, url: request.url ?? this.url});
   }
 
   /**
    * Streams changes of one item when an IRI is supplied, or of the resource's items otherwise.
-   * Payloads are forwarded unchanged, including deletion payloads and their JSON-LD metadata.
+   * Payloads are forwarded unchanged, including API Platform deletion payloads.
    *
-   * Item subscriptions use `match`; resource subscriptions use `match_urlpattern`.
-   * Unsubscribing releases this consumer; other consumers keep sharing the connection.
+   * Item subscriptions use `match`; resource subscriptions use `match_urlpattern`. Updates are kept by `@id`,
+   * so `connection` (default `shared`) only chooses the SSE connection carrying the subscription.
+   * Unsubscribing releases this consumer; other consumers keep sharing the subscription.
    */
-  watch$(iri?: IriRequired): Observable<T | ResourceDeletion> {
+  watch$(iri?: Iri, options?: RealtimeSubscribeOptions): Observable<T | ResourceDeletion> {
     const topic = iri === undefined ? this.topic : this.topic.forIri(iri);
     return this.realtime
-      .subscribe$({match: topic.match, type: topic.type})
+      .subscribe$({match: topic.match, type: topic.type}, options)
       .pipe(
         map((update) => topic.toResource<T>(update.data)),
         filter((resource): resource is T | ResourceDeletion => resource !== undefined),
