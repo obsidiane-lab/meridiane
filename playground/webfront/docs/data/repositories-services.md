@@ -23,4 +23,4 @@ La désinscription est portée par l'abonnement RxJS (`unsubscribe`, `takeUntilD
 
 La cohérence des relations et les topics publiés relèvent du backend de l'application. Le service frontend charge les IRI présentes dans les ressources ; il ne demande pas au bridge de fabriquer une conversation enrichie.
 
-La référence d'API est [la documentation Mercure du dépôt](../../../../docs/fonctionnalites/mercure-sse.md).
+La référence d'API est [la documentation temps réel du dépôt](../../../../docs/temps-reel.md).

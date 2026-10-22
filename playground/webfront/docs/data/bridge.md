@@ -10,4 +10,4 @@ La commande utilise les sources de `../packages/meridiane/` et le contrat OpenAP
 
 Ne jamais modifier cette sortie à la main ni dupliquer localement les types des modèles générés. Toute évolution des entités visibles impose une nouvelle génération.
 
-La documentation publique fait référence dans le dépôt Meridiane : [API](../../../../docs/fonctionnalites/api.md), [HTTP](../../../../docs/fonctionnalites/http.md), [Mercure 1.0](../../../../docs/fonctionnalites/mercure-sse.md).
+La documentation publique fait référence dans le dépôt Meridiane : [API](../../../../docs/reference.md), [HTTP](../../../../docs/http.md), [Mercure 1.0](../../../../docs/temps-reel.md).

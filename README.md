@@ -1,17 +1,18 @@
 # Meridiane
 
-CLI pour générer un bridge Angular depuis une spec OpenAPI (API Platform + Mercure), avec un backend Symfony et une sandbox Angular pour valider le runtime.
+Meridiane génère, depuis le contrat OpenAPI d'API Platform, une librairie Angular qui
+fournit les modèles TypeScript, le client HTTP et le temps réel Mercure 1.0 de votre API.
+Le bridge gère la connexion ; la gestion des données reste dans votre application.
 
-Meridiane 3.0 prend en charge Mercure 1.0. Le bridge fournit les types du contrat API,
-les appels HTTP et les abonnements temps réel. Dans l'application consommatrice,
-les repositories alimentent des stores à signaux avec les ressources reçues ; les services
-portent les agrégations et la logique métier, et les composants affichent les signaux.
-Les relations restent des IRI lorsque le backend les expose ainsi : leur chargement à la
-demande et la cohérence entre ressources appartiennent à l'application.
+```ts
+provideBridge({baseUrl: '/', mercure: {hubUrl: '/.well-known/mercure', authorize: '/api/mercure/authorization'}});
 
-Les abonnements `watch$()` transmettent directement les ressources JSON reçues.
-Les suppressions conservent le payload `{"@id": ...}` ; le helper
-`isResourceDeletion()` permet au repository de les appliquer au store.
+const projects = inject(FacadeFactory).create<Project>({url: '/api/projects'});
+projects.getCollection$({page: 1});   // HTTP
+projects.watch$();                    // créations, modifications et suppressions en direct
+```
+
+**[Lire la documentation →](docs/README.md)**
 
 ![CI](https://github.com/obsidiane-lab/meridiane/actions/workflows/ci.yml/badge.svg)
 
@@ -21,7 +22,7 @@ Les suppressions conservent le payload `{"@id": ...}` ; le helper
 - `playground` : l'environnement interne utilisé pour développer et valider le générateur
   - `playground/core` : API Symfony/API Platform + Mercure 1.0
   - `playground/webfront` : application Angular Foundation qui consomme le bridge local généré
-- `docs` : documentation produit (CLI, guide d'intégration, HTTP, SSE, API publique)
+- `docs` : documentation pour les développeurs qui utilisent le bridge
 
 Le package publié ne dépend pas du playground. Le playground fournit uniquement un contrat OpenAPI et des scénarios réels pour développer le générateur.
 
@@ -83,14 +84,6 @@ ciblées dans le navigateur selon le périmètre. Le workflow est décrit dans
 
 ## Documentation
 
-- Guide bridge : `docs/guide-bridge.md`
-- CLI : `docs/cli.md`
-- API publique : `docs/fonctionnalites/api.md`
-- HTTP / Hydra : `docs/fonctionnalites/http.md`
-- Mercure / SSE : `docs/fonctionnalites/mercure-sse.md`
-- FAQ : `docs/fonctionnalites/questions-frequentes.md`
-- Package npm : `packages/meridiane/README.md`
-- Environnement de développement : `playground/README.md`
-- Application Angular : `playground/webfront/README.md`
-- API Symfony : `playground/core/README.md`
-- Architecture interne : `docs/contributing/architecture.md`
+- [Documentation du bridge](docs/README.md) : démarrage, fonctionnement, configuration, HTTP, temps réel, backend, recettes, référence, CLI, dépannage, migration.
+- Environnement de développement : [playground/README.md](playground/README.md).
+- Architecture interne du générateur : [docs/contributing/architecture.md](docs/contributing/architecture.md).

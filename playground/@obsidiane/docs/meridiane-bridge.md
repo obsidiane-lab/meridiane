@@ -6,4 +6,4 @@ Le frontend conserve ses ressources par IRI. Le repository synchronise les répo
 
 Un abonnement `watch$(iri)` suit une entité, `watch$()` suit une ressource. La désinscription RxJS suffit à libérer les écoutes. Les suppressions reçues de l'autre client retirent l'entité du store.
 
-Voir [la documentation actuelle du bridge](../../../docs/guide-bridge.md), [du temps réel](../../../docs/fonctionnalites/mercure-sse.md) et [le README playground](../../README.md).
+Voir [la documentation actuelle du bridge](../../../docs/README.md), [du temps réel](../../../docs/temps-reel.md) et [le README playground](../../README.md).
