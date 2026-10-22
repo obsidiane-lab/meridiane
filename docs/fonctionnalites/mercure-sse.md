@@ -32,17 +32,23 @@ Sans `mercure`, le realtime est désactivé. Un `hubUrl` relatif est résolu par
 `ResourceFacade<T>.watch$(iri?: IriRequired)` retourne un
 `Observable<T | ResourceDeletion>` et émet directement le JSON reçu : la ressource
 pour une création ou modification, ou le payload de suppression d'API Platform.
-`ResourceDeletion` est un type exporté qui conserve les métadonnées d'un `Item` :
+`ResourceDeletion` est le type exporté du payload qu'API Platform publie à la
+suppression : `{"@id": ...}`, plus `@type` quand `api_platform.mercure.include_type`
+est activé.
 
 ```ts
-interface ResourceDeletion extends Item {
+interface ResourceDeletion {
   '@id': string;
+  '@type'?: string | string[];
 }
 ```
 
-Le helper exporté `isResourceDeletion(payload: Item): payload is ResourceDeletion`
-reconnaît un payload réduit à `@id`, éventuellement accompagné de `@type` et
-`@context`. Le repository applique les ressources au store de l'application :
+Le helper exporté `isResourceDeletion(payload: object): payload is ResourceDeletion`
+reconnaît un payload réduit à `@id`, éventuellement accompagné de `@type`. Une
+création ou une modification est la ressource sérialisée en JSON-LD et porte toujours
+`@context`. Si une ressource définit son propre payload avec l'option Mercure `data`,
+le bridge ne peut pas distinguer une suppression. Le repository applique les
+ressources au store de l'application :
 
 ```ts
 import {inject, Injectable} from '@angular/core';

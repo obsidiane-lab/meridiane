@@ -42,7 +42,7 @@ API principale `ResourceFacade<T>` :
 - `getCollection$(query?, opts?)`, `get$(iri, opts?)`
 - `post$(payload, opts?)`, `patch$(iri, changes, opts?)`, `put$(iri, payload, opts?)`, `delete$(iri, opts?)`
 - `request$({method, url?, query?, body?, headers?, responseType?, withCredentials?, options?})`
-- `watch$(iri?: IriRequired)` : `Observable<T | ResourceDeletion>`. Émet directement la ressource JSON reçue pour une création ou modification et le payload `{"@id": ...}` pour une suppression, en conservant aussi les éventuels `@type` et `@context`. Sans IRI, écoute la ressource via `match_urlpattern` ; avec une IRI relative ou absolue, écoute cet item via `match`. Le désabonnement se fait avec `unsubscribe()`.
+- `watch$(iri?: IriRequired)` : `Observable<T | ResourceDeletion>`. Émet directement la ressource JSON reçue pour une création ou modification et le payload `{"@id": ...}` (plus `@type` si `mercure.include_type` est activé) pour une suppression. Sans IRI, écoute la ressource via `match_urlpattern` ; avec une IRI relative ou absolue, écoute cet item via `match`. Le désabonnement se fait avec `unsubscribe()`.
 - `connectionStatus` (`'connecting' | 'connected' | 'closed'`)
 
 ## `BridgeFacade`
@@ -57,8 +57,8 @@ Realtime :
 ## Types utiles
 
 - `Item` contient les champs Hydra/JSON-LD usuels (`@id`, `@type`, `@context`)
-- `ResourceDeletion` étend `Item` avec un `@id: string` requis et les métadonnées optionnelles `@type` et `@context`
-- `isResourceDeletion(payload: Item): payload is ResourceDeletion` reconnaît un payload de suppression limité à `@id` et ses éventuelles métadonnées `@type` et `@context`
+- `ResourceDeletion` décrit le payload de suppression d'API Platform : `@id: string` requis et `@type?: string | string[]`
+- `isResourceDeletion(payload: object): payload is ResourceDeletion` reconnaît un payload limité à `@id` et à l'éventuel `@type` ; une création ou modification JSON-LD porte toujours `@context`
 - `watch$()` conserve le JSON reçu, sans expansion des relations ni GET complémentaire ; le repository de l'application décide comment l'appliquer à son store
 - `Collection<T>` expose `member`, `totalItems`, `view`, `search`
 - `HttpRequestConfig` sert d'escape hatch pour les endpoints non standards

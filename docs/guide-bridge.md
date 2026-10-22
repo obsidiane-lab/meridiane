@@ -131,8 +131,8 @@ Mercure est optionnel. Sans `mercure.hubUrl`, aucune connexion SSE n'est ouverte
 `watch$()` écoute tous les items de la ressource via `match_urlpattern`. `watch$(iri)`
 écoute un item précis via `match`, avec une IRI relative ou absolue. Les deux émettent
 directement les ressources JSON reçues (`T | ResourceDeletion`) que le repository
-applique au store. `isResourceDeletion()` reconnaît un payload de suppression limité
-à `@id`, éventuellement accompagné de `@type` et `@context`.
+applique au store. `isResourceDeletion()` reconnaît le payload de suppression
+d'API Platform : `@id`, éventuellement accompagné de `@type`.
 
 ```ts
 import {isResourceDeletion} from '@acme/backend-bridge';

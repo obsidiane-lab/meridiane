@@ -1,9 +1,10 @@
 import type {Item} from '../../ports/resource-repository.port';
 import type {MercureSubscription} from '../../ports/realtime.port';
 
-/** Native API Platform deletion payload, optionally accompanied by JSON-LD metadata. */
-export interface ResourceDeletion extends Item {
+/** Payload API Platform publishes on deletion: `{"@id"}`, plus `@type` with `mercure.include_type`. */
+export interface ResourceDeletion {
   '@id': string;
+  '@type'?: string | string[];
 }
 
 interface UrlPatternLike {
@@ -12,12 +13,13 @@ interface UrlPatternLike {
 
 type UrlPatternConstructor = new (input: string) => UrlPatternLike;
 
-/** Keys API Platform sends when it publishes a deletion (`{"@id": ...}`, plus `@type` with `mercure.include_type`). */
-const DELETION_KEYS = new Set(['@id', '@type', '@context']);
-
-/** Recognizes API Platform deletion payloads without interpreting resource fields. */
-export function isResourceDeletion(payload: Item): payload is ResourceDeletion {
-  return typeof payload['@id'] === 'string' && Object.keys(payload).every((key) => DELETION_KEYS.has(key));
+/**
+ * Recognizes the deletion payload API Platform builds by hand. Creations and updates are serialized
+ * resources, which always carry `@context` in JSON-LD.
+ */
+export function isResourceDeletion(payload: object): payload is ResourceDeletion {
+  return typeof (payload as ResourceDeletion)['@id'] === 'string'
+    && Object.keys(payload).every((key) => key === '@id' || key === '@type');
 }
 
 /**

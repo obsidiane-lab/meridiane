@@ -39,9 +39,9 @@ actualiser les ressources liées.
 
 Non. `watch$()` transmet directement la ressource JSON reçue. Pour l'appliquer au
 store, configurez API Platform pour publier la même représentation complète que
-GET. Une suppression conserve le payload `{"@id": ...}` et les éventuels `@type`
-et `@context` ; `isResourceDeletion(resource)` permet au repository de retirer
-`resource['@id']` du store.
+GET. Une suppression transmet le payload `{"@id": ...}` et l'éventuel `@type` ;
+`isResourceDeletion(resource)` permet au repository de retirer `resource['@id']`
+du store.
 
 ## Comment activer les logs ?
 
