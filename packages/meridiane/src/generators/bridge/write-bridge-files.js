@@ -2,32 +2,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { readJson, writeJsonIfChanged } from '../../infrastructure/json.js';
+import { ensureCleanDir, readJson, writeJson } from '../../infrastructure/files.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(currentDir, '../../..');
 const bridgeTemplateDir = path.join(packageRoot, 'templates', 'angular-bridge');
 
-export async function writeBridgeFiles({
-  projectDir,
-  libName,
-  packageName,
-  version,
-  projectReadmePath,
-  debug,
-  log,
-}) {
-  if (debug) {
-    log?.debug?.('[meridiane] generate lib', {
-      libName,
-      packageName,
-      version,
-      targetDir: projectDir,
-    });
-  }
+export async function writeBridgeFiles({ projectDir, libName, packageName, version, projectReadmePath, log }) {
+  log.debug('[meridiane] generate lib', { libName, packageName, version, targetDir: projectDir });
 
-  await fs.rm(projectDir, { recursive: true, force: true });
-  await fs.mkdir(projectDir, { recursive: true });
+  await ensureCleanDir(projectDir);
   await fs.cp(bridgeTemplateDir, projectDir, { recursive: true });
 
   await replacePlaceholders(projectDir, {
@@ -39,9 +23,9 @@ export async function writeBridgeFiles({
   const packageJson = await readJson(packageJsonPath);
   packageJson.name = packageName;
   packageJson.version = version;
-  await writeJsonIfChanged(packageJsonPath, packageJson);
+  await writeJson(packageJsonPath, packageJson);
 
-  await appendProjectReadme(path.join(projectDir, 'README.md'), projectReadmePath, debug, log);
+  await appendProjectReadme(path.join(projectDir, 'README.md'), projectReadmePath, log);
 }
 
 export async function configureBridgeOutput({ projectDir, distRoot, libName, log }) {
@@ -50,8 +34,8 @@ export async function configureBridgeOutput({ projectDir, distRoot, libName, log
   const outputDir = path.join(distRoot, libName);
 
   ngPackage.dest = path.relative(projectDir, outputDir).split(path.sep).join('/');
-  await writeJsonIfChanged(ngPackagePath, ngPackage);
-  log?.debug?.('ng-package.json dest overridden', { dest: ngPackage.dest });
+  await writeJson(ngPackagePath, ngPackage);
+  log.debug('ng-package.json dest overridden', { dest: ngPackage.dest });
 }
 
 async function replacePlaceholders(directory, placeholders) {
@@ -72,23 +56,21 @@ async function replacePlaceholders(directory, placeholders) {
   }
 }
 
-async function appendProjectReadme(targetPath, sourcePath, debug, log) {
-  if (!sourcePath) return;
-
+async function appendProjectReadme(targetPath, sourcePath, log) {
   const projectReadme = await readText(sourcePath);
   if (!projectReadme?.trim()) return;
 
   const bridgeReadme = await readText(targetPath);
   if (!bridgeReadme?.trim()) {
     await fs.writeFile(targetPath, projectReadme);
-    if (debug) log?.debug?.('[meridiane] project README copied', { source: sourcePath });
+    log.debug('[meridiane] project README copied', { source: sourcePath });
     return;
   }
 
   const combinedReadme =
     `${bridgeReadme.trimEnd()}\n\n---\n\n## Documentation du projet\n\n${projectReadme.trimStart()}`;
   await fs.writeFile(targetPath, combinedReadme);
-  if (debug) log?.debug?.('[meridiane] project README appended', { source: sourcePath });
+  log.debug('[meridiane] project README appended', { source: sourcePath });
 }
 
 async function readText(filePath) {

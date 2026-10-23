@@ -1,308 +1,56 @@
 # __PACKAGE_NAME__
 
-Bridge Angular (runtime + models TypeScript) pour une API Platform (Hydra/JSON-LD), avec support Mercure/SSE optionnel.
+Bridge Angular de l'API, généré par [Meridiane 3](https://github.com/obsidiane-lab/meridiane/blob/master/docs/README.md) depuis son contrat OpenAPI. Ne pas modifier : régénérer quand le contrat change.
 
-Le package expose une API Angular volontairement minimaliste :
-- `provideBridge()` pour configurer le bridge (HTTP + tokens + Mercure) ;
-- `FacadeFactory` / `ResourceFacade<T>` pour une API orientée ressource ;
-- `BridgeFacade` pour des appels ad-hoc.
+Il fournit les modèles TypeScript, le client HTTP (JSON-LD, Hydra, merge-patch) et le temps réel Mercure 1.0. Angular 20, 21 ou 22 ; RxJS 7.8.
 
-## Installation
-
-```bash
-npm i __PACKAGE_NAME__
-```
-
-Le bridge est conçu pour être installé dans une application Angular. Les dépendances Angular et RxJS sont des `peerDependencies`.
-
-## Compatibilité
-
-- Angular `@angular/*` `^20.0.0 || ^21.0.0`
-- RxJS `^7.8.0`
-
-## Démarrage rapide
-
-Configurez le bridge au démarrage de l’application avec `provideBridge()` (requis).
-
-### Application standalone (recommandé)
+## Configurer
 
 ```ts
-// app.config.ts (ou main.ts)
-import {ApplicationConfig} from '@angular/core';
 import {provideBridge} from '__PACKAGE_NAME__';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBridge({
-      baseUrl: 'https://api.example.com',
-      mercure: {hubUrl: 'https://api.example.com/.well-known/mercure'},
+      baseUrl: '/',                                        // API sur la même origine que le front
+      mercure: {
+        hubUrl: '/.well-known/mercure',
+        authorize: '/api/mercure/authorization',           // pose et renouvelle le cookie Mercure
+      },
     }),
   ],
 };
 ```
 
-### Application NgModule
+`provideBridge()` installe `HttpClient`. Options, cookies et topologies : [Configuration](https://github.com/obsidiane-lab/meridiane/blob/master/docs/configuration.md).
+
+## Utiliser une ressource
 
 ```ts
-import {NgModule} from '@angular/core';
-import {provideBridge} from '__PACKAGE_NAME__';
+import {FacadeFactory, isResourceDeletion, type Project} from '__PACKAGE_NAME__';
 
-@NgModule({
-  providers: [
-    provideBridge({baseUrl: 'https://api.example.com'}),
-  ],
-})
-export class AppModule {}
-```
+const projects = inject(FacadeFactory).create<Project>({url: '/api/projects'});
 
-## Configuration
+projects.getCollection$({page: 1, itemsPerPage: 20});   // Collection<Project>
+projects.get$('/api/projects/42');                       // Project
+projects.post$({name: 'Refonte'});
+projects.patch$('/api/projects/42', {archived: true});
+projects.delete$('/api/projects/42');
 
-`provideBridge({ ... })` accepte notamment :
-- `baseUrl` (requis) ;
-- `auth` (Bearer ou interceptor custom) ;
-- `http` (`withCredentials` HTTP par défaut) ;
-- `mercure` (hubUrl + `topicMode` + stratégie de connexions SSE `connectionMode`/`maxUrlLength`) ;
-- `defaults` (headers/timeout/retries) ;
-- `singleFlight` (déduplication “in-flight” des requêtes HTTP identiques `GET/HEAD/OPTIONS`) ;
-- `debug` (logs runtime) ;
-- `extraInterceptors` (interceptors Angular additionnels).
-
-Les comportements HTTP internes du bridge s'appliquent uniquement aux requêtes
-appartenant à l'origine et au chemin de `baseUrl`. Les interceptors personnalisés
-restent responsables de leur propre périmètre.
-
-### Cookies / `withCredentials`
-
-Le bridge peut envoyer des cookies (sessions) côté HTTP et SSE.
-
-Vous pouvez configurer explicitement le HTTP via `http.withCredentials` :
-- `true` → cookies envoyés sur les requêtes HTTP
-- `false` → cookies désactivés côté HTTP
-
-`mercure.init.credentials` pilote uniquement Mercure/SSE :
-- `credentials: 'include'` (défaut) → cookies envoyés sur EventSource
-- `credentials: 'omit'` → cookies désactivés côté SSE
-
-Compat legacy :
-- si `http.withCredentials` est absent, le bridge conserve le comportement historique et le déduit de `mercure.init.credentials`
-
-Vous pouvez aussi surcharger appel par appel via `opts.withCredentials` sur les appels HTTP.
-
-```ts
-import {provideBridge} from '__PACKAGE_NAME__';
-
-provideBridge({
-  baseUrl: 'https://api.example.com',
-  http: {withCredentials: true},
-  mercure: {
-    hubUrl: 'https://api.example.com/.well-known/mercure',
-    init: {credentials: 'omit'},
-  },
+projects.watch$().subscribe((resource) => {             // toute la ressource, en direct
+  if (isResourceDeletion(resource)) store.remove(resource['@id']);
+  else store.upsert(resource);
 });
 ```
 
-### Auth (Bearer)
+Pour un endpoint hors ressource ou un topic Mercure personnalisé : `BridgeFacade`.
 
-`auth` accepte :
-- une string (token Bearer),
-- `{ type: 'bearer', token }`,
-- `{ type: 'bearer', getToken }` (sync ou async),
-- ou un `HttpInterceptorFn` custom.
+## Documentation
 
-Le Bearer intégré est ajouté uniquement aux requêtes dont l’origine et le chemin
-appartiennent au `baseUrl` configuré. Une requête vers un autre service conserve
-donc ses en-têtes d’origine. Un interceptor custom garde le comportement Angular
-standard et reste responsable de son propre périmètre.
-
-```ts
-import {provideBridge} from '__PACKAGE_NAME__';
-
-provideBridge({
-  baseUrl: 'https://api.example.com',
-  auth: {type: 'bearer', getToken: () => localStorage.getItem('token') ?? undefined},
-});
-```
-
-### Defaults (headers / timeout / retries)
-
-```ts
-import {provideBridge} from '__PACKAGE_NAME__';
-
-provideBridge({
-  baseUrl: 'https://api.example.com',
-  defaults: {
-    headers: {'X-Requested-With': 'fetch'},
-    timeoutMs: 15_000,
-    retries: {count: 2, delayMs: 250, methods: ['GET']},
-  },
-});
-```
-
-### Debug
-
-```ts
-import {provideBridge} from '__PACKAGE_NAME__';
-
-provideBridge({baseUrl: 'https://api.example.com', debug: true});
-```
-
-## Appeler l’API
-
-### Style orienté ressource (`FacadeFactory` + `ResourceFacade<T>`)
-
-```ts
-import {inject} from '@angular/core';
-import {FacadeFactory, ResourceFacade, Item} from '__PACKAGE_NAME__';
-
-type Book = Item & {title?: string};
-
-export class BooksService {
-  private readonly factory = inject(FacadeFactory);
-  readonly books: ResourceFacade<Book> = this.factory.create<Book>({url: '/api/books'});
-}
-```
-
-Exemples :
-
-```ts
-// collection Hydra
-this.books.getCollection$({page: 1, itemsPerPage: 20, filters: {title: 'Dune'}});
-
-// item (souvent via @id)
-this.books.get$(book['@id']!);
-
-// write
-this.books.post$({title: 'Neuromancer'});
-this.books.patch$(book['@id']!, {title: 'Count Zero'});
-this.books.delete$(book['@id']!);
-```
-
-### Style ad-hoc (`BridgeFacade`)
-
-```ts
-import {inject} from '@angular/core';
-import {BridgeFacade} from '__PACKAGE_NAME__';
-
-export class HealthService {
-  private readonly bridge = inject(BridgeFacade);
-  getHealth$() {
-    return this.bridge.get$<{status: string}>('/health');
-  }
-}
-```
-
-## Realtime (Mercure/SSE)
-
-Le realtime est inactif tant que `mercure.hubUrl` n’est pas fourni à `provideBridge()`.
-
-```ts
-provideBridge({
-  baseUrl: 'https://api.example.com',
-  mercure: {hubUrl: 'https://api.example.com/.well-known/mercure', topicMode: 'url'},
-});
-```
-
-### Concurrence
-
-Le bridge propose 2 stratégies SSE configurables via `provideBridge({mercure: ...})` :
-- `connectionMode: 'single'` : chaque appel `watch*` ouvre sa propre connexion SSE ;
-- `connectionMode: 'auto'` (défaut) : les topics sont mutualisés, puis découpés automatiquement en plusieurs connexions si l’URL Mercure dépasse `maxUrlLength` (défaut `1900`).
-
-Vous pouvez forcer une connexion dédiée par appel avec `newConnection: true` sur `watch$`, `watchSubResource$` et `watchTypes$`.
-
-```ts
-provideBridge({
-  baseUrl: 'https://api.example.com',
-  mercure: {
-    hubUrl: 'https://api.example.com/.well-known/mercure',
-    connectionMode: 'auto',
-    maxUrlLength: 1900,
-  },
-});
-```
-
-Côté HTTP, le bridge déduplique les requêtes identiques tant qu’elles sont en cours (single-flight, activé par défaut) :
-- `GET` / `HEAD` / `OPTIONS` : deux appels identiques partagent le même appel réseau et reçoivent la même réponse ;
-- les méthodes avec body (`POST`/`PUT`/`PATCH`/`DELETE`) ne sont pas dédupliquées.
-
-Ce n’est pas un cache : une fois la requête terminée, un nouvel appel identique relance un nouvel appel réseau.
-
-Pour désactiver :
-
-```ts
-provideBridge({baseUrl: 'https://api.example.com', singleFlight: false});
-```
-
-API :
-- `ResourceFacade<T>.watch$(iri | iri[], {newConnection?})` / `unwatch(iri | iri[])`
-- `ResourceFacade<T>.watchSubResource$(iri | iri[], 'field.path', {newConnection?})`
-- `BridgeFacade.watch$(iri | iri[], filter?, {newConnection?})` / `unwatch(iri | iri[])`
-- `BridgeFacade.watchTypes$(iri | iri[], resourceTypes, cfg?, {newConnection?})` (topics “multi-entités”, filtrage par type)
-- `BridgeFacade.realtimeDiagnostics$()` (état courant des connexions SSE actives)
-
-Note SSR : la connexion SSE ne s’ouvre que dans le navigateur.
-
-### Topic “multi-entités” (event-bus)
-
-Quand un même topic Mercure publie plusieurs types de payloads (sans lien entre eux),
-utilisez `BridgeFacade.watchTypes$()`.
-Le flux renvoie une union discriminée par `resourceType` (par défaut via `@type` en JSON-LD).
-
-Fonctionnement (résumé) :
-- le bridge s’abonne au(x) topic(s) Mercure (connexion dédiée ou mutualisée selon `connectionMode`)
-- chaque event JSON recu est testé sur le champ de discrimination (`@type` par défaut)
-- seuls les `resourceType` explicitement demandés sont émis
-- chaque event émis est `{ resourceType, payload }`
-
-Important (provenance des events) :
-- `watchTypes$` filtre par type (`payload[discriminator]`), pas par provenance réseau du topic.
-- En mode mutualisé (`connectionMode: 'auto'` et sans `newConnection`), un event d’un autre topic partagé peut être émis s’il porte un type autorisé.
-- Si vous voulez ecouter strictement un seul topic, utilisez une connexion dédiée :
-  `watchTypes$(..., {newConnection: true})` (ou `connectionMode: 'single'` globalement).
-
-Configuration :
-- `discriminator` : champ type (défaut `@type`)
-- `resourceTypes` : liste de strings à accepter (`['Conversation', 'Message']`, etc.)
-
-```ts
-import {inject} from '@angular/core';
-import {BridgeFacade} from '__PACKAGE_NAME__';
-import type {Item} from '__PACKAGE_NAME__';
-
-type Conversation = Item & {title?: string | null};
-type Message = Item & {originalText?: string | null};
-
-type Registry = {
-  Conversation: Conversation;
-  Message: Message;
-};
-
-const bridge = inject(BridgeFacade);
-
-bridge.watchTypes$<Registry>(
-  '/api/events/me',
-  ['Conversation', 'Message'],
-  {discriminator: '@type'},
-  {newConnection: true} // isolation stricte du topic
-).subscribe((evt) => {
-  switch (evt.resourceType) {
-    case 'Conversation':
-      // evt.payload: Conversation
-      break;
-    case 'Message':
-      // evt.payload: Message
-      break;
-  }
-});
-```
-
-## Models TypeScript
-
-Les models générés (si présents) sont exportés au même niveau que le runtime :
-
-```ts
-import type {Item} from '__PACKAGE_NAME__';
-// import type {Book} from '__PACKAGE_NAME__';
-```
-
-En JSON-LD (`application/ld+json`), l’IRI est typiquement dans `model['@id']`.
+[Démarrage](https://github.com/obsidiane-lab/meridiane/blob/master/docs/demarrage.md) ·
+[HTTP](https://github.com/obsidiane-lab/meridiane/blob/master/docs/http.md) ·
+[Temps réel](https://github.com/obsidiane-lab/meridiane/blob/master/docs/temps-reel.md) ·
+[Backend](https://github.com/obsidiane-lab/meridiane/blob/master/docs/backend.md) ·
+[Recettes](https://github.com/obsidiane-lab/meridiane/blob/master/docs/recettes.md) ·
+[Référence](https://github.com/obsidiane-lab/meridiane/blob/master/docs/reference.md) ·
+[Dépannage](https://github.com/obsidiane-lab/meridiane/blob/master/docs/depannage.md)

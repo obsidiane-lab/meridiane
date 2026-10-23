@@ -6,6 +6,5 @@ export * from './lib/facades/resource.facade';
 export * from './lib/facades/facade.interface';
 export * from './lib/ports/realtime.port';
 export * from './lib/ports/resource-repository.port';
-export * from './lib/utils/url';
 
 export * from './models';

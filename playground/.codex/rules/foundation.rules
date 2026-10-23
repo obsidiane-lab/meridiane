@@ -1,0 +1,74 @@
+# Regles natives Codex pour les commandes sensibles executees hors sandbox.
+# La doctrine projet detaillee reste dans AGENTS.md, les recettes et les patterns.
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "Pousser vers un remote modifie l'etat partage ; demander une validation humaine.",
+    match = ["git push origin main"],
+    not_match = ["git status"],
+)
+
+prefix_rule(
+    pattern = ["git", "commit"],
+    decision = "prompt",
+    justification = "Les commits doivent rester une decision explicite de livraison.",
+    match = ["git commit -m feature"],
+    not_match = ["git diff"],
+)
+
+prefix_rule(
+    pattern = ["git", "reset"],
+    decision = "prompt",
+    justification = "Un reset peut supprimer du travail ou masquer un diff utile.",
+    match = ["git reset --hard HEAD"],
+    not_match = ["git status --short"],
+)
+
+prefix_rule(
+    pattern = ["git", "clean"],
+    decision = "prompt",
+    justification = "git clean peut supprimer des fichiers non suivis.",
+    match = ["git clean -fd"],
+    not_match = ["git status --short"],
+)
+
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "prompt",
+    justification = "Suppression recursive destructive : demander une validation explicite.",
+    match = ["rm -rf tmp/cache"],
+    not_match = ["rm file.txt"],
+)
+
+prefix_rule(
+    pattern = ["docker", "compose", "down"],
+    decision = "prompt",
+    justification = "Arreter ou supprimer des services/volumes peut interrompre le travail local.",
+    match = ["docker compose down"],
+    not_match = ["docker compose ps"],
+)
+
+prefix_rule(
+    pattern = ["composer", "require"],
+    decision = "prompt",
+    justification = "Ajouter une dependance de production doit rester explicite.",
+    match = ["composer require api-platform/core"],
+    not_match = ["composer validate"],
+)
+
+prefix_rule(
+    pattern = ["npm", "install"],
+    decision = "prompt",
+    justification = "Ajouter ou modifier des dependances npm doit rester explicite.",
+    match = ["npm install package"],
+    not_match = ["npm run lint"],
+)
+
+prefix_rule(
+    pattern = ["env"],
+    decision = "prompt",
+    justification = "L'environnement peut contenir des secrets ; preferer lire les cles attendues dans .env.example.",
+    match = ["env"],
+    not_match = ["printenv PATH"],
+)

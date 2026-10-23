@@ -1,0 +1,83 @@
+{
+	auto_https off
+	skip_install_trust
+
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp {
+		{$FRANKENPHP_CONFIG}
+	}
+}
+
+{$CADDY_EXTRA_CONFIG}
+
+(webfront) {
+	import webfront.caddy
+}
+
+:80 {
+	log {
+		{$CADDY_SERVER_LOG_OPTIONS}
+		format filter {
+			request>uri query {
+				replace authorization REDACTED
+			}
+		}
+	}
+
+	root * /app/public
+	encode zstd br gzip
+	vulcain
+
+	{$CADDY_SERVER_EXTRA_DIRECTIVES}
+
+	header ?Permissions-Policy "browsing-topics=()"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+	header X-Content-Type-Options "nosniff"
+
+	mercure {
+		# Mêmes variables que symfony/mercure-bundle : un émetteur, une clé.
+		issuer {$MERCURE_JWT_ISSUER} {
+			publisher {
+				jwt {env.MERCURE_JWT_SECRET}
+			}
+			subscriber {
+				jwt {env.MERCURE_JWT_SECRET}
+			}
+		}
+		# Développement : nom de cookie du bundle en debug, et front servi par `ng serve` sur le port 4200.
+		cookie_name mercure_access_token
+		cors_origins http://localhost:8000 http://localhost:4200
+	}
+
+	route {
+		@frontend {
+			not path /api /api/* /bundles /bundles/* /.well-known/mercure* /_profiler /_profiler/* /_wdt /_wdt/* /_error /_error/*
+		}
+		handle @frontend {
+			import webfront
+		}
+
+		handle {
+			@phpRoute {
+				not path /.well-known/mercure*
+				not file {path}
+			}
+			rewrite @phpRoute index.php
+
+			@frontController path index.php
+			php @frontController {
+				{$FRANKENPHP_SITE_CONFIG}
+
+				worker {
+					file ./public/index.php
+					{$FRANKENPHP_WORKER_CONFIG}
+				}
+			}
+
+			file_server {
+				hide *.php
+			}
+		}
+	}
+}

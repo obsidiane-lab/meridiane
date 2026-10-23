@@ -8,23 +8,14 @@ export function resolveHttpCallOptions(options: HttpCallOptions | undefined, wit
   };
 }
 
-export function buildHttpRequestOptions(
-  req: HttpRequestConfig,
-  {withCredentialsDefault}: {withCredentialsDefault: boolean}
-): Record<string, unknown> {
-  const {query, body, headers, responseType, withCredentials, options = {}} = req;
-  const mergedOptions: Record<string, unknown> = {...options};
-
-  if (headers) mergedOptions['headers'] = headers;
-  if (query) mergedOptions['params'] = toHttpParams(query);
-  if (body !== undefined) mergedOptions['body'] = body;
-
-  const inheritedResponseType = mergedOptions['responseType'];
-  const inheritedWithCredentials = mergedOptions['withCredentials'];
-
-  mergedOptions['responseType'] = responseType ?? inheritedResponseType ?? 'json';
-  mergedOptions['withCredentials'] = withCredentials ?? inheritedWithCredentials ?? withCredentialsDefault;
-  mergedOptions['observe'] = 'body';
-
-  return mergedOptions;
+export function buildHttpRequestOptions(request: HttpRequestConfig, withCredentialsDefault: boolean) {
+  return {
+    headers: request.headers,
+    params: request.query ? toHttpParams(request.query) : undefined,
+    body: request.body,
+    // The caller types the response with `R`; `HttpClient.request` only infers it for `json`.
+    responseType: (request.responseType ?? 'json') as 'json',
+    withCredentials: request.withCredentials ?? withCredentialsDefault,
+    observe: 'body' as const,
+  };
 }

@@ -1,0 +1,5 @@
+{
+  "app": {
+    "production": false,"apiBaseUrl": "http://localhost:8000","mercureHubUrl": "http://localhost:8000/.well-known/mercure","version": "3.0.0-playground"
+  }
+}

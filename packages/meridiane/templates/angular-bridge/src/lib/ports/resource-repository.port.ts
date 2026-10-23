@@ -1,8 +1,8 @@
 import {HttpHeaders, HttpParams} from '@angular/common/http';
 import {Observable} from 'rxjs';
 
-export type Iri = string | undefined;
-export type IriRequired = string;
+/** IRI of an API Platform resource (e.g. `/api/books/1`), or an absolute URL. */
+export type Iri = string;
 
 type BaseHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS' | 'HEAD';
 export type HttpMethod = BaseHttpMethod | Lowercase<BaseHttpMethod>;
@@ -10,29 +10,40 @@ export type HttpMethod = BaseHttpMethod | Lowercase<BaseHttpMethod>;
 export type QueryParamValue = string | number | boolean | Array<string | number | boolean>;
 export type AnyQuery = Query | Record<string, QueryParamValue> | HttpParams;
 
+/** A resource read from the API, as described by API Platform's `HydraItemBaseSchema`. */
 export interface Item {
-  '@id'?: Iri;
-  '@context'?: string;
-  '@type'?: string;
+  '@context'?: string | Record<string, unknown>;
+  '@id': Iri;
+  '@type': string;
 }
 
-export interface View extends Item {
-  first?: Iri;
-  last?: Iri;
-  next?: Iri;
-  previous?: Iri;
+/** Pagination of a collection (`view` of `HydraCollectionBaseSchema`). */
+export interface View {
+  '@id'?: Iri;
+  '@type'?: string;
+  first?: Iri | null;
+  last?: Iri | null;
+  previous?: Iri | null;
+  next?: Iri | null;
 }
-export interface IriTemplateMapping extends Item {
-  variable: string;
-  property?: string;
+
+export interface IriTemplateMapping {
+  '@type'?: string;
+  variable?: string;
+  property?: string | null;
   required?: boolean;
 }
-export interface IriTemplate extends Item {
-  template: string;
+
+/** Filters of a collection (`search` of `HydraCollectionBaseSchema`). */
+export interface IriTemplate {
+  '@type'?: string;
+  template?: string;
   variableRepresentation?: string;
-  mapping: IriTemplateMapping[];
+  mapping?: IriTemplateMapping[];
 }
-export interface Collection<T> extends Item {
+
+/** A collection, as described by API Platform's `HydraCollectionBaseSchema`. */
+export interface Collection<T> {
   member: T[];
   totalItems?: number;
   search?: IriTemplate;
@@ -53,15 +64,15 @@ export interface HttpCallOptions {
 export interface ResourceRepository<T> {
   getCollection$(query?: AnyQuery, options?: HttpCallOptions): Observable<Collection<T>>;
 
-  get$(iri: IriRequired, options?: HttpCallOptions): Observable<T>;
+  get$(iri: Iri, options?: HttpCallOptions): Observable<T>;
 
   post$(payload: Partial<T>, options?: HttpCallOptions): Observable<T>;
 
-  patch$(iri: IriRequired, changes: Partial<T>, options?: HttpCallOptions): Observable<T>;
+  patch$(iri: Iri, changes: Partial<T>, options?: HttpCallOptions): Observable<T>;
 
-  put$(iri: IriRequired, payload: Partial<T>, options?: HttpCallOptions): Observable<T>;
+  put$(iri: Iri, payload: Partial<T>, options?: HttpCallOptions): Observable<T>;
 
-  delete$(iri: IriRequired, options?: HttpCallOptions): Observable<void>;
+  delete$(iri: Iri, options?: HttpCallOptions): Observable<void>;
 
   request$<R = unknown, B = unknown>(request: HttpRequestConfig<B>): Observable<R>;
 }
@@ -74,5 +85,4 @@ export interface HttpRequestConfig<TBody = unknown> {
   headers?: HttpHeaders | Record<string, string>;
   responseType?: 'json' | 'text' | 'blob';
   withCredentials?: boolean;
-  options?: Record<string, unknown>;
 }

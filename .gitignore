@@ -34,9 +34,7 @@ yarn-error.log
 .angular/
 .sass-cache/
 /connect.lock
-/coverage
 /libpeerconnection.log
-testem.log
 /typings
 
 # System files

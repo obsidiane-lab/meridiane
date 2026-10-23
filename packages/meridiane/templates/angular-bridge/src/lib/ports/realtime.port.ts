@@ -1,71 +1,52 @@
+import {Signal} from '@angular/core';
 import {Observable} from 'rxjs';
-import {Iri} from './resource-repository.port';
-import {RealtimeConnectionStatus, RealtimeDiagnostics, WatchConnectionOptions} from '../bridge.types';
+import {RealtimeDiagnostics, RealtimeStatus} from '../bridge.types';
 
-export type RealtimeStatus = RealtimeConnectionStatus;
-
-export interface SseEvent {
-  type: string;
-  data: string;
-  lastEventId?: string;
+/**
+ * A Mercure 1.0 subscription, sent to the hub as `match=` (exact) or `match_urlpattern=` (WHATWG URL Pattern).
+ */
+export interface MercureSubscription {
+  /** Absolute topic, or absolute URL Pattern when `type` is `urlpattern` (e.g. `https://api.example.com/api/books/:id`). */
+  match: string;
+  type: 'exact' | 'urlpattern';
 }
 
-export interface SseOptions {
-  withCredentials?: boolean;
+/**
+ * Connection carrying a subscription:
+ * - `shared`: connections shared by the application, split automatically when too long;
+ * - `dedicated`: a connection for this subscription only;
+ * - any other value: connections shared by the subscriptions using this name.
+ */
+export type RealtimeConnection = 'shared' | 'dedicated' | (string & {});
+
+export interface RealtimeSubscribeOptions {
+  connection?: RealtimeConnection;
 }
 
-export interface RealtimeEvent<T> {
-  iri: string;
-  /**
-   * Matched subscription topic (normalized).
-   *
-   * - When matching by `@id`, this is typically the same as `iri`.
-   * - When matching by a relation field (e.g. `conversation`), this is the parent topic IRI.
-   */
-  topic?: string;
-  data?: T;
+/** A Mercure update received on the SSE connection. */
+export interface MercureUpdate {
+  /** Update ID assigned by the hub (SSE `id`). */
+  id?: string;
+  /** Parsed JSON payload. */
+  data: unknown;
 }
-
-export type SubscribeFilter = {
-  /**
-   * Single relation path used to match events to subscription topics.
-   * Example: `conversation` or `embedded.author`.
-   */
-  field?: string;
-  /**
-   * Multiple relation paths used to match events to subscription topics.
-   */
-  fields?: string[];
-  /**
-   * When relation fields are provided, also include events whose `@id` matches the subscribed topics.
-   *
-   * Default:
-   * - `true` when no relation fields are provided (match by `@id`)
-   * - `false` when relation fields are provided (sub-resource mode)
-   */
-  includeSelf?: boolean;
-};
 
 export interface RealtimePort {
-  /**
-   * Subscribes to Mercure events for the given topics.
-   *
-   * Note: topics must be stable strings. Undefined values are ignored by the adapter.
-   */
-  subscribe$<T>(iris: Iri[], filter?: SubscribeFilter, options?: WatchConnectionOptions): Observable<RealtimeEvent<T>>;
+  /** State of the connections. */
+  readonly status: Signal<RealtimeStatus>;
 
   /**
-   * Subscribes to all JSON payloads received on the given Mercure topics.
+   * Registers a subscription for as long as the returned Observable is subscribed. Default connection: `shared`.
    *
-   * No payload-to-topic matching is applied.
+   * Mercure does not tell which subscription matched an update: the stream emits every update received on the
+   * connections carrying the subscription, and consumers keep the ones that concern them (e.g. by `@id`).
    */
-  subscribeAll$<T>(iris: Iri[], options?: WatchConnectionOptions): Observable<RealtimeEvent<T>>;
+  subscribe$(subscription: MercureSubscription, options?: RealtimeSubscribeOptions): Observable<MercureUpdate>;
 
-  unsubscribe(iris: Iri[]): void;
+  /** Renews the authorization and reopens every connection, e.g. after login or logout. */
+  reconnect(): void;
 
   status$(): Observable<RealtimeStatus>;
-}
 
-export interface RealtimeDiagnosticsPort extends RealtimePort {
   diagnostics$(): Observable<RealtimeDiagnostics>;
 }

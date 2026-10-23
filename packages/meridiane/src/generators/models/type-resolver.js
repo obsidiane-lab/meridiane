@@ -53,7 +53,6 @@ function nonNegativeInteger(value) {
 export function createTypeResolver({
   dependencies = new Set(),
   typeNames = new Map(),
-  requiredMode = 'all',
   spec,
 } = {}) {
   const resolvingRefs = new Set();
@@ -81,11 +80,6 @@ export function createTypeResolver({
     }
   }
 
-  function resolveProperty(schema) {
-    const type = resolve(schema);
-    return requiredMode === 'spec' ? type : nullableType(type);
-  }
-
   function resolveDictionaryValue(additionalProperties, properties) {
     const additionalType = additionalProperties === true
       ? atomicType('any')
@@ -101,8 +95,8 @@ export function createTypeResolver({
     const requiredProperties = new Set(schema.required ?? []);
     const properties = Object.entries(schema.properties ?? {}).map(([key, propertySchema]) => ({
       key,
-      optional: requiredMode !== 'spec' || !requiredProperties.has(key),
-      type: resolveProperty(propertySchema),
+      optional: !requiredProperties.has(key),
+      type: resolve(propertySchema),
     }));
     const members = properties.map(({key, optional, type}) =>
       `${quoteKeyIfNeeded(key)}${optional ? '?' : ''}: ${type.code};`
@@ -224,17 +218,5 @@ export function createTypeResolver({
 
   return {
     typeOf: (schema) => resolve(schema).code,
-    nullableTypeOf: (schema) => nullableType(resolve(schema)).code,
   };
-}
-
-/**
- * Resolves an OpenAPI schema to TypeScript and collects component dependencies.
- */
-export function tsTypeOf(schema, dependencies, typeNames, options) {
-  return createTypeResolver({dependencies, typeNames, ...options}).typeOf(schema);
-}
-
-export function nullableTsTypeOf(schema, dependencies, typeNames, options) {
-  return createTypeResolver({dependencies, typeNames, ...options}).nullableTypeOf(schema);
 }

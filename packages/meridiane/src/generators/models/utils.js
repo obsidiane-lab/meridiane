@@ -1,14 +1,3 @@
-import fs from 'node:fs/promises';
-
-/**
- * Supprime et recrée un dossier (idempotent)
- * @param {string} dir
- */
-export async function ensureCleanDir(dir) {
-  await fs.rm(dir, { recursive: true, force: true });
-  await fs.mkdir(dir, { recursive: true });
-}
-
 const RESERVED = new Set([
   'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do',
   'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import',

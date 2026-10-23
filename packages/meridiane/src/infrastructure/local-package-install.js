@@ -38,7 +38,7 @@ export async function installPackageFromDist({packageName, distDir, appRoot, log
   const packageDir = scope ? path.join(nodeModules, scope, name) : path.join(nodeModules, name);
   const displayName = scope ? `${scope}/${name}` : name;
 
-  log?.step?.(`installation locale dans node_modules (${displayName})`);
+  log.step(`installation locale dans node_modules (${displayName})`);
 
   await fs.rm(packageDir, {recursive: true, force: true});
   await fs.mkdir(path.dirname(packageDir), {recursive: true});
@@ -71,7 +71,7 @@ async function invalidateAngularViteCache({appRoot, packageName, log}) {
   }
 
   if (removedFiles > 0) {
-    log?.info?.(`cache Angular/Vite invalidé (${removedFiles} fichier(s)) pour ${packageName}`);
+    log.info(`cache Angular/Vite invalidé (${removedFiles} fichier(s)) pour ${packageName}`);
   }
 }
 

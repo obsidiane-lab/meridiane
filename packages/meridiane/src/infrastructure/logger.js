@@ -13,8 +13,6 @@ export function createLogger({ debug = false } = {}) {
   const prefix = color('35', 'meridiane');
 
   return {
-    debugEnabled: debug,
-
     title(text) {
       console.log(line('🌙', `${prefix} ${text}`));
     },

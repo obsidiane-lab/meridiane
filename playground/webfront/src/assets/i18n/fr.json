@@ -1,0 +1,135 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "reset": "Réinitialiser",
+    "loading": "Chargement...",
+    "retry": "Réessayer",
+    "status": {
+      "active": "Actif",
+      "inactive": "Inactif",
+      "onboarding": "En onboarding"
+    }
+  },
+  "table": {
+    "show": "Afficher",
+    "per_page": "par page",
+    "of": "sur",
+    "pagination": "Pagination",
+    "itemsPerPage": "Nombre d’éléments par page",
+    "firstPage": "Première page",
+    "lastPage": "Dernière page",
+    "morePages": "Pages supplémentaires",
+    "page": "Page {{page}}",
+    "search": "Rechercher",
+    "filters": "Filtres",
+    "active": "Actifs",
+    "reset_filters": "Réinitialiser les filtres",
+    "apply_filters": "Appliquer les filtres",
+    "no_data_found": "Aucune donnée disponible"
+  },
+  "form": {
+    "required": "Ce champ est obligatoire.",
+    "email": "Adresse email invalide.",
+    "minlength": "La longueur minimale est de {{ requiredLength }} caractères.",
+    "maxlength": "La longueur maximale est de {{ requiredLength }} caractères.",
+    "min": "La valeur minimale est {{ min }}.",
+    "max": "La valeur maximale est {{ max }}.",
+    "pattern": "Le format est invalide.",
+    "invalid": "Ce champ est invalide."
+  },
+  "theme": {
+    "modes": {
+      "light": "Clair",
+      "dark": "Sombre"
+    }
+  },
+  "layout": {
+    "command": {
+      "open": "Rechercher une page...",
+      "title": "Navigation rapide",
+      "description": "Recherchez une page accessible dans cet espace.",
+      "placeholder": "Rechercher une page...",
+      "empty": "Aucune page trouvée."
+    },
+    "profileMenu": {
+      "lightMode": "Activer le mode clair",
+      "darkMode": "Activer le mode sombre"
+    },
+    "nav": {
+      "primary": "Navigation principale",
+      "breadcrumb": "Fil d’Ariane",
+      "openMenu": "Ouvrir le menu",
+      "closeMenu": "Fermer le menu",
+      "toggleSubmenu": "Afficher ou masquer le sous-menu"
+    }
+  },
+  "errorPages": {
+    "backHome": "Retour à l'accueil",
+    "notFound": {
+      "title": "Page introuvable",
+      "description": "La page demandée n'existe pas ou a été déplacée."
+    },
+    "serverError": {
+      "title": "Erreur du serveur",
+      "description": "Le service est momentanément indisponible. Réessayez dans quelques instants."
+    }
+  },
+  "menu": {
+    "groups": {
+      "playground": "Playground"
+    },
+    "items": {
+      "conversations": "Conversations et messages"
+    }
+  },
+  "playground": {
+    "title": "Conversations et messages",
+    "description": "Ouvrez deux onglets pour tester les ressources natives, les relations par IRI et les mises à jour Mercure.",
+    "status": {
+      "closed": "Temps réel arrêté",
+      "connecting": "Connexion au hub…",
+      "connected": "Temps réel connecté"
+    },
+    "pause": "Suspendre le temps réel",
+    "resume": "Activer le temps réel",
+    "refresh": "Rafraîchir",
+    "errorTitle": "Opération impossible",
+    "error": "Vérifiez que le backend et le hub sont disponibles, puis réessayez. Les détails sont dans la console.",
+    "conversations": "Conversations",
+    "conversationsHelp": "La sélection charge chaque message manquant depuis son IRI.",
+    "noConversations": "Aucune conversation",
+    "newConversation": "Titre de la nouvelle conversation",
+    "titleValidation": "Saisissez un titre de 1 à 200 caractères.",
+    "create": "Créer",
+    "rename": "Renommer la conversation",
+    "deleteConversation": "Supprimer la conversation",
+    "deleteConversationHelp": "La conversation et tous ses messages seront définitivement supprimés.",
+    "delete": "Supprimer",
+    "editMessage": "Modifier le message",
+    "deleteMessage": "Supprimer le message",
+    "deleteMessageHelp": "Ce message sera définitivement supprimé.",
+    "noMessages": "Aucun message",
+    "newMessage": "Nouveau message",
+    "send": "Envoyer",
+    "selectConversation": "Sélectionnez une conversation",
+    "nativeResource": "Ressource native de la conversation",
+    "lookup": "Charger un message par IRI",
+    "lookupHelp": "Chargez un message isolé, puis sa conversation à la demande. Le store réutilise les ressources déjà disponibles.",
+    "messageIri": "IRI du message",
+    "iriValidation": "Utilisez une IRI comme /api/messages/1.",
+    "load": "Charger",
+    "openConversation": "Ouvrir la conversation",
+    "diagnostics": "Diagnostic Mercure",
+    "entityState": {
+      "idle": "Ressource non chargée",
+      "loading": "Chargement…",
+      "ready": "Disponible",
+      "notFound": "Ressource introuvable",
+      "forbidden": "Accès refusé",
+      "error": "Chargement impossible : utilisez Rafraîchir pour réessayer.",
+      "deleted": "Ressource supprimée"
+    }
+  }
+}

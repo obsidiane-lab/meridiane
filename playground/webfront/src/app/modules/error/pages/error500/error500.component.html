@@ -1,0 +1,16 @@
+<section hlmEmpty>
+  <div hlmEmptyHeader>
+    <span hlmEmptyMedia variant="icon">
+      <ng-icon name="lucideServerCrash" aria-hidden="true" />
+    </span>
+    <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">500</p>
+    <h1 hlmEmptyTitle>{{ 'errorPages.serverError.title' | translate }}</h1>
+    <p hlmEmptyDescription>{{ 'errorPages.serverError.description' | translate }}</p>
+  </div>
+  <div hlmEmptyContent>
+    <a hlmBtn size="lg" routerLink="/">
+      <ng-icon name="lucideHouse" aria-hidden="true" />
+      {{ 'errorPages.backHome' | translate }}
+    </a>
+  </div>
+</section>

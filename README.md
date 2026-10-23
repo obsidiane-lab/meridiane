@@ -1,6 +1,18 @@
 # Meridiane
 
-CLI pour générer un bridge Angular depuis une spec OpenAPI (API Platform + Mercure), avec un backend Symfony et une sandbox Angular pour valider le runtime.
+Meridiane génère, depuis le contrat OpenAPI d'API Platform, une librairie Angular qui
+fournit les modèles TypeScript, le client HTTP et le temps réel Mercure 1.0 de votre API.
+Le bridge gère la connexion ; la gestion des données reste dans votre application.
+
+```ts
+provideBridge({baseUrl: '/', mercure: {hubUrl: '/.well-known/mercure', authorize: '/api/mercure/authorization'}});
+
+const projects = inject(FacadeFactory).create<Project>({url: '/api/projects'});
+projects.getCollection$({page: 1});   // HTTP
+projects.watch$();                    // créations, modifications et suppressions en direct
+```
+
+**[Lire la documentation →](docs/README.md)**
 
 ![CI](https://github.com/obsidiane-lab/meridiane/actions/workflows/ci.yml/badge.svg)
 
@@ -8,40 +20,31 @@ CLI pour générer un bridge Angular depuis une spec OpenAPI (API Platform + Mer
 
 - `packages/meridiane` : le produit publié, package npm `@obsidiane/meridiane` et CLI de génération
 - `playground` : l'environnement interne utilisé pour développer et valider le générateur
-  - `playground/api-platform` : API Symfony/API Platform + Mercure de référence
-  - `playground/angular-app` : application Angular qui consomme un bridge généré
-- `docs` : documentation produit (CLI, guide d'intégration, HTTP, SSE, API publique)
+  - `playground/core` : API Symfony/API Platform + Mercure 1.0
+  - `playground/webfront` : application Angular Foundation qui consomme le bridge local généré
+- `docs` : documentation pour les développeurs qui utilisent le bridge
 
 Le package publié ne dépend pas du playground. Le playground fournit uniquement un contrat OpenAPI et des scénarios réels pour développer le générateur.
 
 ## Pré-requis
 
-- Node.js `>=24` (LTS)
-- npm
-- Docker + Docker Compose v2 (pour le backend)
+- Node.js `>=24.15`
+- npm `>=11`
+- Docker + Docker Compose v2
 
 ## Démarrage local rapide
 
 1. Installer les dépendances du workspace :
 
 ```bash
-npm install
+npm ci
 ```
 
-2. Démarrer le backend :
+2. Démarrer et initialiser le playground Foundation :
 
 ```bash
-cd playground/api-platform
-docker compose up -d --build
-# optionnel mais recommandé au premier démarrage :
-docker compose exec php php bin/console app:dev:reset --no-interaction
-```
-
-3. Lancer la sandbox Angular depuis la racine du repo :
-
-```bash
-cd ../..
-npm run sandbox:dev
+cd playground
+make init
 ```
 
 URLs locales :
@@ -49,9 +52,9 @@ URLs locales :
 - docs API : `http://localhost:8000/api/docs`
 - sandbox Angular : `http://localhost:4200`
 
-Comptes de dev (fixtures) :
-- `dev@meridiane.local` / `dev`
-- `admin@meridiane.local` / `admin`
+Le playground n'a pas de compte utilisateur ; l'abonnement Mercure passe par le cookie
+posé par `/api/mercure/authorization`. Il fournit une conversation avec deux messages. Son
+[README](playground/README.md) décrit les scénarios et la génération du bridge local.
 
 ## Utiliser le CLI Meridiane
 
@@ -68,22 +71,19 @@ npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.
 
 ## Scripts utiles (racine)
 
-- `npm run playground:bridge` : regénère le bridge du playground
-- `npm run playground:dev` : bridge du playground + `ng serve`
-- `npm run playground:build` : bridge du playground + build Angular
+- `npm run playground:bridge` : régénère le bridge depuis l'export OpenAPI local (`make bridge` réexporte aussi le contrat)
+- `npm run playground:dev` : lance `ng serve` sur le port 4200, en remplacement du conteneur webfront
+- `npm run playground:build` : compile le frontend avec son bridge généré
 
 Les commandes historiques `npm run sandbox:bridge`, `npm run sandbox:dev` et `npm run sandbox:build` restent disponibles avec le même comportement.
 
+Le projet n'utilise aucun test unitaire ; ne pas en ajouter. La validation repose sur
+la compilation, les contrôles de package npm, le lint, PHPStan et des vérifications
+ciblées dans le navigateur selon le périmètre. Le workflow est décrit dans
+[l'architecture du dépôt](docs/contributing/architecture.md#validation).
+
 ## Documentation
 
-- Guide bridge : `docs/guide-bridge.md`
-- CLI : `docs/cli.md`
-- API publique : `docs/fonctionnalites/api.md`
-- HTTP / Hydra : `docs/fonctionnalites/http.md`
-- Mercure / SSE : `docs/fonctionnalites/mercure-sse.md`
-- FAQ : `docs/fonctionnalites/questions-frequentes.md`
-- Package npm : `packages/meridiane/README.md`
-- Environnement de développement : `playground/README.md`
-- Application Angular : `playground/angular-app/README.md`
-- API Symfony : `playground/api-platform/README.md`
-- Architecture interne : `docs/contributing/architecture.md`
+- [Documentation du bridge](docs/README.md) : démarrage, fonctionnement, configuration, HTTP, temps réel, backend, recettes, référence, CLI, dépannage, migration.
+- Environnement de développement : [playground/README.md](playground/README.md).
+- Architecture interne du générateur : [docs/contributing/architecture.md](docs/contributing/architecture.md).

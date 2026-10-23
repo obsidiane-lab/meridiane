@@ -1,3 +1,5 @@
+import {isAbsoluteHttpUrl, trimTrailingSlash} from './url';
+
 type UrlKind = 'absolute' | 'protocol-relative' | 'relative';
 
 /** Returns whether a request belongs to the configured API origin and path. */
@@ -13,7 +15,7 @@ export function isRequestWithinBaseUrl(requestUrl: string, baseUrl: string): boo
 
     if (base.origin !== request.origin) return false;
 
-    const basePath = trimTrailingSlash(base.pathname);
+    const basePath = trimTrailingSlash(base.pathname) || '/';
     return basePath === '/' || request.pathname === basePath || request.pathname.startsWith(`${basePath}/`);
   } catch {
     return false;
@@ -21,11 +23,7 @@ export function isRequestWithinBaseUrl(requestUrl: string, baseUrl: string): boo
 }
 
 function classifyUrl(url: string): UrlKind {
-  if (/^https?:\/\//i.test(url)) return 'absolute';
+  if (isAbsoluteHttpUrl(url)) return 'absolute';
   if (url.startsWith('//')) return 'protocol-relative';
   return 'relative';
-}
-
-function trimTrailingSlash(pathname: string): string {
-  return pathname === '/' ? pathname : pathname.replace(/\/+$/, '') || '/';
 }

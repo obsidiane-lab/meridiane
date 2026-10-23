@@ -1,4 +1,3 @@
-import { canonicalizeMediaType } from './oas-contract.js';
 import {pascalCase} from './utils.js';
 
 export function parseOpenApiSchemaName(originalName) {
@@ -26,17 +25,7 @@ export function parseOpenApiSchemaName(originalName) {
     groupRaw = groupRaw.replace(/\.jsonmergepatch$/i, '');
   }
 
-  const basePath = baseRaw;
-  const groupPath = groupRaw;
-
-  return {
-    originalName: raw,
-    basePath,
-    groupPath,
-    baseVariant,
-    isMergePatch,
-    key: `${basePath.toLowerCase()}|${groupPath.toLowerCase()}`,
-  };
+  return {basePath: baseRaw, groupPath: groupRaw, baseVariant, isMergePatch};
 }
 
 export function baseTsNameFromBasePath(basePath) {
@@ -52,11 +41,4 @@ export function baseTsNameFromBasePath(basePath) {
 export function groupTsNameFromGroupPath(groupPath) {
   const tokens = String(groupPath || '').split(/[._:]+/g).filter(Boolean);
   return pascalCase(tokens);
-}
-
-export function formatSuffixToken(mediaType) {
-  const canon = canonicalizeMediaType(mediaType);
-  const tokens = canon.split(/[\/+.-]+/g).filter(Boolean);
-  const trimmed = tokens[0] === 'application' ? tokens.slice(1) : tokens;
-  return pascalCase(trimmed.length ? trimmed : tokens) || 'Fmt';
 }

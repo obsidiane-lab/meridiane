@@ -1,6 +1,6 @@
 {
   "name": "@obsidiane/meridiane",
-  "version": "0.1.0",
+  "version": "3.0.0",
   "description": "Générateur de librairie Angular et modèles TypeScript (OpenAPI) pour un bridge Symfony/API Platform + Mercure.",
   "repository": {
     "type": "git",

@@ -1,0 +1,9 @@
+api_platform:
+    title: Meridiane Playground
+    version: 1.0.0
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']
+        # Le composant table du front choisit la taille des pages (itemsPerPage).
+        pagination_client_items_per_page: true

@@ -25,46 +25,35 @@ export interface BridgeDefaults {
 }
 
 /**
- * Controls how Mercure topics are sent in the hub URL.
- * - `url`: topics are absolute URLs (recommended default)
- * - `iri`: topics are same-origin relative IRIs (e.g. `/api/...`)
+ * State of the Mercure connections.
+ * - `closed`: no active subscription (or realtime disabled)
+ * - `connecting`: at least one connection is opening, reconnecting, or waiting before a retry
+ * - `connected`: the hub accepted every connection and the streams are open
  */
-export type MercureTopicMode = 'url' | 'iri';
+export type RealtimeStatus = 'closed' | 'connecting' | 'connected';
 
-/**
- * Controls how SSE connections are managed.
- * - `single`: each watch subscription opens its own SSE connection
- * - `auto`: subscriptions are shared and split into multiple connections only when URL length is too large
- */
-export type MercureConnectionMode = 'single' | 'auto';
-
-/**
- * Per-subscription realtime override.
- * - `true`: force an isolated SSE connection for this watch call
- * - `false`/`undefined`: use adapter strategy (`single` or `auto`)
- */
-export interface WatchConnectionOptions {
-  newConnection?: boolean;
+export interface RealtimeSubscriptionDiagnostics {
+  match: string;
+  type: 'exact' | 'urlpattern';
+  /** Number of active `watch$()` streams sharing this subscription. */
+  consumers: number;
 }
 
-export type RealtimeConnectionScope = 'shared' | 'dedicated';
-
-export type RealtimeConnectionStatus = 'connecting' | 'connected' | 'closed';
-
 export interface RealtimeConnectionDiagnostics {
-  id: string;
-  scope: RealtimeConnectionScope;
-  status: RealtimeConnectionStatus;
-  topicCount: number;
-  topics: string[];
-  urlLength: number;
+  /** `shared`, `dedicated`, or the name given with `watch$(..., {connection})`. */
+  connection: string;
+  status: RealtimeStatus;
+  /** Subscribe URL (without `last_event_id`). */
+  url?: string;
+  subscriptions: RealtimeSubscriptionDiagnostics[];
+  /** Last update ID received on this connection, used to request replay after a reconnection. */
+  lastEventId?: string;
+  /** Consecutive connections refused by the hub (authentication, authorization, limits). */
+  failures: number;
 }
 
 export interface RealtimeDiagnostics {
-  mode: MercureConnectionMode;
-  maxUrlLength: number;
-  totalConnections: number;
-  sharedConnections: number;
-  dedicatedConnections: number;
+  status: RealtimeStatus;
+  /** One entry per `EventSource`: subscriptions are split when a subscribe URL would exceed the limits. */
   connections: RealtimeConnectionDiagnostics[];
 }

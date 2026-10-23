@@ -1,0 +1,111 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+
+# Configuration projet OpenAI Codex pour le template Foundation.
+# Les secrets, tokens, credentials MCP personnels et chemins machine restent hors repo.
+
+project_root_markers = [".git", "AGENTS.md", "compose.yaml", "Makefile"]
+project_doc_max_bytes = 32768
+project_doc_fallback_filenames = []
+
+[sandbox_workspace_write]
+network_access = false
+writable_roots = []
+exclude_tmpdir_env_var = true
+exclude_slash_tmp = true
+
+[shell_environment_policy]
+inherit = "core"
+ignore_default_excludes = false
+experimental_use_profile = false
+exclude = [
+  "*KEY*",
+  "*SECRET*",
+  "*TOKEN*",
+  "*PASSWORD*",
+  "*PASS*",
+  "*COOKIE*",
+  "*CREDENTIAL*",
+  "*AUTH*",
+  "OPENAI_API_KEY",
+  "LOGTO_*",
+  "OIDC_*",
+  "MERCURE_JWT_SECRET",
+  "DATABASE_URL",
+]
+set = {}
+
+[mcp_servers.openaiDeveloperDocs]
+enabled = true
+required = false
+url = "https://developers.openai.com/mcp"
+startup_timeout_sec = 10
+tool_timeout_sec = 60
+
+[agents]
+max_threads = 2
+max_depth = 1
+job_max_runtime_seconds = 1800
+
+[agents.docs_researcher]
+description = "Chercheur documentaire lecture seule focalise sur les sources officielles quand la version, la securite ou un comportement externe comptent."
+config_file = "agents/docs_researcher.toml"
+
+[agents.reviewer]
+description = "Reviewer lecture seule pour chercher regressions, risques de securite, derive Spartan, oublis de contrat et preuves manquantes avant livraison."
+config_file = "agents/reviewer.toml"
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-project-bootstrap/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-feature-delivery/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-webapp-feature/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-api-backend/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-frontend-ux/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-api-contract/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-realtime-sync/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-async-workflow/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-security/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-intervention-debug/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-durable-documentation/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-review/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/obsidiane-upgrade-source-validation/SKILL.md"
+enabled = true
+
+[[skills.config]]
+path = "../.agents/skills/spartan/SKILL.md"
+enabled = true

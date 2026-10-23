@@ -1,37 +1,37 @@
-import {EnvironmentInjector, inject, Injectable, runInInjectionContext} from '@angular/core';
-import {HttpClient} from '@angular/common/http';
+import {inject, Injectable} from '@angular/core';
+import {DOCUMENT} from '@angular/common';
 import {RealtimePort} from '../ports/realtime.port';
-import {Item, ResourceRepository} from '../ports/resource-repository.port';
-import {API_BASE_URL, BRIDGE_HTTP_WITH_CREDENTIALS} from '../tokens';
-import {MercureRealtimeAdapter} from '../bridge/sse/mercure.adapter';
-import {ApiPlatformRestRepository} from '../bridge/rest/api-platform.adapter';
+import {Item} from '../ports/resource-repository.port';
+import {API_BASE_URL} from '../tokens';
+import {MercureHub} from '../bridge/sse/mercure-hub';
+import {ResourceTopic} from '../bridge/sse/resource-topic';
+import {resolveUrl, toAbsoluteUrl, trimTrailingSlash} from '../utils/url';
+import {BridgeFacade} from './bridge.facade';
 import {ResourceFacade} from './resource.facade';
 
-export type FacadeConfig<T> = {
+export type FacadeConfig = {
+  /** Collection path of the resource (e.g. `/api/books`). */
   url: string;
-  repo?: ResourceRepository<T>;
+  /**
+   * URL Pattern of the resource item IRIs, i.e. the Mercure topics API Platform publishes on.
+   * Default: `{url}/:id`. Relative patterns are resolved against `baseUrl`.
+   */
+  topic?: string;
   realtime?: RealtimePort;
 };
 
 @Injectable({providedIn: 'root'})
 export class FacadeFactory {
-  private readonly env = inject(EnvironmentInjector);
-  private readonly http = inject(HttpClient);
-  private readonly baseUrl = inject(API_BASE_URL);
-  private readonly httpWithCredentials = inject(BRIDGE_HTTP_WITH_CREDENTIALS);
-  private readonly mercure = inject(MercureRealtimeAdapter);
+  private readonly bridge = inject(BridgeFacade);
+  private readonly mercure = inject(MercureHub);
+  /** Mercure topics are absolute URLs: a relative `baseUrl` is resolved against the document base. */
+  private readonly topicBaseUrl = toAbsoluteUrl(inject(API_BASE_URL), inject(DOCUMENT).baseURI);
 
-  /**
-   * Creates a `ResourceFacade<T>`.
-   *
-   * Important: `ResourceFacade` uses `toSignal()`, which requires an injection context.
-   * This factory ensures that by using `runInInjectionContext`.
-   */
-  create<T extends Item>(config: FacadeConfig<T>): ResourceFacade<T> {
-    const url = config.url;
-    const repo = config.repo ?? new ApiPlatformRestRepository<T>(this.http, this.baseUrl, url, this.httpWithCredentials);
-    const realtime = config.realtime ?? this.mercure;
-
-    return runInInjectionContext(this.env, () => new ResourceFacade<T>(repo, realtime));
+  create<T extends Item>(config: FacadeConfig): ResourceFacade<T> {
+    const topic = new ResourceTopic(
+      resolveUrl(this.topicBaseUrl, config.topic ?? `${trimTrailingSlash(config.url)}/:id`),
+      this.topicBaseUrl
+    );
+    return new ResourceFacade<T>(this.bridge, config.url, config.realtime ?? this.mercure, topic);
   }
 }

@@ -1,0 +1,51 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Entity-first contract", "version": "1.0.0"},
+  "paths": {
+    "/api/conversations/{id}": {
+      "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+      "get": {
+        "responses": {
+          "200": {
+            "description": "A conversation with message IRIs",
+            "content": {"application/ld+json": {"schema": {"$ref": "#/components/schemas/Conversation"}}}
+          }
+        }
+      }
+    },
+    "/api/messages/{id}": {
+      "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "integer"}}],
+      "get": {
+        "responses": {
+          "200": {
+            "description": "A message with its conversation IRI",
+            "content": {"application/ld+json": {"schema": {"$ref": "#/components/schemas/Message"}}}
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Conversation": {
+        "type": "object",
+        "required": ["@id", "title", "messages"],
+        "properties": {
+          "@id": {"type": "string", "format": "iri-reference"},
+          "title": {"type": "string"},
+          "description": {"type": ["string", "null"]},
+          "messages": {"type": "array", "items": {"type": "string", "format": "iri-reference"}}
+        }
+      },
+      "Message": {
+        "type": "object",
+        "required": ["@id", "content", "conversation"],
+        "properties": {
+          "@id": {"type": "string", "format": "iri-reference"},
+          "content": {"type": "string"},
+          "conversation": {"type": "string", "format": "iri-reference"}
+        }
+      }
+    }
+  }
+}
