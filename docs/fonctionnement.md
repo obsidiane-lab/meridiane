@@ -17,13 +17,14 @@ Meridiane lit **tous** les schémas du contrat, sans filtre de format. Les forma
 API Platform décrit une ressource plusieurs fois : `Project.jsonld` (lecture JSON-LD), `Project` (corps des requêtes), `Project.multipart`… Les représentations de même forme donnent **un seul modèle** :
 
 ```ts
-export interface Project extends Item {   // Item : '@id', '@type', '@context'
+export interface Project extends Item {   // Item : '@id' et '@type' requis, '@context'
   id?: number;
   name: string;
   archived?: boolean;
 }
 ```
 
+- Un modèle JSON-LD étend `Item` quand le contrat exige `@id` et `@type`, ce qui est le cas de toute ressource API Platform. Les écritures (`Partial<T>`) ne les demandent pas.
 - Une représentation de forme différente garde son propre modèle, suffixé par sa variante (`ErrorJson`, `ProjectMultipart`).
 - Les schémas `Hydra*` sont couverts par `Item` et `Collection<T>`.
 - Les corps `PATCH` (merge-patch) n'ont pas de modèle : ils sont typés `Partial<T>`.

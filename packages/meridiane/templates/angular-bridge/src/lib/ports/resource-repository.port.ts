@@ -10,29 +10,40 @@ export type HttpMethod = BaseHttpMethod | Lowercase<BaseHttpMethod>;
 export type QueryParamValue = string | number | boolean | Array<string | number | boolean>;
 export type AnyQuery = Query | Record<string, QueryParamValue> | HttpParams;
 
+/** A resource read from the API, as described by API Platform's `HydraItemBaseSchema`. */
 export interface Item {
-  '@id'?: Iri;
-  '@context'?: string;
-  '@type'?: string;
+  '@context'?: string | Record<string, unknown>;
+  '@id': Iri;
+  '@type': string;
 }
 
-export interface View extends Item {
-  first?: Iri;
-  last?: Iri;
-  next?: Iri;
-  previous?: Iri;
+/** Pagination of a collection (`view` of `HydraCollectionBaseSchema`). */
+export interface View {
+  '@id'?: Iri;
+  '@type'?: string;
+  first?: Iri | null;
+  last?: Iri | null;
+  previous?: Iri | null;
+  next?: Iri | null;
 }
-export interface IriTemplateMapping extends Item {
-  variable: string;
-  property?: string;
+
+export interface IriTemplateMapping {
+  '@type'?: string;
+  variable?: string;
+  property?: string | null;
   required?: boolean;
 }
-export interface IriTemplate extends Item {
-  template: string;
+
+/** Filters of a collection (`search` of `HydraCollectionBaseSchema`). */
+export interface IriTemplate {
+  '@type'?: string;
+  template?: string;
   variableRepresentation?: string;
-  mapping: IriTemplateMapping[];
+  mapping?: IriTemplateMapping[];
 }
-export interface Collection<T> extends Item {
+
+/** A collection, as described by API Platform's `HydraCollectionBaseSchema`. */
+export interface Collection<T> {
   member: T[];
   totalItems?: number;
   search?: IriTemplate;

@@ -2,10 +2,14 @@ import type {Item} from '../../ports/resource-repository.port';
 import type {MercureSubscription} from '../../ports/realtime.port';
 import {resolveUrl} from '../../utils/url';
 
-/** Payload API Platform publishes on deletion: `{"@id"}`, plus `@type` with `mercure.include_type`. */
+/**
+ * Payload API Platform publishes on deletion: `{"@id"}`, plus `@type` with `mercure.include_type`.
+ * Never a `@context`, unlike a serialized resource: a generated model therefore never matches this type.
+ */
 export interface ResourceDeletion {
   '@id': string;
   '@type'?: string | string[];
+  '@context'?: never;
 }
 
 interface UrlPatternLike {

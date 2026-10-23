@@ -16,6 +16,7 @@ Meridiane 3.0 parle le protocole **Mercure 1.0**. Le hub, le bundle Symfony et l
 | `--formats application/ld+json` | supprimé : le contrat est lu tel quel, les formats se règlent dans `api_platform.formats` |
 | `meridiane dev` sans nom de package | `meridiane dev <packageName>` obligatoire |
 | `Project` et `ProjectLdJson` identiques | un seul modèle `Project` |
+| `Item`, `Collection`, `View` aux clés JSON-LD optionnelles | calqués sur les schémas Hydra du contrat : `Item` exige `@id` et `@type`, `Collection` n'étend plus `Item` |
 
 ## 3. Configuration Angular
 

@@ -74,10 +74,11 @@ inject(FacadeFactory).create<Project>({url: '/api/projects'});
 | Type | Contenu |
 |---|---|
 | `Iri` | `string` : IRI (`/api/projects/1`) ou URL absolue. |
-| `Item` | `{'@id'?, '@type'?, '@context'?}`, base des modèles JSON-LD. |
-| `Collection<T>` | `{member: T[], totalItems?, view?, search?}`. |
+| `Item` | `{'@context'?, '@id', '@type'}` : ressource lue (`HydraItemBaseSchema`), base des modèles JSON-LD. |
+| `Collection<T>` | `{member: T[], totalItems?, search?, view?}` (`HydraCollectionBaseSchema`). |
+| `View` | Pagination de la collection : `{'@id'?, '@type'?, first?, last?, previous?, next?}`. |
 | `Query` | `{page?, itemsPerPage?, filters?}`. `AnyQuery` accepte aussi un objet libre ou des `HttpParams`. |
-| `ResourceDeletion` | `{'@id': string, '@type'?: string \| string[]}`. |
+| `ResourceDeletion` | `{'@id': string, '@type'?: string \| string[]}`, jamais de `@context`. |
 | `isResourceDeletion(payload)` | `true` si le payload ne contient que `@id` (et `@type`). |
 | `RealtimeStatus` | `'closed'` \| `'connecting'` \| `'connected'`. `connected` quand toutes les connexions sont ouvertes. |
 | `RealtimeDiagnostics` | `{status, connections: [{connection, status, url, subscriptions, lastEventId, failures}]}`. |

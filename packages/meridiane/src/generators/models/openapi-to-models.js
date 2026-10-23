@@ -1,7 +1,7 @@
 import {collectInterfaceTypeNames, resolveInterfaceSchema} from './interface-schema.js';
 import {assignTypeNames, resourceTypeName, selectModelSchemas} from './model-selection.js';
 import {parseOpenApiSchemaName} from './oas-schema-name.js';
-import {isObject} from './schema-utils.js';
+import {isObject, schemaNameFromRef} from './schema-utils.js';
 import {createTypeResolver} from './type-resolver.js';
 import {quoteKeyIfNeeded} from './utils.js';
 
@@ -27,6 +27,7 @@ import {quoteKeyIfNeeded} from './utils.js';
  */
 
 const JSON_LD_KEYWORDS = new Set(['@id', '@type', '@context']);
+const HYDRA_SCHEMA = /^Hydra/i;
 
 function createModelBuilder({spec, schemas, schemaNames, typeNames}) {
   const knownTypeNames = new Set(typeNames.values());
@@ -55,8 +56,17 @@ function createModelBuilder({spec, schemas, schemaNames, typeNames}) {
     };
   }
 
-  /** A JSON-LD representation extends the runtime `Item`, which carries `@id`, `@type` and `@context`. */
-  function buildInterface(schema, typeName, extendsTypes, isJsonLd) {
+  /** Whether the Hydra base schema of a representation requires `@id` and `@type`, like the runtime `Item`. */
+  function isHydraItem(raw) {
+    return (raw?.allOf ?? []).some((part) => {
+      const baseName = part?.$ref ? schemaNameFromRef(part.$ref) : undefined;
+      const required = baseName && HYDRA_SCHEMA.test(baseName) ? schemas[baseName]?.required ?? [] : [];
+      return required.includes('@id') && required.includes('@type');
+    });
+  }
+
+  /** A JSON-LD item extends the runtime `Item`, which carries `@id`, `@type` and `@context`. */
+  function buildInterface(schema, typeName, extendsTypes, isJsonLd, extendsItem) {
     const requiredProperties = new Set(schema.required ?? []);
     const dependencies = new Set(extendsTypes);
     const resolver = resolverFor(dependencies);
@@ -75,7 +85,7 @@ function createModelBuilder({spec, schemas, schemaNames, typeNames}) {
       props,
       imports: importsFor(dependencies, typeName),
       extendsTypes,
-      extendsItem: isJsonLd,
+      extendsItem,
     };
   }
 
@@ -96,7 +106,7 @@ function createModelBuilder({spec, schemas, schemaNames, typeNames}) {
     }
 
     const isJsonLd = parseOpenApiSchemaName(schemaName).baseVariant === 'jsonld';
-    return buildInterface(schema, typeName, extendsTypes, isJsonLd);
+    return buildInterface(schema, typeName, extendsTypes, isJsonLd, isJsonLd && isHydraItem(raw));
   };
 }
 
