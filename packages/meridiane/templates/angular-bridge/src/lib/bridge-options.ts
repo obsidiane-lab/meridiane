@@ -21,6 +21,9 @@ export interface BridgeMercureOptions {
    * Obtains the Mercure authorization cookie: an API endpoint called with `GET` (e.g. `/api/mercure/authorization`),
    * or a function. Called before the first connection and after each connection refused by the hub
    * (e.g. expired token), before reconnecting.
+   *
+   * When the endpoint returns (or the function resolves) `{expiresIn: <seconds>}`, the cookie is renewed 5 seconds
+   * before it expires: when the hub ends a connection, the browser reconnects with a valid one.
    */
   authorize?: string | (() => Promise<unknown>);
   /**

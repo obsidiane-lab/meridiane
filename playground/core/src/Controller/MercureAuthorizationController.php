@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\AsController;
@@ -14,7 +15,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Sets the Mercure subscriber cookie. The bridge calls it (`mercure.authorize`) before its first
- * connection and after each connection refused by the hub, e.g. when the token has expired.
+ * connection, and renews it 5 seconds before `expiresIn` elapses: the hub ends each connection before its token
+ * expires, and the browser reconnects with the renewed cookie.
  */
 #[AsController]
 final class MercureAuthorizationController
@@ -36,7 +38,7 @@ final class MercureAuthorizationController
             'urlpattern' => [$baseUrl.'/api/conversations/:id', $baseUrl.'/api/messages/:id'],
         ]);
 
-        $response = new Response(null, Response::HTTP_NO_CONTENT, ['Cache-Control' => 'no-store, private']);
+        $response = new JsonResponse(['expiresIn' => $this->ttl], Response::HTTP_OK, ['Cache-Control' => 'no-store, private']);
         $response->headers->setCookie($this->authorization->createCookie(
             $request,
             [$grant],

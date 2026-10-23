@@ -10,7 +10,7 @@ Tout ce qui est exporté par le bridge (`public-api.ts`).
 | `auth` | `string` \| `{type: 'bearer', token}` \| `{type: 'bearer', getToken}` \| `HttpInterceptorFn` | — | Ajoute l'authentification aux requêtes vers `baseUrl`. `getToken` peut être asynchrone. |
 | `http.withCredentials` | `boolean` | `false` | Cookies sur les requêtes cross-origin. |
 | `mercure.hubUrl` | `string` | — | Active le temps réel. Une URL relative est résolue contre `baseUrl`. |
-| `mercure.authorize` | `string` \| `() => Promise<unknown>` | — | Endpoint (GET) ou fonction qui pose le cookie Mercure, avant la première connexion et après chaque refus. |
+| `mercure.authorize` | `string` \| `() => Promise<unknown>` | — | Endpoint (GET) ou fonction qui pose le cookie Mercure, avant la première connexion et après chaque refus. Une réponse `{expiresIn: secondes}` déclenche le renouvellement 5 secondes avant l'expiration. |
 | `mercure.withCredentials` | `boolean` | `true` | Envoie les cookies au hub. |
 | `mercure.maxUrlLength` | `number` | `4000` | Longueur maximale d'une URL d'abonnement avant d'ouvrir une autre connexion. |
 | `defaults.headers` | `Record<string, string>` | — | En-têtes ajoutés s'ils sont absents. Priment sur `Accept` et `Content-Type` du bridge. |

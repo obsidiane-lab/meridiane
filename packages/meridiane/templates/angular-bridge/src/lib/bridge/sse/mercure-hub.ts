@@ -16,6 +16,8 @@ import {buildSubscribeUrl, subscriptionKey} from './mercure-url';
 
 const RETRY_MIN_DELAY_MS = 1_000;
 const RETRY_MAX_DELAY_MS = 30_000;
+/** Renewal margin before the authorization cookie expires. */
+const RENEW_BEFORE_EXPIRY_MS = 5_000;
 /** Maximum number of `match*` parameters the reference hub accepts in one subscription request. */
 const MAX_MATCHERS = 100;
 const DEFAULT_MAX_URL_LENGTH = 4_000;
@@ -81,6 +83,7 @@ export class MercureHub implements RealtimePort, OnDestroy {
 
   private authorization?: Promise<void>;
   private authorizing = false;
+  private renewTimer?: ReturnType<typeof setTimeout>;
   private destroyed = false;
   private suspended = false;
   private dedicatedSequence = 0;
@@ -154,6 +157,7 @@ export class MercureHub implements RealtimePort, OnDestroy {
   ngOnDestroy(): void {
     this.destroyed = true;
     clearTimeout(this.syncTimer);
+    clearTimeout(this.renewTimer);
     for (const connection of this.connections) this.closeSource(connection);
     this.connections.length = 0;
     this.subscriptions.clear();
@@ -280,7 +284,8 @@ export class MercureHub implements RealtimePort, OnDestroy {
     source.onerror = () => {
       if (connection.source !== source) return;
       if (source.readyState !== EventSource.CLOSED) {
-        // Network interruption: the browser reconnects by itself and sends `Last-Event-ID`.
+        // Network interruption, or the hub ending the stream before the token expires:
+        // the browser reconnects by itself, with `Last-Event-ID` and the current cookie.
         connection.status = 'connecting';
         this.publishDiagnostics();
         return;
@@ -296,6 +301,25 @@ export class MercureHub implements RealtimePort, OnDestroy {
       connection.retryTimer = setTimeout(() => void this.retry(connection), delay);
       this.publishDiagnostics();
     };
+  }
+
+  /**
+   * The hub ends each stream before its token expires, and the browser reconnects by itself with `Last-Event-ID`.
+   * When the authorization endpoint returns `expiresIn`, the cookie is renewed 5 seconds before it expires, so that
+   * reconnections keep carrying a valid token instead of being refused.
+   */
+  private scheduleRenewal(expiresIn: number | undefined): void {
+    clearTimeout(this.renewTimer);
+    if (expiresIn === undefined || this.destroyed) return;
+
+    this.renewTimer = setTimeout(() => {
+      if (this.connections.some((connection) => connection.subscriptions.size > 0)) {
+        void this.authorize('renew');
+      } else {
+        // Nothing open: the next connection asks for a new cookie.
+        this.authorization = undefined;
+      }
+    }, Math.max(expiresIn * 1_000 - RENEW_BEFORE_EXPIRY_MS, RETRY_MIN_DELAY_MS));
   }
 
   private async retry(connection: HubConnection): Promise<void> {
@@ -340,7 +364,9 @@ export class MercureHub implements RealtimePort, OnDestroy {
     const authorization: Promise<void> = (this.authorizing ? this.authorization! : Promise.resolve())
       .then(request)
       .then(
-        () => undefined,
+        (response) => {
+          if (this.authorization === authorization) this.scheduleRenewal(expiresInOf(response));
+        },
         (error: unknown) => this.logger?.warn?.('[Mercure] authorization failed', error)
       )
       .finally(() => {
@@ -406,6 +432,12 @@ function aggregateStatus(statuses: RealtimeStatus[]): RealtimeStatus {
   if (statuses.every((status) => status === 'closed')) return 'closed';
   if (statuses.every((status) => status === 'connected')) return 'connected';
   return 'connecting';
+}
+
+/** `expiresIn` (seconds) of the authorization response, when the endpoint returns it. */
+function expiresInOf(response: unknown): number | undefined {
+  const expiresIn = (response as {expiresIn?: unknown} | null | undefined)?.expiresIn;
+  return typeof expiresIn === 'number' && expiresIn > 0 ? expiresIn : undefined;
 }
 
 function parseJson(raw: string): unknown {

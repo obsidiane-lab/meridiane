@@ -82,12 +82,13 @@ Mercure ne permet pas de modifier un flux ouvert : quand ses abonnements changen
 ### Autorisation
 
 ```text
-première connexion   → GET /api/mercure/authorization → cookie HttpOnly → EventSource
-token expiré         → le hub coupe → reconnexion refusée (401)
-                     → GET /api/mercure/authorization → nouvelle connexion
+première connexion   → GET /api/mercure/authorization → cookie HttpOnly + {"expiresIn": 600} → EventSource
+avant l'expiration   → le hub ferme le flux → le navigateur se reconnecte (Last-Event-ID, cookie courant)
+5 s avant l'échéance → GET /api/mercure/authorization → nouveau cookie
+refus du hub (401)   → GET /api/mercure/authorization → nouvelle connexion
 ```
 
-Avec `mercure.authorize`, le bridge obtient et renouvelle le cookie seul. Le délai entre deux tentatives croît de 1 à 30 secondes.
+Avec `mercure.authorize`, le bridge obtient et renouvelle le cookie seul. Le cookie est `HttpOnly` : seul `expiresIn` lui donne l'échéance. Sans lui, la reconnexion qui suit la fermeture par le hub est refusée, et le bridge renouvelle le cookie après ce refus. Le délai entre deux tentatives croît de 1 à 30 secondes.
 
 ## Ce que le bridge ne fait pas
 

@@ -54,6 +54,7 @@ Côté front : `bridge.watch$({match: '/users/42/notifications'})` ([Temps réel
 Le bridge appelle l'endpoint déclaré dans `mercure.authorize`. Il pose un cookie dont les droits **reflètent ce que l'utilisateur peut lire** : le hub ne livre une update privée qu'aux tokens dont un droit couvre son topic.
 
 ```php
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Mercure\Authorization;
 use Symfony\Component\Mercure\Jwt\Grant;
 
@@ -71,7 +72,8 @@ final class MercureAuthorizationController extends AbstractController
             $topics['urlpattern'] = [$base.'/api/projects/:id'];
         }
 
-        $response = new Response(null, Response::HTTP_NO_CONTENT, ['Cache-Control' => 'no-store, private']);
+        // expiresIn : le bridge renouvelle le cookie avant que le hub ne coupe la connexion.
+        $response = new JsonResponse(['expiresIn' => 600], 200, ['Cache-Control' => 'no-store, private']);
         $response->headers->setCookie($authorization->createCookie(
             $request,
             [new Grant([Grant::ACTION_SUBSCRIBE], $topics)],
@@ -84,7 +86,7 @@ final class MercureAuthorizationController extends AbstractController
 }
 ```
 
-- **Durée courte** (10 min) : le bridge redemande un cookie quand le hub refuse une reconnexion.
+- **Durée courte** (10 min) : le hub ferme chaque connexion avant l'expiration de son token, et le navigateur se reconnecte seul. Avec `expiresIn` (secondes, même valeur que `exp`), le bridge renouvelle le cookie 5 secondes avant son expiration : les reconnexions partent toujours avec un token valide et reprennent avec `Last-Event-ID`. Sans `expiresIn` (réponse 204), la reconnexion est refusée (401) et le bridge renouvelle le cookie après ce refus.
 - **Logout** : renvoyez `$authorization->createClearCookie($request)`.
 - **Utilisateur non connecté** : l'endpoint répond 401. Le bridge réessaie plus tard ; votre intercepteur 401 global doit ignorer cette URL.
 - Le cookie est `HttpOnly`, `SameSite=Strict`, limité au chemin du hub. Il s'appelle `__Secure-mercure_access_token` en HTTPS, et `mercure_access_token` quand `kernel.debug` est actif.

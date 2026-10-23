@@ -102,7 +102,7 @@ await bootstrapApplication(AppComponent, {
 
 **Cookie Mercure.**
 
-- Gardez une durée courte. Avec `mercure.authorize`, le bridge le renouvelle quand le hub refuse une reconnexion, sans minuteur côté application.
+- Gardez une durée courte. Avec `mercure.authorize`, le bridge le renouvelle seul, sans minuteur côté application : 5 secondes avant son expiration si l'endpoint renvoie `expiresIn`, sinon quand le hub refuse une reconnexion.
 - `__Secure-` impose HTTPS. En développement HTTP, utilisez `mercure_access_token` et déclarez `cookie_name mercure_access_token` sur le hub. symfony/mercure-bundle choisit ce nom lorsque `kernel.debug` est actif.
 - Ne mettez jamais de token dans l'URL (le paramètre `authorization` n'existe plus en Mercure 1.0), et ne lisez jamais ce cookie en JavaScript.
 

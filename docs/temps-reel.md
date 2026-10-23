@@ -92,6 +92,8 @@ orders$ = this.bridge.watch$<Order>({match: '/api/orders/:id', type: 'urlpattern
 
 Avec `mercure.authorize`, le bridge appelle l'endpoint avant la première connexion, puis à chaque connexion refusée par le hub (token expiré, droits insuffisants). Rien à faire côté application.
 
+Le hub ferme une connexion avant l'expiration de son token, et le navigateur se reconnecte seul. Si l'endpoint répond `{"expiresIn": 600}`, le bridge renouvelle le cookie 5 secondes avant son expiration : les reconnexions partent avec un token valide et reprennent les événements manqués, sans refus. Voir [Backend](backend.md#autoriser-les-abonnés).
+
 Le hub n'évalue les droits qu'à l'ouverture d'une connexion. Après un login ou un logout **sans rechargement de page** :
 
 ```ts
