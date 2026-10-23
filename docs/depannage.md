@@ -7,10 +7,11 @@ Activez d'abord `debug: true` dans `provideBridge()` et ouvrez `BridgeFacade.rea
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | Statut toujours `closed` | `mercure.hubUrl` absent, ou aucun `watch$()` souscrit | Ajouter `hubUrl` ; vérifier que l'Observable est bien souscrit. |
+| Temps réel absent quand l'application est ouverte sur le port 4200 | La page n'a pas l'origine de l'API et du hub | Ouvrir l'application par FrankenPHP (`https://localhost`) ([Configuration Angular](configuration.md#serveur-de-développement)). |
 | Statut bloqué sur `connecting`, échecs qui augmentent | Le hub refuse la connexion (401, 403, 429 ou 400) | Voir les lignes suivantes ; l'onglet Réseau montre le code de `/.well-known/mercure`. |
 | 401 sur `/.well-known/mercure` | Pas de cookie, cookie expiré ou signé avec une autre clé | Déclarer `mercure.authorize` ; vérifier que `publisher` et `subscriber` du hub utilisent la clé du bundle et le même issuer (`iss`). |
 | 401 malgré un cookie valide | Le hub attend une autre audience (`aud`) que `MERCURE_PUBLIC_URL` : port explicite (`:443`), autre hôte, ou proxy TLS | `MERCURE_PUBLIC_URL` = URL exacte appelée par le navigateur ; derrière un proxy TLS, `resource_identifier` ([Backend](backend.md#derrière-un-proxy-tls)). |
-| Le cookie n'est jamais enregistré (dev HTTP) | Nom en `__Secure-…` sur HTTP | Hub : `cookie_name mercure_access_token` ; Symfony en `kernel.debug`. |
+| 401 en développement, alors que l'endpoint `authorize` pose un cookie | Le bundle en debug pose `mercure_access_token`, le hub attend `__Secure-mercure_access_token` | `MERCURE_EXTRA_DIRECTIVES: cookie_name mercure_access_token` ([Backend](backend.md#composeoverrideyaml-développement)). |
 | Le cookie n'est pas enregistré (API sur un autre domaine) | Réponse cross-origin sans credentials | `http.withCredentials: true` et CORS `Access-Control-Allow-Credentials`. |
 | 400 sur `/.well-known/mercure` | Sélecteur invalide (URL Pattern mal formé) | Corriger le `topic` de la façade ou le `match` de `BridgeFacade.watch$()`. Un sélecteur invalide bloque la connexion qui le porte. |
 | 414 ou 431 | URL d'abonnement trop longue pour un proxy | Baisser `mercure.maxUrlLength`. |
@@ -26,6 +27,7 @@ Activez d'abord `debug: true` dans `provideBridge()` et ouvrez `BridgeFacade.rea
 
 | Symptôme | Cause probable | Solution |
 |---|---|---|
+| 502 sur les pages du front en développement | Le service `front` est arrêté, ou `ng serve` n'écoute pas sur `0.0.0.0` | `docker compose logs front` ; `ng serve --host 0.0.0.0`. |
 | 403 `Invalid CSRF token` sur POST/PATCH/DELETE | En-tête `X-XSRF-TOKEN` absent | Angular ne l'ajoute qu'en même origine (URL relative sur Angular 20) : utiliser `baseUrl: '/'` ; vérifier que le cookie `XSRF-TOKEN` est lisible par JavaScript. |
 | Session non envoyée à l'API | API sur une autre origine | `http.withCredentials: true` et CORS avec credentials, ou passer par un token (`auth`). |
 | `Authorization` absent | Requête hors `baseUrl` | `auth` ne s'applique qu'à `baseUrl` ; pour un autre service, un intercepteur dans `extraInterceptors`. |
@@ -39,4 +41,4 @@ Activez d'abord `debug: true` dans `provideBridge()` et ouvrez `BridgeFacade.rea
 | Deux modèles proches (`Error` et `ErrorJson`) | Deux représentations de forme différente dans le contrat | Normal ; retirer de `api_platform.formats` les formats inutiles. |
 | Un champ attendu manque dans le modèle | Groupes de normalisation de l'opération | Corriger les groupes côté API, puis régénérer. |
 | Un champ est optionnel (`?`) alors qu'il est toujours présent | Le contrat ne le déclare pas requis | Le déclarer requis côté API (contraintes ou `#[ApiProperty(required: true)]`). |
-| `Spec fetch failed` | API arrêtée ou URL fausse | Démarrer l'API ou passer un fichier : `--spec ./openapi.json`. |
+| `Spec fetch failed` | API arrêtée, URL fausse ou certificat local (`https://localhost`) | Passer le fichier exporté par `bin/console api:openapi:export` ([CLI](cli.md#le-contrat-openapi)). |

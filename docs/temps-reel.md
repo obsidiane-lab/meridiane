@@ -57,7 +57,7 @@ Pour une IRI fixe : `this.service.watch$(iri).pipe(takeUntilDestroyed()).subscri
 
 ## Ce que contient un événement
 
-Le payload est la ressource sérialisée par API Platform au moment de l'écriture, avec le contexte de normalisation de l'opération. Pour qu'il puisse remplacer directement l'entrée du store, publiez la même représentation que le GET (mêmes groupes de lecture).
+Le payload est la ressource sérialisée par API Platform au moment de l'écriture. Sans groupes de sérialisation, c'est la représentation du GET : elle remplace directement l'entrée du store.
 
 Les relations restent des IRI. Si l'écran affiche une donnée liée (le nombre de tâches d'un projet), faites publier aussi la ressource parente par le backend, ou rechargez-la.
 

@@ -36,9 +36,10 @@ Les IRI sont utilisées telles quelles. `get$(task.project)` charge le projet li
 ```ts
 this.projects.post$({name: 'Refonte'});                         // POST   /api/projects        application/ld+json
 this.projects.patch$(iri, {archived: true});                    // PATCH  /api/projects/42     application/merge-patch+json
-this.projects.put$(iri, {name: 'Refonte', archived: false});    // PUT    /api/projects/42
 this.projects.delete$(iri);                                     // DELETE /api/projects/42     Observable<void>
 ```
+
+Ce sont les opérations par défaut d'API Platform 5. `put$()` existe aussi, pour une ressource qui déclare l'opération `Put`.
 
 Les corps sont typés `Partial<Project>`. Chaque appel renvoie un Observable froid : rien ne part tant qu'on ne s'y abonne pas, ou qu'on ne passe pas par `firstValueFrom()`.
 

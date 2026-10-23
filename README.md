@@ -1,89 +1,88 @@
 # Meridiane
 
-Meridiane génère, depuis le contrat OpenAPI d'API Platform, une librairie Angular qui
-fournit les modèles TypeScript, le client HTTP et le temps réel Mercure 1.0 de votre API.
-Le bridge gère la connexion ; la gestion des données reste dans votre application.
-
-```ts
-provideBridge({baseUrl: '/', mercure: {hubUrl: '/.well-known/mercure', authorize: '/api/mercure/authorization'}});
-
-const projects = inject(FacadeFactory).create<Project>({url: '/api/projects'});
-projects.getCollection$({page: 1});   // HTTP
-projects.watch$();                    // créations, modifications et suppressions en direct
-```
-
-**[Lire la documentation →](docs/README.md)**
-
 ![CI](https://github.com/obsidiane-lab/meridiane/actions/workflows/ci.yml/badge.svg)
 
-## Organisation du monorepo
+Meridiane connecte une application **Angular** à une API **API Platform**, en HTTP et en temps réel (Mercure).
 
-- `packages/meridiane` : le produit publié, package npm `@obsidiane/meridiane` et CLI de génération
-- `playground` : l'environnement interne utilisé pour développer et valider le générateur
-  - `playground/core` : API Symfony/API Platform + Mercure 1.0
-  - `playground/webfront` : application Angular Foundation qui consomme le bridge local généré
-- `docs` : documentation pour les développeurs qui utilisent le bridge
+Le CLI lit le contrat OpenAPI de l'API et génère une librairie Angular, **le bridge**, qui contient :
 
-Le package publié ne dépend pas du playground. Le playground fournit uniquement un contrat OpenAPI et des scénarios réels pour développer le générateur.
+- les **modèles TypeScript** de vos ressources ;
+- une **façade HTTP** par ressource, aux conventions d'API Platform (JSON-LD, Hydra, merge-patch) ;
+- le **temps réel Mercure 1.0** : créations, modifications et suppressions reçues en direct, avec des connexions partagées et une autorisation par cookie.
 
-## Pré-requis
+Le bridge s'occupe de la communication avec l'API. Les stores, la logique métier et l'affichage restent dans votre application.
 
-- Node.js `>=24.15`
-- npm `>=11`
-- Docker + Docker Compose v2
+## Exemple
 
-## Démarrage local rapide
+Côté API, une entité Doctrine publiée sur Mercure :
 
-1. Installer les dépendances du workspace :
+```php
+#[ORM\Entity]
+#[ApiResource(mercure: true)]
+class Project
+{
+    #[ORM\Id, ORM\GeneratedValue, ORM\Column]
+    private ?int $id = null;
 
-```bash
-npm ci
+    #[ORM\Column]
+    private string $name = '';
+
+    // getters et setters
+}
 ```
 
-2. Démarrer et initialiser le playground Foundation :
+Côté Angular, après génération du bridge :
 
-```bash
-cd playground
-make init
+```ts
+// app.config.ts
+provideBridge({
+  baseUrl: '/',
+  mercure: {hubUrl: '/.well-known/mercure', authorize: '/api/mercure/authorization'},
+});
+
+// project.repository.ts
+const projects = inject(FacadeFactory).create<Project>({url: '/api/projects'});
+
+projects.getCollection$({page: 1});            // Observable<Collection<Project>>
+projects.patch$('/api/projects/42', {name: 'Refonte'});
+projects.watch$();                             // Observable<Project | ResourceDeletion>, en direct
 ```
 
-URLs locales :
-- backend : `http://localhost:8000`
-- docs API : `http://localhost:8000/api/docs`
-- sandbox Angular : `http://localhost:4200`
+## Installation
 
-Le playground n'a pas de compte utilisateur ; l'abonnement Mercure passe par le cookie
-posé par `/api/mercure/authorization`. Il fournit une conversation avec deux messages. Son
-[README](playground/README.md) décrit les scénarios et la génération du bridge local.
+1. **Configurer le backend** : FrankenPHP, hub Mercure, Symfony et API Platform, sur une seule origine. Voir [Backend](docs/backend.md).
+2. **Générer le bridge** depuis le contrat de l'API :
 
-## Utiliser le CLI Meridiane
+   ```bash
+   # dans api/ : exporter le contrat OpenAPI
+   docker compose exec php bin/console api:openapi:export --output=openapi.json
 
-```bash
-# Génération dans le workspace courant (sources locales)
-npx meridiane generate @acme/backend-bridge --spec ./openapi.json
+   # dans front/ : générer le bridge
+   npx @obsidiane/meridiane@3 generate @app/bridge --spec ../api/openapi.json --out bridge
+   ```
 
-# Boucle de dev (build + installation locale dans node_modules)
-npx meridiane dev @acme/backend-bridge --spec http://localhost:8000/api/docs.json
+3. **Brancher le bridge** dans Angular avec `provideBridge()`. Voir [Configuration Angular](docs/configuration.md).
+4. **Utiliser les façades** dans vos repositories. Voir [Démarrage](docs/demarrage.md).
 
-# Build publiable (dist + npm pack)
-npx meridiane build @acme/backend-bridge --version 1.2.3 --spec https://staging.example/api/docs.json
-```
+## Compatibilité
 
-## Scripts utiles (racine)
-
-- `npm run playground:bridge` : régénère le bridge depuis l'export OpenAPI local (`make bridge` réexporte aussi le contrat)
-- `npm run playground:dev` : lance `ng serve` sur le port 4200, en remplacement du conteneur webfront
-- `npm run playground:build` : compile le frontend avec son bridge généré
-
-Les commandes historiques `npm run sandbox:bridge`, `npm run sandbox:dev` et `npm run sandbox:build` restent disponibles avec le même comportement.
-
-Le projet n'utilise aucun test unitaire ; ne pas en ajouter. La validation repose sur
-la compilation, les contrôles de package npm, le lint, PHPStan et des vérifications
-ciblées dans le navigateur selon le périmètre. Le workflow est décrit dans
-[l'architecture du dépôt](docs/contributing/architecture.md#validation).
+| Élément | Version |
+|---|---|
+| Angular | 20, 21 ou 22, avec RxJS 7.8 |
+| API Platform | 5, format JSON-LD |
+| Mercure | hub 1.x (FrankenPHP ≥ 1.13), symfony/mercure-bundle ≥ 0.6 |
+| CLI | Node.js ≥ 24 |
 
 ## Documentation
 
-- [Documentation du bridge](docs/README.md) : démarrage, fonctionnement, configuration, HTTP, temps réel, backend, recettes, référence, CLI, dépannage, migration.
-- Environnement de développement : [playground/README.md](playground/README.md).
-- Architecture interne du générateur : [docs/contributing/architecture.md](docs/contributing/architecture.md).
+**[Lire la documentation →](docs/README.md)**
+
+- [Démarrage](docs/demarrage.md) : générer le bridge, lire une ressource, la suivre en direct.
+- [Backend](docs/backend.md) : la configuration de référence pour FrankenPHP, Mercure, Symfony et API Platform.
+- [Configuration Angular](docs/configuration.md) : `provideBridge()`, serveur de développement, cookies, authentification.
+- [HTTP](docs/http.md) · [Temps réel](docs/temps-reel.md) · [Recettes](docs/recettes.md) · [Référence](docs/reference.md) · [CLI](docs/cli.md) · [Dépannage](docs/depannage.md)
+- [Migrer depuis Meridiane 2.x](docs/migration-3.0.md)
+
+## Contribuer
+
+Le développement de Meridiane lui-même (générateur, runtime, playground) est décrit dans [CONTRIBUTING.md](CONTRIBUTING.md).
