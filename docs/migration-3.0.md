@@ -4,9 +4,9 @@ Meridiane 3.0 parle le protocole **Mercure 1.0**. Le hub, le bundle Symfony et l
 
 ## 1. Backend
 
-1. Passer à symfony/mercure ≥ 0.9 et symfony/mercure-bundle ≥ 0.6. Dans `mercure.yaml`, ajouter `protocol_version: '1.0'` et les claims `iss`, `sub`, `client_id` ([Backend](backend.md#symfonymercure-bundle)).
-2. Passer à un hub Mercure 1.x (FrankenPHP ≥ 1.13). Dans le Caddyfile, remplacer `publisher_jwt` / `subscriber_jwt` par un bloc `issuer`, et retirer `demo`, qui n'existe plus ([Backend](backend.md#hub-mercure)).
-3. Remplacer le cookie `mercureAuthorization` par celui du bundle (`Authorization::createCookie`). Le JWT porte `authorization_details` : remplacer `subscribe: ['*']` par les droits réels de l'utilisateur ([Backend](backend.md#autoriser-les-abonnés)).
+1. Passer à symfony/mercure ≥ 0.9 et symfony/mercure-bundle ≥ 0.6 (protocole 1.0 par défaut). `mercure.yaml` reprend la recette : claims `iss` (`MERCURE_JWT_ISSUER`), `sub` et `client_id` ([Backend](backend.md#symfonymercure-bundle)).
+2. Passer à un hub Mercure 1.x (FrankenPHP ≥ 1.13). Dans le Caddyfile, remplacer `publisher_jwt` / `subscriber_jwt` par un bloc `issuer` qui lit `MERCURE_JWT_ISSUER` et `MERCURE_JWT_SECRET`, et retirer `demo`, qui n'existe plus ([Backend](backend.md#hub-mercure)).
+3. Remplacer le cookie `mercureAuthorization` par celui du bundle (`Authorization::setCookie`). Le JWT porte `authorization_details` : remplacer `subscribe: ['*']` par les droits réels de l'utilisateur, et renvoyer `{"expiresIn": …}` ([Backend](backend.md#autoriser-les-abonnés)).
 4. Supprimer les topics de collection (`'/api/projects'`) : le front écoute la ressource par URL Pattern.
 
 ## 2. Génération

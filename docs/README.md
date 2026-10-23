@@ -17,7 +17,7 @@ Le bridge gère la connexion avec le backend. La gestion des données (stores, r
 | Configurer l'URL de l'API, les cookies, l'authentification, Mercure | [Configuration](configuration.md) |
 | Lire et écrire des ressources | [HTTP](http.md) |
 | Afficher les mises à jour en direct | [Temps réel](temps-reel.md) |
-| Préparer Symfony, API Platform et le hub Mercure | [Backend](backend.md) |
+| Configurer Symfony, API Platform et le hub Mercure (configuration de référence) | [Backend](backend.md) |
 | Partir d'un cas concret | [Recettes](recettes.md) |
 | Retrouver une option ou une méthode | [Référence](reference.md) |
 | Utiliser les commandes du CLI | [CLI](cli.md) |
@@ -29,7 +29,7 @@ Le bridge gère la connexion avec le backend. La gestion des données (stores, r
 | Élément | Version |
 |---|---|
 | Application | Angular 20, 21 ou 22, RxJS 7.8 |
-| API | API Platform 4, format JSON-LD |
+| API | API Platform 5, format JSON-LD ([configuration de référence](backend.md)) |
 | Temps réel | hub Mercure 1.x, symfony/mercure ≥ 0.9, symfony/mercure-bundle ≥ 0.6 |
 | CLI | Node.js ≥ 24 |
 

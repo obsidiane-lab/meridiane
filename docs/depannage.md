@@ -9,6 +9,7 @@ Activez d'abord `debug: true` dans `provideBridge()` et ouvrez `BridgeFacade.rea
 | Statut toujours `closed` | `mercure.hubUrl` absent, ou aucun `watch$()` souscrit | Ajouter `hubUrl` ; vérifier que l'Observable est bien souscrit. |
 | Statut bloqué sur `connecting`, échecs qui augmentent | Le hub refuse la connexion (401, 403, 429 ou 400) | Voir les lignes suivantes ; l'onglet Réseau montre le code de `/.well-known/mercure`. |
 | 401 sur `/.well-known/mercure` | Pas de cookie, cookie expiré ou signé avec une autre clé | Déclarer `mercure.authorize` ; vérifier que `publisher` et `subscriber` du hub utilisent la clé du bundle et le même issuer (`iss`). |
+| 401 malgré un cookie valide | Le hub attend une autre audience (`aud`) que `MERCURE_PUBLIC_URL` : port explicite (`:443`), autre hôte, ou proxy TLS | `MERCURE_PUBLIC_URL` = URL exacte appelée par le navigateur ; derrière un proxy TLS, `resource_identifier` ([Backend](backend.md#derrière-un-proxy-tls)). |
 | Le cookie n'est jamais enregistré (dev HTTP) | Nom en `__Secure-…` sur HTTP | Hub : `cookie_name mercure_access_token` ; Symfony en `kernel.debug`. |
 | Le cookie n'est pas enregistré (API sur un autre domaine) | Réponse cross-origin sans credentials | `http.withCredentials: true` et CORS `Access-Control-Allow-Credentials`. |
 | 400 sur `/.well-known/mercure` | Sélecteur invalide (URL Pattern mal formé) | Corriger le `topic` de la façade ou le `match` de `BridgeFacade.watch$()`. Un sélecteur invalide bloque la connexion qui le porte. |

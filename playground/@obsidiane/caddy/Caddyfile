@@ -26,8 +26,7 @@
 	}
 
 	root * /app/public
-	@compressible not path /.well-known/mercure*
-	encode @compressible zstd br gzip
+	encode zstd br gzip
 	vulcain
 
 	{$CADDY_SERVER_EXTRA_DIRECTIVES}
@@ -37,19 +36,16 @@
 	header X-Content-Type-Options "nosniff"
 
 	mercure {
-		transport bolt {
-			path /data/mercure.db
-		}
-		# symfony/mercure-bundle signe les publications et le cookie abonné avec la même clé.
-		issuer {$MERCURE_JWT_ISSUER:http://localhost:8000} {
+		# Mêmes variables que symfony/mercure-bundle : un émetteur, une clé.
+		issuer {$MERCURE_JWT_ISSUER} {
 			publisher {
-				jwt {env.MERCURE_PUBLISHER_JWT_KEY} HS256
+				jwt {env.MERCURE_JWT_SECRET}
 			}
 			subscriber {
-				jwt {env.MERCURE_PUBLISHER_JWT_KEY} HS256
+				jwt {env.MERCURE_JWT_SECRET}
 			}
 		}
-		# Le préfixe __Secure- exige HTTPS : nom sans préfixe pour le développement en HTTP.
+		# Développement : nom de cookie du bundle en debug, et front servi par `ng serve` sur le port 4200.
 		cookie_name mercure_access_token
 		cors_origins http://localhost:8000 http://localhost:4200
 	}

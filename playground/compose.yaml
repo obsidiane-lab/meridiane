@@ -10,11 +10,12 @@ services:
       APP_DEBUG: '1'
       APP_BASE_URL: http://localhost:8000
       APP_SECRET: meridiane-playground-local
+      DEFAULT_URI: http://localhost:8000
       ALLOWED_ORIGINS: '^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$'
       DATABASE_URL: mysql://app:ChangeMe@database:3306/app?serverVersion=11.8.3-MariaDB&charset=utf8mb4
       MERCURE_URL: http://core/.well-known/mercure
       MERCURE_PUBLIC_URL: http://localhost:8000/.well-known/mercure
-      MERCURE_PUBLISHER_JWT_KEY: '!ChangeThisMercureHubJWTSecretKey!'
+      MERCURE_JWT_SECRET: '!ChangeThisMercureHubJWTSecretKey!'
       MERCURE_JWT_ISSUER: http://localhost:8000
       MERCURE_SUBSCRIBER_TTL: ${MERCURE_SUBSCRIBER_TTL:-600}
     volumes:

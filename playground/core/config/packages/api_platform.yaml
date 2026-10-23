@@ -1,24 +1,9 @@
 api_platform:
     title: Meridiane Playground
     version: 1.0.0
-    use_symfony_listeners: true
-    patch_formats:
-        json: [ "application/merge-patch+json" ]
-        jsonapi: [ "application/vnd.api+json" ]
-    formats:
-        jsonld: [ 'application/ld+json' ]
-        json: [ 'application/json' ]
-        multipart: [ 'multipart/form-data' ]
-    docs_formats:
-        json: [ 'application/json' ]
-        html: [ 'text/html' ]
     defaults:
         stateless: true
         cache_headers:
-            vary: [ 'Content-Type', 'Authorization', 'Origin' ]
-        extra_properties: { }
+            vary: ['Content-Type', 'Authorization', 'Origin']
+        # Le composant table du front choisit la taille des pages (itemsPerPage).
         pagination_client_items_per_page: true
-        pagination_maximum_items_per_page: 100
-        collection:
-            pagination:
-                items_per_page_parameter_name: itemsPerPage
